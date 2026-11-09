@@ -1,0 +1,11 @@
+.DS_Store
+node_modules/
+dist/
+.env
+.env.*
+*.local
+
+# Full copyrighted charts stay on this machine. Titles in the spec are fine.
+chord-sheet-maker-handoff/rebuild_lyrics.py
+chord-sheet-maker-handoff/mockup/index.html
+chord-sheet-maker-handoff/mockup/*.png
