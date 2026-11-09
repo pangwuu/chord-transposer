@@ -1,9 +1,8 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
-import { formatKey, formatSymbol, friendlyCapos, keyFromPitch, normaliseSymbol, notePitch, parseChord, parseKey, shiftKey } from '../domain/chord'
+import { formatKey, formatSymbol, keyFromPitch, normaliseSymbol, notePitch, parseChord, parseKey, shiftKey } from '../domain/chord'
 import {
   addAt,
   addSectionOf,
-  changeLyric,
   checkLine,
   chooseCapo,
   chooseConcert,
@@ -60,6 +59,7 @@ export function App() {
   const [place, setPlace] = useState<'songs' | 'editor' | 'sets' | 'settings' | 'import'>('editor')
   const [showPreview, setShowPreview] = useState(false)
   const [mode, setMode] = useState<'visual' | 'chordpro'>('visual')
+  const [menuOpen, setMenuOpen] = useState(false)
   const [performance, setPerformance] = useState<{ mode: 'stage' | 'projector'; songs: Song[] } | null>(null)
   const [exportOpen, setExportOpen] = useState(false)
   const [songs, setSongs] = useState<Song[]>([])
@@ -344,14 +344,35 @@ export function App() {
             <strong>{editor.song.title}</strong>
             <span className="meta">{status === 'Not saved' ? '· Not saved' : status === 'Saving…' ? '· Saving…' : '· Saved'}</span>
             <span className="grow" />
-            <button className="text-button" type="button" onClick={() => { setEditor(undo(editor)); announce('Undid') }}>Undo</button>
-            <button className="text-button" type="button" onClick={() => { setEditor(redo(editor)); announce('Redid') }}>Redo</button>
-            <button className="text-button" type="button" aria-pressed={mode === 'chordpro'} onClick={() => setMode((value) => value === 'visual' ? 'chordpro' : 'visual')}>{mode === 'visual' ? 'ChordPro' : 'Visual'}</button>
-            <button className="text-button" type="button" onClick={() => { const blob = new Blob([toChordPro(editor.song)], { type: 'text/plain' }); const url = URL.createObjectURL(blob); const link = document.createElement('a'); link.href = url; link.download = `${editor.song.title}.cho`; link.click(); URL.revokeObjectURL(url) }}>.cho</button>
-            <button className="text-button" type="button" onClick={() => { const encoded = encodeShare(editor.song); if (!encoded.ok) { announce('This song is too large for a link'); return } void navigator.clipboard.writeText(`${location.origin}${location.pathname}#${encoded.hash}`); announce('Share link copied') }}>Share</button>
-            <button className="text-button" type="button" onClick={() => view && setPerformance({ mode: 'stage', songs: [view] })}>Stage</button>
-            <button className="text-button" type="button" onClick={() => view && setPerformance({ mode: 'projector', songs: [view] })}>Projector</button>
-            <button className="text-button" type="button" aria-pressed={showPreview} onClick={() => setShowPreview((value) => !value)}>Preview</button>
+            {!phone && (
+              <>
+                <button className="text-button" type="button" onClick={() => { setEditor(undo(editor)); announce('Undid') }}>Undo</button>
+                <button className="text-button" type="button" onClick={() => { setEditor(redo(editor)); announce('Redid') }}>Redo</button>
+                <button className="text-button" type="button" aria-pressed={mode === 'chordpro'} onClick={() => setMode((value) => value === 'visual' ? 'chordpro' : 'visual')}>{mode === 'visual' ? 'ChordPro' : 'Visual'}</button>
+                <button className="text-button" type="button" onClick={() => downloadCho(editor.song)}>.cho</button>
+                <button className="text-button" type="button" onClick={() => copyShare(editor.song, announce)}>Share</button>
+                <button className="text-button" type="button" onClick={() => view && setPerformance({ mode: 'stage', songs: [view] })}>Stage</button>
+                <button className="text-button" type="button" onClick={() => view && setPerformance({ mode: 'projector', songs: [view] })}>Projector</button>
+                <button className="text-button" type="button" aria-pressed={showPreview} onClick={() => setShowPreview((value) => !value)}>Preview</button>
+              </>
+            )}
+            {phone && (
+              <div className="editor-bar-phone">
+                <button className="text-button" type="button" aria-pressed={showPreview} onClick={() => setShowPreview((value) => !value)}>Preview</button>
+                <button className="text-button" type="button" aria-label="More actions" aria-expanded={menuOpen} aria-haspopup="menu" onClick={() => setMenuOpen((open) => !open)}>Menu</button>
+                {menuOpen && (
+                  <div className="menu editor-menu" role="menu">
+                    <button type="button" role="menuitem" onClick={() => { setEditor(undo(editor)); announce('Undid'); setMenuOpen(false) }}>Undo</button>
+                    <button type="button" role="menuitem" onClick={() => { setEditor(redo(editor)); announce('Redid'); setMenuOpen(false) }}>Redo</button>
+                    <button type="button" role="menuitem" onClick={() => { setMode((value) => value === 'visual' ? 'chordpro' : 'visual'); setMenuOpen(false) }}>{mode === 'visual' ? 'ChordPro' : 'Visual'}</button>
+                    <button type="button" role="menuitem" onClick={() => { downloadCho(editor.song); setMenuOpen(false) }}>.cho</button>
+                    <button type="button" role="menuitem" onClick={() => { copyShare(editor.song, announce); setMenuOpen(false) }}>Share</button>
+                    <button type="button" role="menuitem" onClick={() => { if (view) setPerformance({ mode: 'stage', songs: [view] }); setMenuOpen(false) }}>Stage</button>
+                    <button type="button" role="menuitem" onClick={() => { if (view) setPerformance({ mode: 'projector', songs: [view] }); setMenuOpen(false) }}>Projector</button>
+                  </div>
+                )}
+              </div>
+            )}
           </header>
           <div className="transport">
             <button className="outline" type="button" aria-label="Key down a semitone" onClick={() => setEditor(stepConcert(editor, -1))}>−</button>
@@ -400,11 +421,6 @@ export function App() {
                 })}
               </div>
               {editor.capo > 0 && <p className="capo-banner">Capo {editor.capo} · showing {formatKey(shapeKey).replace(/m$/, '')} shapes · sounds in {formatKey(editor.concert)}</p>}
-              <div className="chips">
-                {friendlyCapos(editor.concert).filter((item) => item.capo > 0).map((item) => (
-                  <button key={item.shapes} className="chip" type="button" onClick={() => setEditor(chooseCapo(editor, item.capo))}>Capo {item.capo} · {item.shapes}</button>
-                ))}
-              </div>
               <Chart
                 song={mode === 'chordpro' ? editor.song : settings.normalise ? mapSymbols(view, normaliseSymbol) : view}
                 shapeKey={mode === 'chordpro' ? editor.song.originalKey : shapeKey}
@@ -418,7 +434,6 @@ export function App() {
                   setFocusSignal((value) => value + 1)
                   announce('Chord added')
                 }}
-                onLyric={(lineId, text) => setEditor(changeLyric(editor, lineId, text))}
                 onCheck={(lineId) => setEditor(checkLine(editor, lineId))}
                 onRename={(sectionId, label) => setEditor(renameSectionOf(editor, sectionId, label))}
                 onDuplicate={(sectionId) => setEditor(duplicateSectionOf(editor, sectionId))}
@@ -457,7 +472,7 @@ export function App() {
       {place === 'import' && <main className="editor"><ImportScreen onCancel={() => setPlace('editor')} onSave={(song) => { void library.current.saveSong(song); setSongs((current) => [song, ...current.filter((item) => item.id !== song.id)]); const opened = openEditor(song); setEditor({ ...opened, prefs: settings.prefs }); setPlace('editor') }} /></main>}
       {place === 'sets' && <main className="editor"><SetlistScreen songs={songs} setlists={setlists} onCreate={() => { const setlist: Setlist = { id: crypto.randomUUID(), name: 'Sunday', date: new Date().toISOString().slice(0, 10), entries: [] }; setSetlists((current) => [...current, setlist]); void library.current.saveSetlist(setlist) }} onChange={(setlist) => { setSetlists((current) => current.map((item) => item.id === setlist.id ? setlist : item)); void library.current.saveSetlist(setlist) }} onDelete={(id) => { setSetlists((current) => current.filter((item) => item.id !== id)); void library.current.deleteSetlist(id) }} onExport={(setlist, rightHand) => void exportSetlist(setlist, rightHand)} onStage={(setlist) => { const ordered = setlist.entries.flatMap((entry) => { const song = songs.find((item) => item.id === entry.songId); return song ? [displayedSong(song, entry.key ?? song.originalKey, entry.capo ?? 0, settings.prefs)] : [] }); if (ordered.length > 0) setPerformance({ mode: 'stage', songs: ordered }) }} /></main>}
       {place === 'settings' && <main className="editor"><SettingsScreen settings={settings} onChange={(next) => { setSettings(next); void library.current.saveSettings(next); document.documentElement.dataset.theme = next.theme === 'system' ? '' : next.theme; document.documentElement.dataset.size = next.textSize; try { localStorage.setItem('csm-theme', next.theme) } catch { /* ignore */ } setEditor((state) => state && { ...state, prefs: next.prefs, concert: keyFromPitch(notePitch(state.concert.tonic), state.concert.mode, next.prefs) }) }} onBackup={() => { const backup: BackupFile = { version: 1, songs, setlists, settings }; const blob = new Blob([JSON.stringify(backup, null, 2)], { type: 'application/json' }); const url = URL.createObjectURL(blob); const link = document.createElement('a'); link.href = url; link.download = 'chord-sheet-backup.json'; link.click(); URL.revokeObjectURL(url) }} onRestore={(file) => void restoreBackup(file)} /></main>}
-      {place === 'editor' && layout && <PreviewPane layout={layout} onExport={() => setExportOpen(true)} />}
+      {place === 'editor' && layout && <PreviewPane layout={layout} onExport={() => setExportOpen(true)} onBack={phone ? () => setShowPreview(false) : undefined} />}
       {exportOpen && layout && <ExportDialog layout={layout} choices={pdfChoices} onChange={setPdfChoices} onClose={() => setExportOpen(false)} onDownload={() => void exportPdf()} />}
       {performance?.mode === 'stage' && <StageView songs={performance.songs} onExit={() => setPerformance(null)} />}
       {performance?.mode === 'projector' && performance.songs[0] && <ProjectorView song={performance.songs[0]} onExit={() => setPerformance(null)} />}
@@ -475,6 +490,26 @@ export function App() {
       )}
     </div>
   )
+}
+
+function downloadCho(song: Song) {
+  const blob = new Blob([toChordPro(song)], { type: 'text/plain' })
+  const url = URL.createObjectURL(blob)
+  const link = document.createElement('a')
+  link.href = url
+  link.download = `${song.title}.cho`
+  link.click()
+  URL.revokeObjectURL(url)
+}
+
+function copyShare(song: Song, announce: (message: string) => void) {
+  const encoded = encodeShare(song)
+  if (!encoded.ok) {
+    announce('This song is too large for a link')
+    return
+  }
+  void navigator.clipboard.writeText(`${location.origin}${location.pathname}#${encoded.hash}`)
+  announce('Share link copied')
 }
 
 function DetailField({ label, value, onCommit, className = 'field' }: { label: string; value: string; onCommit: (value: string) => void; className?: string }) {

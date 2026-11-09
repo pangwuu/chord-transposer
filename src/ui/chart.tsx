@@ -29,7 +29,6 @@ export function Chart({
   readOnly,
   onSelect,
   onAdd,
-  onLyric,
   onCheck,
   onRename,
   onDuplicate,
@@ -51,7 +50,6 @@ export function Chart({
   readOnly: boolean
   onSelect: (id: string | null, shift?: boolean) => void
   onAdd: (lineId: string, index: number) => void
-  onLyric: (lineId: string, text: string) => void
   onCheck: (lineId: string) => void
   onRename: (sectionId: string, label: string) => void
   onDuplicate: (sectionId: string) => void
@@ -66,7 +64,6 @@ export function Chart({
   onEdit: (id: string) => void
   onDelete: () => void
 }) {
-  const [editing, setEditing] = useState<string | null>(null)
   const [dragging, setDragging] = useState(false)
   const [caret, setCaret] = useState<{ lineId: string; index: number } | null>(null)
   const [sectionMenu, setSectionMenu] = useState(false)
@@ -84,8 +81,22 @@ export function Chart({
                 <button className="text-button" type="button" aria-label={`Move ${section.label} down`} onClick={() => onMoveSection(section.id, 1)}>Down</button>
                 <button className="text-button" type="button" onClick={() => onDuplicate(section.id)}>Duplicate</button>
                 <button className="text-button" type="button" onClick={() => onDeleteSection(section.id)}>Delete</button>
-                <button className="text-button" type="button" onClick={() => setLineDraft({ id: section.id, kind: 'comment' })}>Comment</button>
-                <button className="text-button" type="button" onClick={() => setLineDraft({ id: section.id, kind: 'bars' })}>Bars</button>
+                <button
+                  className="text-button"
+                  type="button"
+                  aria-pressed={lineDraft?.id === section.id && lineDraft.kind === 'comment'}
+                  onClick={() => setLineDraft((current) => current?.id === section.id && current.kind === 'comment' ? null : { id: section.id, kind: 'comment' })}
+                >
+                  Comment
+                </button>
+                <button
+                  className="text-button"
+                  type="button"
+                  aria-pressed={lineDraft?.id === section.id && lineDraft.kind === 'bars'}
+                  onClick={() => setLineDraft((current) => current?.id === section.id && current.kind === 'bars' ? null : { id: section.id, kind: 'bars' })}
+                >
+                  Bars
+                </button>
               </span>
             )}
           </div>
@@ -163,10 +174,6 @@ export function Chart({
                 </div>
                 {line.needsCheck && (
                   <p className="check-line">Chords on this line moved with the words. <button type="button" onClick={() => onCheck(line.id)}>Checked</button></p>
-                )}
-                {!readOnly && editing !== line.id && <button className="text-button" type="button" onClick={() => setEditing(line.id)}>Edit lyric</button>}
-                {editing === line.id && (
-                  <input className="lyric-edit" aria-label="Lyric line" defaultValue={line.text} onBlur={(event) => { onLyric(line.id, event.target.value); setEditing(null) }} onKeyDown={(event) => { if (event.key === 'Enter') event.currentTarget.blur() }} />
                 )}
               </div>
             )

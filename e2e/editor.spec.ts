@@ -29,7 +29,12 @@ test('nudges, adds, edits, deletes, and replaces chords', async ({ page }) => {
 
 test('shows ChordPro beside the chart and opens import review', async ({ page }, testInfo) => {
   await page.goto('/')
-  await page.getByRole('button', { name: 'ChordPro' }).click()
+  if (testInfo.project.name === 'mobile') {
+    await page.getByRole('button', { name: 'More actions' }).click()
+    await page.getByRole('menuitem', { name: 'ChordPro' }).click()
+  } else {
+    await page.getByRole('button', { name: 'ChordPro' }).click()
+  }
   await expect(page.getByLabel('ChordPro source')).toBeVisible()
   await expect(page.getByRole('button', { name: /^Chord / }).first()).toBeVisible()
   if (testInfo.project.name === 'mobile') await page.getByRole('button', { name: 'Songs' }).click()

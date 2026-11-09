@@ -8,6 +8,11 @@ async function songs(page: Page, project: string) {
   if (mobile(project)) await page.getByRole('button', { name: 'Songs' }).click()
 }
 
+async function editorAction(page: Page, project: string, name: string | RegExp) {
+  if (mobile(project)) await page.getByRole('button', { name: 'More actions' }).click()
+  await page.getByRole(mobile(project) ? 'menuitem' : 'button', { name }).click()
+}
+
 test('transposes, shows capo shapes, and numbers the chords', async ({ page }) => {
   await page.goto('/')
   await expect(page.getByLabel('Title')).toHaveValue('Amazing Grace')
@@ -45,7 +50,12 @@ test('drags a chord along the lyric on a wide screen', async ({ page }, testInfo
 
 test('adds a comment, a bar line, and an arrangement repeat', async ({ page }) => {
   await page.goto('/')
-  await page.getByRole('button', { name: 'Comment' }).first().click()
+  const comment = page.getByRole('button', { name: 'Comment' }).first()
+  await comment.click()
+  await expect(page.getByLabel('Comment')).toBeVisible()
+  await comment.click()
+  await expect(page.getByLabel('Comment')).toHaveCount(0)
+  await comment.click()
   await page.getByLabel('Comment').fill('Build')
   await page.getByLabel('Comment').press('Enter')
   await expect(page.locator('.comment').filter({ hasText: 'Build' })).toBeVisible()
@@ -57,16 +67,16 @@ test('adds a comment, a bar line, and an arrangement repeat', async ({ page }) =
   await expect(page.getByRole('button', { name: 'Verse 1 ×2' })).toBeVisible()
 })
 
-test('keeps a ChordPro edit and the chart in sync', async ({ page }) => {
+test('keeps a ChordPro edit and the chart in sync', async ({ page }, testInfo) => {
   await page.goto('/')
-  await page.getByRole('button', { name: 'ChordPro' }).click()
+  await editorAction(page, testInfo.project.name, 'ChordPro')
   const source = page.getByLabel('ChordPro source')
   await expect(source).toBeVisible()
   await expect(page.getByRole('button', { name: /^Chord / }).first()).toBeVisible()
   await source.fill('{title: Kitchen}\n{key: C}\n[C]Hello there\n')
   await expect(page.getByLabel('Title')).toHaveValue('Kitchen')
   await expect(page.getByRole('button', { name: /Chord C / }).first()).toBeVisible()
-  await page.getByRole('button', { name: 'Visual' }).click()
+  await editorAction(page, testInfo.project.name, 'Visual')
   await expect(source).toHaveCount(0)
 })
 
@@ -82,7 +92,10 @@ test('reviews an import and saves it into the library', async ({ page }, testInf
 
 test('changes the PDF paper and fit from the export dialog', async ({ page }, testInfo) => {
   await page.goto('/')
-  if (mobile(testInfo.project.name)) await page.getByRole('button', { name: 'Preview' }).click()
+  if (mobile(testInfo.project.name)) {
+    await page.getByRole('button', { name: 'Preview' }).click()
+    await expect(page.getByRole('button', { name: 'Back' })).toBeVisible()
+  }
   await page.getByRole('button', { name: 'Export PDF' }).click()
   const dialog = page.getByRole('dialog')
   await expect(dialog).toContainText('Amazing Grace - G.pdf')
@@ -91,17 +104,21 @@ test('changes the PDF paper and fit from the export dialog', async ({ page }, te
   await expect(dialog).toContainText('1 page')
   await page.getByRole('button', { name: 'Cancel' }).click()
   await expect(dialog).toHaveCount(0)
+  if (mobile(testInfo.project.name)) {
+    await page.getByRole('button', { name: 'Back' }).click()
+    await expect(page.getByLabel('Title')).toBeVisible()
+  }
 })
 
-test('steps a projector slide and leaves the stage', async ({ page }) => {
+test('steps a projector slide and leaves the stage', async ({ page }, testInfo) => {
   await page.goto('/')
-  await page.getByRole('button', { name: 'Projector' }).click()
+  await editorAction(page, testInfo.project.name, 'Projector')
   await expect(page.locator('.projector')).toContainText('Amazing grace')
   await page.keyboard.press('ArrowRight')
   await expect(page.locator('.projector')).toContainText('grace that taught')
   await page.getByRole('button', { name: 'Exit' }).click()
   await expect(page.locator('.projector')).toHaveCount(0)
-  await page.getByRole('button', { name: 'Stage' }).click()
+  await editorAction(page, testInfo.project.name, 'Stage')
   await expect(page.locator('.stage')).toContainText('Amazing grace')
   await page.getByRole('button', { name: 'Next section' }).click()
   await page.getByRole('button', { name: 'Exit' }).click()
@@ -137,14 +154,20 @@ test('switches theme and finds a song from the library', async ({ page }, testIn
   await expect(page.getByLabel('Title')).toHaveValue('Untitled song')
 })
 
-test('copies a share link and downloads a ChordPro file', async ({ page }) => {
+test('copies a share link and downloads a ChordPro file', async ({ page }, testInfo) => {
   await page.goto('/')
   await page.context().grantPermissions(['clipboard-read', 'clipboard-write'])
-  await page.getByRole('button', { name: 'Share' }).click()
+  await editorAction(page, testInfo.project.name, 'Share')
   await expect(page.getByRole('status')).toContainText('Share link copied')
   const link = await page.evaluate(() => navigator.clipboard.readText())
   expect(link).toContain('#1.')
   const download = page.waitForEvent('download')
-  await page.getByRole('button', { name: '.cho' }).click()
+  await editorAction(page, testInfo.project.name, '.cho')
   expect((await download).suggestedFilename()).toBe('Amazing Grace.cho')
+})
+
+test('does not show capo chips or per-line Edit lyric', async ({ page }) => {
+  await page.goto('/')
+  await expect(page.getByRole('button', { name: /Capo \d+ ·/ })).toHaveCount(0)
+  await expect(page.getByRole('button', { name: 'Edit lyric' })).toHaveCount(0)
 })

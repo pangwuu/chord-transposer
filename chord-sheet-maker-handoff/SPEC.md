@@ -193,7 +193,7 @@ The PDF must be readable at a distance on a music stand, with pages laid side by
 - **Stage view:** large text, dark mode, adjustable autoscroll speed, screen wake lock, tap to jump to the next section; uses the setlist order.
 - **Projector view:** lyrics only, large, one section per screen, arrow keys to advance.
 - **Setlists:** name, date, ordered songs, key and capo per song, notes; export as one PDF; step through on stage.
-- **Sharing:** export a song or setlist as a file, and a read-only share link that encodes the song in the URL (compressed), so band members can open it without an account.
+- **Sharing:** export a song or setlist as a file, and a share link that encodes the song in the URL (compressed). Opening the link imports an editable local copy into the recipient's library (no account). For view-only handoff, export a PDF instead.
 
 ---
 

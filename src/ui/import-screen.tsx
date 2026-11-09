@@ -40,7 +40,6 @@ export function ImportScreen({ onCancel, onSave }: { onCancel: () => void; onSav
               readOnly
               onSelect={() => {}}
               onAdd={() => {}}
-              onLyric={() => {}}
               onCheck={() => {}}
               onRename={() => {}}
               onDuplicate={() => {}}
