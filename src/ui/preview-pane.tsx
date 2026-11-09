@@ -26,7 +26,7 @@ export function PreviewPane({ layout, onExport, onBack }: { layout: PdfDocument;
       </div>
       <div className="preview-scroll" ref={scrollRef}>
         {layout.pages.map((page, index) => {
-          const scale = paneWidth > 0 ? Math.min(0.62, (paneWidth - 24) / page.width) : 0.62
+          const scale = paneWidth > 0 ? Math.min(1, (paneWidth - 24) / page.width) : 1
           return (
             <div key={page.pageLabel}>
               <p className="meta" style={{ textAlign: 'center' }}>Page {index + 1}</p>

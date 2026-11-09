@@ -43,20 +43,7 @@ export function Inspector({
 
   const used = chordsUsed(song)
   const suggestions = suggestionsFor(shapeKey)
-  if (!selected || !found) {
-    return (
-      <aside className="inspector">
-        <h2>Song</h2>
-        <p className="hint">Select a chord to edit it. Click a letter to add one. Arrow keys nudge the selection.</p>
-        <h3>Used in this song</h3>
-        <div className="tiles">
-          {used.map((chord) => (
-            <span className="chip" key={chord.label}>{chord.label} {chord.count}</span>
-          ))}
-        </div>
-      </aside>
-    )
-  }
+  if (!selected || !found) return null
 
   const parsed = parseChord(draft)
   const line = found.line.type === 'lyric' ? found.line : null
