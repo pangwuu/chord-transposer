@@ -30,9 +30,20 @@ function isRest(token: string): boolean {
   return token === '-' || token === '/' || token === 'x' || token === '|'
 }
 
+function isChordToken(token: string): boolean {
+  if (isRest(token) || parseChord(token).kind !== 'invalid') return true
+  return /^[A-GH](?:#|b)?(?:maj|min|dim|aug|sus|add|m|M)?\d*$/i.test(token)
+}
+
 function isChordish(line: string): boolean {
   const tokens = chordTokens(line).filter((token) => token !== '|')
-  return tokens.length > 0 && tokens.every((token) => isRest(token) || parseChord(token).kind !== 'invalid')
+  return tokens.length > 0 && tokens.every((token) => isChordToken(token))
+}
+
+function beatsPerBar(timeSignature?: string): number {
+  const match = timeSignature?.match(/^(\d+)\s*\//)
+  const beats = match ? Number(match[1]) : 4
+  return Number.isFinite(beats) && beats > 0 ? beats : 4
 }
 
 function isHeading(line: string): boolean {
@@ -107,9 +118,12 @@ function parsePlain(text: string, ids: IdGen): Song {
     return section
   }
   const flush = () => {
+    if (pending) {
+      ensure().lines.push(barsFromChordLine(pending.chordLine, ids, beatsPerBar(song.timeSignature)))
+      pending = null
+    }
     if (open && section) section.lines.push(open)
     open = null
-    pending = null
   }
   const lines = text.split(/\r?\n/)
   for (const rawLine of lines) {
@@ -136,13 +150,16 @@ function parsePlain(text: string, ids: IdGen): Song {
       continue
     }
     if (isChordish(line)) {
+      if (pending) ensure().lines.push(barsFromChordLine(pending.chordLine, ids, beatsPerBar(song.timeSignature)))
       const tokens = chordTokens(line)
       pending = { raw: tokens[0], columns: tokens.length > 1, chordLine: rawLine.replace(/\s+$/, '') }
       continue
     }
     if (pending?.columns) {
       const chordLine = pending.chordLine
-      flush()
+      pending = null
+      if (open && section) section.lines.push(open)
+      open = null
       ensure().lines.push(alignColumns(chordLine, line, ids))
       continue
     }
@@ -208,6 +225,17 @@ function alignColumns(chordLine: string, lyric: string, ids: IdGen): LyricLine {
     })
   }
   return { id: ids(), type: 'lyric', text: lyric, chords, needsCheck: false }
+}
+
+function barsFromChordLine(raw: string, ids: IdGen, beats: number): import('./song').BarLine {
+  if (raw.includes('|')) return parseBars(raw, ids)
+  const tokens = chordTokens(raw)
+  if (tokens.some((token) => isRest(token))) {
+    const groups: string[] = []
+    for (let index = 0; index < tokens.length; index += beats) groups.push(tokens.slice(index, index + beats).join(' '))
+    return parseBars(`| ${groups.join(' | ')} |`, ids)
+  }
+  return parseBars(`| ${tokens.join(' | ')} |`, ids)
 }
 
 function parseBars(raw: string, ids: IdGen): import('./song').BarLine {

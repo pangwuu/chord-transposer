@@ -3,7 +3,7 @@ import { describe, expect, it } from 'vitest'
 import { PDFDocument } from 'pdf-lib'
 import { formatKey, formatSymbol, parseChord, parseKey } from './chord'
 import { applyRestore, planRestore } from './backup'
-import { addAt, addBarsOf, addCommentOf, addSectionOf, applyChordProOf, changeLyric, checkLine, deleteSectionOf, duplicateSectionOf, moveSectionOf, nudge, openEditor, placeSectionOf, removeSelected, renameSectionOf, repeatArrangementOf, saveConcertAsSongKey, setChordText, setSongDetails, stepConcert, undo, viewSong, chooseCapo } from './editor'
+import { addAt, addBarChordOf, addBarsOf, addCommentOf, addSectionOf, applyChordProOf, changeLyric, checkLine, deleteSectionOf, duplicateSectionOf, moveSectionOf, nudge, openEditor, placeSectionOf, removeSelected, renameSectionOf, repeatArrangementOf, saveConcertAsSongKey, setChordText, setSongDetails, stepConcert, undo, viewSong, chooseCapo } from './editor'
 import { amazingGrace, firstLight } from '../fixtures/charts'
 import { chordTextFromPdfItems, importText } from './import-text'
 import { padCollisions } from './line-layout'
@@ -12,7 +12,7 @@ import { formatLyric, fromChordPro, toChordPro } from './chordpro'
 import { layoutPdf, SECTION_LEAD_IN } from './pdf-layout'
 import { renderPdf, rightHandParts, mergePdfs } from './pdf-render'
 import { decodeShare, encodeShare } from './share'
-import { emptySong, idSequence, performance, type Song } from './song'
+import { addBarChord, emptySong, idSequence, performance, type Song } from './song'
 
 const ids = idSequence('test')
 
@@ -90,6 +90,53 @@ describe('plain import', () => {
     expect(line.type).toBe('lyric')
     if (line.type !== 'lyric') return
     expect(line.chords[1].symbol).toEqual({ kind: 'invalid', raw: 'H7' })
+  })
+
+  it('keeps a chord line with no lyric as one bar per chord', () => {
+    const result = importText('Intro\nG    D    Em    C\n\nVerse 1\nG                D\nMorning on the kitchen table\n', idSequence('inst'))
+    expect(result.song.sections.map((section) => section.label)).toEqual(['Intro', 'Verse 1'])
+    expect(symbolsIn(result.song.sections[0])).toEqual(['G', 'bar', 'D', 'bar', 'Em', 'bar', 'C'])
+    const verse = result.song.sections[1].lines[0]
+    expect(verse.type).toBe('lyric')
+    if (verse.type !== 'lyric') return
+    expect(verse.text).toBe('Morning on the kitchen table')
+    expect(verse.chords.map((chord) => chord.index)).toEqual([0, 17])
+  })
+
+  it('keeps rests on a lyric-less line and groups them into bars of four', () => {
+    const result = importText('C - - - F/A - - -\n', idSequence('rests'))
+    expect(symbolsIn(result.song.sections[0])).toEqual(['C', 'rest', 'rest', 'rest', 'bar', 'F/A', 'rest', 'rest', 'rest'])
+  })
+
+  it('keeps an unrecognised chord on a lyric-less line', () => {
+    const result = importText('G H7 D\n', idSequence('badbar'))
+    expect(symbolsIn(result.song.sections[0])).toEqual(['G', 'bar', 'H7', 'bar', 'D'])
+    expect(result.issues.map((issue) => issue.raw)).toContain('H7')
+  })
+})
+
+describe('bar chords', () => {
+  it('appends the previous bar chord, or the key chord when the section has no line', () => {
+    const song = fromChordPro('{title: Demo}\n{key: G}\n{start_of_part: Intro}\n| G | D |\n{end_of_part}\n{start_of_part: Instrumental}\n{end_of_part}', idSequence('addbar'))
+    const intro = song.sections[0]
+    const bars = intro.lines[0]
+    if (bars.type !== 'bars') throw new Error('missing bars')
+    let state = addBarChordOf(openEditor(song), intro.id, bars.id)
+    expect(symbolsIn(state.song.sections[0])).toEqual(['G', 'bar', 'D', 'bar', 'D'])
+    state = undo(state)
+    expect(symbolsIn(state.song.sections[0])).toEqual(['G', 'bar', 'D'])
+    const started = addBarChord(state.song, song.sections[1].id, null)
+    expect(symbolsIn(started.sections[1])).toEqual(['G'])
+  })
+})
+
+describe('chord-only brackets', () => {
+  it('turns a bracket line with no words into one bar per chord', () => {
+    const song = fromChordPro('{title: Intro}\n{key: G}\n[G] [D] [Em] [C]\n', idSequence('brackets'))
+    expect(symbolsIn(song.sections[0])).toEqual(['G', 'bar', 'D', 'bar', 'Em', 'bar', 'C'])
+    expect(toChordPro(song)).toContain('| G | D | Em | C |')
+    const line = fromChordPro('{title: Intro}\n{key: G}\n[G]Hello\n', idSequence('word')).sections[0].lines[0]
+    expect(line.type).toBe('lyric')
   })
 })
 
@@ -378,14 +425,16 @@ function textOf(song: Song): string {
   return song.sections.flatMap((section) => section.lines).map((line) => (line.type === 'lyric' ? line.text : line.type === 'comment' ? line.text : 'bars')).join('\n')
 }
 
+function symbolsIn(section: Song['sections'][number]): string[] {
+  return section.lines.flatMap((line) => {
+    if (line.type === 'lyric') return line.chords.map((chord) => `${formatSymbol(chord.symbol)}@${chord.index}`)
+    if (line.type === 'bars') return line.items.map((item) => (item.kind === 'chord' ? formatSymbol(item.symbol) : item.kind))
+    return []
+  })
+}
+
 function symbolsOf(song: Song): string[] {
-  return song.sections.flatMap((section) =>
-    section.lines.flatMap((line) => {
-      if (line.type === 'lyric') return line.chords.map((chord) => `${formatSymbol(chord.symbol)}@${chord.index}`)
-      if (line.type === 'bars') return line.items.map((item) => (item.kind === 'chord' ? formatSymbol(item.symbol) : item.kind))
-      return []
-    }),
-  )
+  return song.sections.flatMap((section) => symbolsIn(section))
 }
 
 function verseOf(lines: number): Song {

@@ -46,6 +46,12 @@ function parseBracketLine(line: string, ids: IdGen): LyricLine {
   return { id: ids(), type: 'lyric', text, chords, needsCheck: false }
 }
 
+function barsForChordOnly(line: LyricLine, ids: IdGen): LyricLine | BarLine {
+  if (line.chords.length === 0 || /[A-Za-z0-9]/.test(line.text)) return line
+  const names = [...line.chords].sort((a, b) => a.index - b.index).map((chord) => formatSymbol(chord.symbol))
+  return parseBarLine(`| ${names.join(' | ')} |`, ids)
+}
+
 function isBarLine(line: string): boolean {
   if (!line.includes('|')) return false
   const tokens = line.split(/[\s|]+/).filter(Boolean)
@@ -138,7 +144,7 @@ export function fromChordPro(text: string, ids: IdGen = createId): Song {
       }
       continue
     }
-    ensure().lines.push(isBarLine(line) ? parseBarLine(line, ids) : parseBracketLine(line, ids))
+    ensure().lines.push(isBarLine(line) ? parseBarLine(line, ids) : barsForChordOnly(parseBracketLine(line, ids), ids))
   }
   if (song.sections.length === 0) return emptySong({ title: song.title, originalKey: song.originalKey, artist: song.artist }, ids)
   return song

@@ -1,6 +1,7 @@
 import { parseChord, shiftKey, type Key, type SpellingPrefs, DEFAULT_PREFS } from './chord'
 import { fromChordPro } from './chordpro'
 import {
+  addBarChord,
   addChord,
   addLine,
   addSection,
@@ -187,6 +188,12 @@ export function addCommentOf(state: EditorState, sectionId: string, text: string
   if (!comment) return state
   const line: CommentLine = { id: createId(), type: 'comment', text: comment }
   return commit(state, addLine(state.song, sectionId, line))
+}
+
+export function addBarChordOf(state: EditorState, sectionId: string, lineId: string | null): EditorState {
+  const song = addBarChord(state.song, sectionId, lineId)
+  if (song === state.song) return state
+  return commit(state, song)
 }
 
 export function addBarsOf(state: EditorState, sectionId: string, text: string): EditorState {

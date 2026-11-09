@@ -38,6 +38,7 @@ export function Chart({
   onAddSection,
   onComment,
   onBars,
+  onAddBar,
   onNudge,
   onMove,
   onEdit,
@@ -59,6 +60,7 @@ export function Chart({
   onAddSection: (kind: SectionKind, label: string) => void
   onComment: (sectionId: string, text: string) => void
   onBars: (sectionId: string, text: string) => void
+  onAddBar: (sectionId: string, lineId: string | null) => void
   onNudge: (how: NudgeHow) => void
   onMove: (id: string, lineId: string, index: number) => void
   onEdit: (id: string) => void
@@ -105,7 +107,11 @@ export function Chart({
               <input className="field" name="line" aria-label={lineDraft.kind === 'comment' ? 'Comment' : 'Bar line'} placeholder={lineDraft.kind === 'comment' ? 'Repeat ×2' : '| C - - - | F/A - - - |'} autoFocus />
             </form>
           )}
-          {section.lines.length === 0 && <p className="hint">Empty section. Add a line</p>}
+          {section.lines.length === 0 && (
+            <p className="hint">
+              Empty section. <button type="button" className="text-button" onClick={(event) => { event.stopPropagation(); onAddBar(section.id, null) }}>Add chord</button>
+            </p>
+          )}
           {section.lines.map((line, lineNumber) => {
             if (line.type === 'comment') return <p className="comment" key={line.id}>{line.text}</p>
             if (line.type === 'bars') {
@@ -118,6 +124,7 @@ export function Chart({
                       </button>
                     ),
                   )}
+                  <button type="button" className="text-button" onClick={(event) => { event.stopPropagation(); onAddBar(section.id, line.id) }}>Add chord</button>
                 </p>
               )
             }
