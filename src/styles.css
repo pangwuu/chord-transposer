@@ -151,6 +151,15 @@ button { cursor: pointer; }
   .title-input { font-size: 24px; }
   .editor-bar { flex-wrap: nowrap; height: auto; row-gap: 4px; padding: 8px 12px; position: relative; z-index: 3; }
   .editor-bar .grow { flex: 1; min-width: 8px; }
+  /* Phone: stack setlist/settings rows so controls stay inside the viewport. */
+  .import-screen, .setlists, .settings { max-width: 100%; overflow-x: hidden; }
+  .setlists .row-meta { flex-wrap: wrap; align-items: center; }
+  .setlists .row-meta > strong { flex: 1 1 100%; min-width: 0; }
+  .setlists .field, .setlists .select { min-width: 0; flex: 1 1 7rem; max-width: 100%; }
+  .setlists input.field[aria-label='Notes'] { flex: 1 1 100%; }
+  .properties { grid-template-columns: 1fr; }
+  .settings .select, .settings input[type='file'], .settings label.hint, .settings .properties > span { max-width: 100%; min-width: 0; }
+  .settings .properties > span { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
 }
 .import-screen, .setlists, .settings { padding: 24px; overflow: auto; background: var(--bg); }
 .chordpro-split { display: grid; grid-template-columns: minmax(220px, 0.8fr) minmax(0, 1.2fr); gap: 12px; align-items: start; }
