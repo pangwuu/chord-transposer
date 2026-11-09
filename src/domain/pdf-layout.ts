@@ -53,6 +53,10 @@ export type PdfDocument = {
 const MARGIN = 42
 const FOOTER = 40
 const MONO = 0.6
+/** Space above a section heading after the previous section's last line. */
+export const SECTION_LEAD_IN = 12
+/** Heading label + rule + gap before the first line of the section. */
+export const SECTION_HEADING = 30
 
 export function pageSize(paper: Paper): { width: number; height: number } {
   return paper === 'letter' ? { width: 612, height: 792 } : { width: 595, height: 842 }
@@ -64,8 +68,12 @@ export function charsPerLine(fontSize: number, width: number, columns: 1 | 2): n
   return Math.floor(column / (fontSize * MONO))
 }
 
+export function sectionBlockHeight(): number {
+  return SECTION_LEAD_IN + SECTION_HEADING
+}
+
 function blockHeight(block: PdfBlock, fontSize: number): number {
-  if (block.kind === 'section') return 30
+  if (block.kind === 'section') return sectionBlockHeight()
   if (block.kind === 'comment' || block.kind === 'pointer') return 16
   if (block.kind === 'bars') return Math.ceil(fontSize * 1.7)
   if (block.chords.length === 0) return Math.ceil(fontSize * 1.35)

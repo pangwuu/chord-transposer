@@ -9,7 +9,7 @@ import { chordTextFromPdfItems, importText } from './import-text'
 import { padCollisions } from './line-layout'
 import { memoryLibrary } from './memory-library'
 import { formatLyric, fromChordPro, toChordPro } from './chordpro'
-import { layoutPdf } from './pdf-layout'
+import { layoutPdf, SECTION_LEAD_IN } from './pdf-layout'
 import { renderPdf, rightHandParts, mergePdfs } from './pdf-render'
 import { decodeShare, encodeShare } from './share'
 import { emptySong, idSequence, performance, type Song } from './song'
@@ -245,6 +245,10 @@ describe('line padding', () => {
 })
 
 describe('pdf', () => {
+  it('leaves space between the last line of a section and the next heading', () => {
+    expect(SECTION_LEAD_IN).toBeGreaterThanOrEqual(8)
+  })
+
   it('keeps a section that fits on one page together and numbers every page', () => {
     const song = longSong(36)
     const layout = layoutPdf(song, pdfOptions(song.originalKey))
