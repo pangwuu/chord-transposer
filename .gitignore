@@ -5,6 +5,9 @@ dist/
 .env
 .env.*
 *.local
+*.tsbuildinfo
+playwright-report/
+test-results/
 
 # Full copyrighted charts stay on this machine. Titles in the spec are fine.
 chord-sheet-maker-handoff/rebuild_lyrics.py

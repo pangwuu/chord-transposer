@@ -7,14 +7,13 @@
     "skipLibCheck": true,
     "moduleResolution": "bundler",
     "isolatedModules": true,
-    "moduleDetection": "force",
     "noEmit": true,
     "jsx": "react-jsx",
     "strict": true,
     "noUnusedLocals": true,
     "noUnusedParameters": true,
     "noFallthroughCasesInSwitch": true,
-    "types": ["vite/client"]
+    "types": ["vitest/globals", "node"]
   },
-  "include": ["src", "vite.config.ts"]
+  "include": ["src"]
 }
