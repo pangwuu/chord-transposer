@@ -4,6 +4,7 @@ import {
   MAJOR_KEYS,
   MINOR_KEYS,
   readChord,
+  shiftKey,
   transposeChord,
   writeChord,
   type KeyName,
@@ -25,14 +26,17 @@ const EXAMPLES: Example[] = [
 ]
 
 function KeySelect({
+  id,
   value,
   onChange,
 }: {
+  id?: string
   value: KeyName
   onChange: (key: KeyName) => void
 }) {
   return (
     <select
+      id={id}
       value={value}
       onChange={(event) => onChange(event.target.value as KeyName)}
     >
@@ -108,10 +112,26 @@ export function App() {
             Written in
             <KeySelect value={fromKey} onChange={setFromKey} />
           </label>
-          <label>
-            Sounds in
-            <KeySelect value={toKey} onChange={setToKey} />
-          </label>
+          <div className="sounding">
+            <label htmlFor="sounds">Sounds in</label>
+            <div className="sounding-row">
+              <button
+                type="button"
+                aria-label="Sound a semitone lower"
+                onClick={() => setToKey(shiftKey(toKey, -1))}
+              >
+                −
+              </button>
+              <KeySelect id="sounds" value={toKey} onChange={setToKey} />
+              <button
+                type="button"
+                aria-label="Sound a semitone higher"
+                onClick={() => setToKey(shiftKey(toKey, 1))}
+              >
+                +
+              </button>
+            </div>
+          </div>
           <label>
             Capo
             <input

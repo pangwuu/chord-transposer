@@ -199,18 +199,74 @@ function pitchOfKey(key: KeyName): number {
   return pitchOf(note)
 }
 
-function spellingTable(key: KeyName): readonly string[] {
+const LETTERS: Letter[] = ['C', 'D', 'E', 'F', 'G', 'A', 'B']
+const MAJOR_STEPS = [0, 2, 4, 5, 7, 9, 11]
+
+function spellingBias(key: KeyName): readonly string[] {
   const major = RELATIVE_MAJOR[key] ?? key
   if (SHARP_MAJORS.has(major)) return SHARP
   if (FLAT_MAJORS.has(major)) return FLAT
   return NATURAL
 }
 
-function spell(pitch: number, table: readonly string[]): Note {
-  const token = table[((pitch % 12) + 12) % 12]
-  const note = parseNote(token)
-  if (!note) throw new Error(`Cannot spell pitch ${pitch}`)
+function accidentalFor(letter: Letter, pitch: number): Accidental | null {
+  const delta = (pitch - LETTER_PITCH[letter] + 12) % 12
+  if (delta === 0) return ''
+  if (delta === 1) return '#'
+  if (delta === 2) return '##'
+  if (delta === 11) return 'b'
+  if (delta === 10) return 'bb'
+  return null
+}
+
+function majorTonic(key: KeyName): Note {
+  const majorName = RELATIVE_MAJOR[key] ?? key
+  const note = parseNote(tonicToken(majorName))
+  if (!note) throw new Error(`Unknown key: ${key}`)
   return note
+}
+
+/** One scale tone per letter, so F# major's 7th is E# and Gb major's 4th is Cb. */
+function diatonicByLetter(key: KeyName): Record<Letter, Note> {
+  const tonic = majorTonic(key)
+  const start = LETTERS.indexOf(tonic.letter)
+  const tonicPitch = pitchOf(tonic)
+  const scale = {} as Record<Letter, Note>
+  for (let step = 0; step < LETTERS.length; step++) {
+    const letter = LETTERS[(start + step) % LETTERS.length]
+    const pitch = (tonicPitch + MAJOR_STEPS[step]) % 12
+    const accidental = accidentalFor(letter, pitch)
+    if (accidental === null) throw new Error(`Cannot spell ${letter} in ${key}`)
+    scale[letter] = { letter, accidental }
+  }
+  return scale
+}
+
+function spell(pitch: number, key: KeyName): Note {
+  const wrapped = ((pitch % 12) + 12) % 12
+  const diatonic = diatonicByLetter(key)
+  const preferred = spellingBias(key)[wrapped]
+  const candidates: { note: Note; distance: number }[] = []
+  for (const letter of LETTERS) {
+    const accidental = accidentalFor(letter, wrapped)
+    if (accidental === null) continue
+    candidates.push({
+      note: { letter, accidental },
+      distance: Math.abs(
+        ACC_VALUE[accidental] - ACC_VALUE[diatonic[letter].accidental],
+      ),
+    })
+  }
+  candidates.sort((a, b) => {
+    if (a.distance !== b.distance) return a.distance - b.distance
+    const aPreferred = noteText(a.note) === preferred ? 0 : 1
+    const bPreferred = noteText(b.note) === preferred ? 0 : 1
+    if (aPreferred !== bPreferred) return aPreferred - bPreferred
+    return a.note.letter.localeCompare(b.note.letter)
+  })
+  const chosen = candidates[0]
+  if (!chosen) throw new Error(`Cannot spell pitch ${wrapped} in ${key}`)
+  return chosen.note
 }
 
 export function readChord(input: string): ChordReading {
@@ -268,16 +324,13 @@ export function transposeChord(
 ): Chord {
   assertKey(from)
   assertKey(to)
-  if (chord.kind === 'nc') return chord
+  if (chord.kind === 'nc' || from === to) return chord
 
   const semitones = (pitchOfKey(to) - pitchOfKey(from) + 12) % 12
-  const table = spellingTable(to)
   const next: Chord = {
     kind: 'pitched',
-    root: spell(pitchOf(chord.root) + semitones, table),
-    bass: chord.bass
-      ? spell(pitchOf(chord.bass) + semitones, table)
-      : undefined,
+    root: spell(pitchOf(chord.root) + semitones, to),
+    bass: chord.bass ? spell(pitchOf(chord.bass) + semitones, to) : undefined,
     quality: chord.quality,
     qualityText: chord.qualityText,
     raw: '',
@@ -291,6 +344,19 @@ export function capoLine(concertKey: KeyName, capo: number): string {
   const shapePitch = (pitchOfKey(concertKey) - (capo % 12) + 12) % 12
   const shape = DEFAULT_KEY_BY_PITCH[shapePitch]
   return `Capo ${capo} — play ${shape} shapes (sounds in ${concertKey})`
+}
+
+export function shiftKey(key: KeyName, semitones: number): KeyName {
+  assertKey(key)
+  const pitch = (pitchOfKey(key) + semitones + 120) % 12
+  const minor = MINOR_KEYS.includes(key as (typeof MINOR_KEYS)[number])
+  const names = minor ? MINOR_KEYS : MAJOR_KEYS
+  const preferred = `${DEFAULT_KEY_BY_PITCH[pitch]}${minor ? 'm' : ''}`
+  const preferredMatch = names.find((name) => name === preferred)
+  if (preferredMatch) return preferredMatch
+  const fallback = names.find((name) => pitchOfKey(name) === pitch)
+  if (!fallback) throw new Error(`No key at pitch ${pitch}`)
+  return fallback
 }
 
 export function friendlyCapos(

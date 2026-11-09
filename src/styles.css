@@ -112,6 +112,8 @@ h1 {
 .field input,
 .keys select,
 .keys input {
+  width: 100%;
+  min-width: 0;
   font-family: ui-monospace, 'SF Mono', Menlo, Consolas, monospace;
   font-size: 18px;
   font-weight: 500;
@@ -140,9 +142,36 @@ h1 {
 
 .keys {
   display: grid;
-  grid-template-columns: 1fr 1fr 96px;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1.5fr) 88px;
   gap: 12px;
   margin-top: 16px;
+}
+
+.sounding {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.sounding-row {
+  display: flex;
+  gap: 6px;
+}
+
+.sounding-row select {
+  flex: 1;
+  min-width: 0;
+}
+
+.sounding-row button {
+  width: 36px;
+  border: 1px solid var(--border-strong);
+  border-radius: 8px;
+  background: var(--bg);
+  cursor: pointer;
+  font-size: 18px;
 }
 
 .result {
