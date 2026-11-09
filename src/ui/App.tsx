@@ -406,8 +406,8 @@ export function App() {
                 ))}
               </div>
               <Chart
-                song={settings.normalise ? mapSymbols(view, normaliseSymbol) : view}
-                shapeKey={shapeKey}
+                song={mode === 'chordpro' ? editor.song : settings.normalise ? mapSymbols(view, normaliseSymbol) : view}
+                shapeKey={mode === 'chordpro' ? editor.song.originalKey : shapeKey}
                 numbers={editor.nashville}
                 selectedIds={editor.selectedIds}
                 readOnly={false}

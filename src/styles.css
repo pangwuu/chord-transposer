@@ -53,6 +53,7 @@ button { cursor: pointer; }
 .rail { align-items: center; }
 .editor { display: flex; flex-direction: column; background: var(--bg); }
 .editor-bar, .transport, .preview-bar { display: flex; gap: 8px; align-items: center; min-height: 48px; padding: 0 16px; border-bottom: 1px solid var(--border); }
+.editor-bar strong { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .transport { min-height: 44px; flex-wrap: wrap; }
 .grow { flex: 1; }
 .editor-scroll { padding: 28px 24px 80px; }
@@ -78,7 +79,7 @@ button { cursor: pointer; }
 .menu { position: absolute; z-index: 6; left: 0; top: 36px; background: var(--bg-raised); box-shadow: var(--shadow-md); border-radius: 8px; padding: 6px; display: flex; flex-direction: column; min-width: 160px; }
 .menu button { text-align: left; border: 0; background: transparent; padding: 6px 8px; border-radius: 6px; }
 .menu button:hover { background: var(--bg-hover); }
-.section-actions { display: flex; gap: 2px; }
+.section-actions { display: flex; flex-wrap: wrap; gap: 2px; }
 .editor-body { display: grid; grid-template-columns: minmax(0, 1fr) 280px; min-height: 0; flex: 1; }
 .editor-body.chordpro-mode { grid-template-columns: minmax(260px, 340px) minmax(0, 1fr); }
 .editor-body.chordpro-mode .source { height: 100%; min-height: 0; box-sizing: border-box; resize: none; }
@@ -143,6 +144,8 @@ button { cursor: pointer; }
   .phone-tabs button[aria-pressed='true'] { color: var(--accent); font-weight: 600; }
   .app.phone-editor .phone-tabs, .app.phone-stage .phone-tabs { display: none; }
   .title-input { font-size: 24px; }
+  .editor-bar { flex-wrap: wrap; height: auto; row-gap: 4px; padding: 8px 12px; position: relative; z-index: 3; }
+  .editor-bar .grow { display: none; }
 }
 .import-screen, .setlists, .settings { padding: 24px; overflow: auto; background: var(--bg); }
 .chordpro-split { display: grid; grid-template-columns: minmax(220px, 0.8fr) minmax(0, 1.2fr); gap: 12px; align-items: start; }
