@@ -1,6 +1,6 @@
 import fontkit from '@pdf-lib/fontkit'
 import { PDFDocument, rgb, type PDFFont, type PDFPage } from 'pdf-lib'
-import type { PdfBlock, PdfDocument, PdfPage } from './pdf-layout'
+import { SECTION_LEAD_IN, sectionBlockHeight, type PdfBlock, type PdfDocument, type PdfPage } from './pdf-layout'
 
 export type PdfFonts = {
   sans: Uint8Array
@@ -96,10 +96,11 @@ function drawBlock(
   hair: ReturnType<typeof rgb>,
 ): number {
   if (block.kind === 'section') {
-    page.drawText(block.label, { x: left, y: y - 11, size: 11, font: fonts.sansBold, color: ink })
+    const top = y - SECTION_LEAD_IN
+    page.drawText(block.label, { x: left, y: top - 11, size: 11, font: fonts.sansBold, color: ink })
     const textWidth = fonts.sansBold.widthOfTextAtSize(block.label, 11)
-    page.drawLine({ start: { x: left + textWidth + 8, y: y - 8 }, end: { x: right, y: y - 8 }, thickness: 0.6, color: hair })
-    return y - 30
+    page.drawLine({ start: { x: left + textWidth + 8, y: top - 8 }, end: { x: right, y: top - 8 }, thickness: 0.6, color: hair })
+    return y - sectionBlockHeight()
   }
   if (block.kind === 'comment' || block.kind === 'pointer') {
     page.drawText(block.text, { x: left, y: y - 10, size: 9.5, font: fonts.sansItalic, color: secondary })
