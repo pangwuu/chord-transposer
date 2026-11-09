@@ -1,12 +1,12 @@
 import { expect, test } from '@playwright/test'
 
 test.describe('phone bottom tabs', () => {
-  test.beforeEach(({ page: _page }, testInfo) => {
+  test.beforeEach(async ({ page }, testInfo) => {
     test.skip(testInfo.project.name !== 'mobile', 'Bottom tabs are phone-only')
+    await page.goto('/')
   })
 
   test('stay on the editor and jump to setlists', async ({ page }) => {
-    await page.goto('/')
     await expect(page.getByLabel('Title')).toHaveValue('Amazing Grace')
     const tabs = page.locator('.phone-tabs')
     await expect(tabs).toBeVisible()
@@ -17,7 +17,6 @@ test.describe('phone bottom tabs', () => {
   })
 
   test('hide on projector and stage', async ({ page }) => {
-    await page.goto('/')
     const tabs = page.locator('.phone-tabs')
     await expect(tabs).toBeVisible()
 
