@@ -48,6 +48,24 @@ test('drags a chord along the lyric on a wide screen', async ({ page }, testInfo
   await expect(page.getByRole('button', { name: /Chord G over "z/ })).toBeVisible()
 })
 
+test('keeps bar-line chords on the bar line', async ({ page }, testInfo) => {
+  await page.goto('/')
+  await songs(page, testInfo.project.name)
+  await page.getByRole('button', { name: 'First Light' }).click()
+  const bars = page.locator('.section', { has: page.getByLabel('Intro name') }).locator('.bars')
+  const chord = bars.getByRole('button', { name: 'D/F#' })
+  await expect(chord).toBeVisible()
+  const barBox = await bars.boundingBox()
+  const chordBox = await chord.boundingBox()
+  expect(barBox).not.toBeNull()
+  expect(chordBox).not.toBeNull()
+  expect(chordBox!.y).toBeGreaterThanOrEqual(barBox!.y - 2)
+  expect(chordBox!.y + chordBox!.height).toBeLessThanOrEqual(barBox!.y + barBox!.height + 2)
+  const header = page.locator('.editor-bar')
+  const headerBox = await header.boundingBox()
+  expect(chordBox!.y).toBeGreaterThan((headerBox?.y ?? 0) + (headerBox?.height ?? 0))
+})
+
 test('adds a comment, a bar line, and an arrangement repeat', async ({ page }) => {
   await page.goto('/')
   const comment = page.getByRole('button', { name: 'Comment' }).first()

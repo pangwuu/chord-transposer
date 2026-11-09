@@ -1,4 +1,11 @@
-import { formatKey, formatSymbol, nashville, shiftKey, type ChordSymbol, type Key } from './chord'
+import {
+  formatKey,
+  formatSymbol,
+  nashville,
+  shiftKey,
+  type ChordSymbol,
+  type Key,
+} from './chord'
 import { padCollisions } from './line-layout'
 import { displayedSong, performance, type BarItem, type Song } from './song'
 
@@ -21,17 +28,22 @@ export type PdfOptions = {
 
 export type PdfChord = { label: string; index: number; invalid: boolean }
 
-export type PdfBlock =
+export type PdfColumn = 1 | 2
+
+type UntaggedBlock =
   | { kind: 'section'; label: string; continued: boolean }
   | { kind: 'lyric'; text: string; chords: PdfChord[] }
   | { kind: 'bars'; text: string }
   | { kind: 'comment'; text: string }
   | { kind: 'pointer'; text: string }
 
+export type PdfBlock = UntaggedBlock & { column: PdfColumn }
+
 export type PdfPage = {
   width: number
   height: number
   blocks: PdfBlock[]
+  columnCount: 1 | 2
   runningHeader: string | null
   title: string
   artist: string | null
@@ -48,6 +60,8 @@ export type PdfDocument = {
   fileName: string
   fontSize: number
   columns: 1 | 2
+  spacing: number
+  fitWarning: string | null
 }
 
 const MARGIN = 42
@@ -59,25 +73,68 @@ export const SECTION_LEAD_IN = 12
 export const SECTION_HEADING = 30
 
 export function pageSize(paper: Paper): { width: number; height: number } {
-  return paper === 'letter' ? { width: 612, height: 792 } : { width: 595, height: 842 }
+  return paper === 'letter'
+    ? { width: 612, height: 792 }
+    : { width: 595, height: 842 }
 }
 
-export function charsPerLine(fontSize: number, width: number, columns: 1 | 2): number {
-  const content = width - MARGIN * 2 - (columns === 2 ? 18 : 0)
-  const column = columns === 2 ? content / 2 : content
-  return Math.floor(column / (fontSize * MONO))
+export function columnBounds(
+  width: number,
+  columns: 1 | 2,
+): { left: number; right: number }[] {
+  if (columns === 1) return [{ left: MARGIN, right: width - MARGIN }]
+  const gutter = 18
+  const column = (width - MARGIN * 2 - gutter) / 2
+  return [
+    { left: MARGIN, right: MARGIN + column },
+    { left: MARGIN + column + gutter, right: width - MARGIN },
+  ]
+}
+
+export function charsPerLine(
+  fontSize: number,
+  width: number,
+  columns: 1 | 2,
+): number {
+  const bounds = columnBounds(width, columns)[0]
+  return Math.floor((bounds.right - bounds.left) / (fontSize * MONO))
+}
+
+export function layoutStatus(layout: PdfDocument): string {
+  const pages =
+    layout.pages.length === 1 ? '1 page' : `${layout.pages.length} pages`
+  const columns = layout.columns === 1 ? '1 column' : '2 columns'
+  return `${pages} · ${layout.fontSize} pt · spacing ${layout.spacing} · ${columns}`
 }
 
 export function sectionBlockHeight(): number {
   return SECTION_LEAD_IN + SECTION_HEADING
 }
 
-function blockHeight(block: PdfBlock, fontSize: number): number {
-  if (block.kind === 'section') return sectionBlockHeight()
-  if (block.kind === 'comment' || block.kind === 'pointer') return 16
-  if (block.kind === 'bars') return Math.ceil(fontSize * 1.7)
-  if (block.chords.length === 0) return Math.ceil(fontSize * 1.35)
-  return Math.ceil(fontSize * 2.2)
+export function blockHeight(
+  block: UntaggedBlock,
+  fontSize: number,
+  spacing = 1,
+): number {
+  let raw: number
+  if (block.kind === 'section') raw = sectionBlockHeight()
+  else if (block.kind === 'comment' || block.kind === 'pointer') raw = 16
+  else if (block.kind === 'bars') raw = Math.ceil(fontSize * 1.7)
+  else if (block.chords.length === 0) raw = Math.ceil(fontSize * 1.35)
+  else raw = Math.ceil(fontSize * 2.2)
+  const floor =
+    block.kind === 'lyric' && block.chords.length > 0
+      ? fontSize * 2
+      : block.kind === 'lyric' || block.kind === 'bars'
+        ? fontSize
+        : block.kind === 'section'
+          ? 22
+          : 10
+  return Math.max(floor, raw * spacing)
+}
+
+function tag(blocks: UntaggedBlock[], column: PdfColumn): PdfBlock[] {
+  return blocks.map((block) => ({ ...block, column }))
 }
 
 function symbolLabel(symbol: ChordSymbol, numbers: boolean, key: Key): string {
@@ -100,112 +157,316 @@ function barText(items: BarItem[], numbers: boolean, key: Key): string {
   return `| ${parts.join(' | ')} |`
 }
 
-type Piece = { blocks: PdfBlock[] }
+type Piece = { blocks: UntaggedBlock[] }
 
 function piecesFor(song: Song, options: PdfOptions): Piece[] {
   const shapeKey = shiftKey(options.concert, -options.capo)
   const played = displayedSong(song, options.concert, options.capo)
-  return performance(song, options.repeats).map(({ section, copies, pointer }) => {
-    const source = played.sections.find((item) => item.id === section.id) ?? section
-    const blocks: PdfBlock[] = [{ kind: 'section', label: source.label.toUpperCase(), continued: false }]
-    if (pointer && copies > 1) blocks.push({ kind: 'pointer', text: `Repeat ${source.label} ×${copies}` })
-    for (const line of source.lines) {
-      if (line.type === 'comment') {
-        blocks.push({ kind: 'comment', text: line.text })
-        continue
+  return performance(song, options.repeats).map(
+    ({ section, copies, pointer }) => {
+      const source =
+        played.sections.find((item) => item.id === section.id) ?? section
+      const blocks: UntaggedBlock[] = [
+        {
+          kind: 'section',
+          label: source.label.toUpperCase(),
+          continued: false,
+        },
+      ]
+      if (pointer && copies > 1)
+        blocks.push({
+          kind: 'pointer',
+          text: `Repeat ${source.label} ×${copies}`,
+        })
+      for (const line of source.lines) {
+        if (line.type === 'comment') {
+          blocks.push({ kind: 'comment', text: line.text })
+          continue
+        }
+        if (line.type === 'bars') {
+          if (options.content !== 'lyrics')
+            blocks.push({
+              kind: 'bars',
+              text: barText(line.items, options.numbers, shapeKey),
+            })
+          continue
+        }
+        if (options.content === 'chords') {
+          const labels = line.chords.map((chord) =>
+            symbolLabel(chord.symbol, options.numbers, shapeKey),
+          )
+          blocks.push({ kind: 'bars', text: labels.join(' | ') || '—' })
+          continue
+        }
+        if (options.content === 'lyrics') {
+          blocks.push({ kind: 'lyric', text: line.text, chords: [] })
+          continue
+        }
+        const ordered = [...line.chords]
+          .map((chord) => ({
+            label: symbolLabel(chord.symbol, options.numbers, shapeKey),
+            index: chord.index,
+            invalid: chord.symbol.kind === 'invalid',
+          }))
+          .sort((a, b) => a.index - b.index || a.label.localeCompare(b.label))
+        const padded = padCollisions(
+          line.text,
+          ordered.map((chord) => ({ label: chord.label, index: chord.index })),
+        )
+        blocks.push({
+          kind: 'lyric',
+          text: padded.text,
+          chords: padded.chords.map((chord, index) => ({
+            ...chord,
+            invalid: ordered[index]?.invalid ?? false,
+          })),
+        })
       }
-      if (line.type === 'bars') {
-        if (options.content !== 'lyrics') blocks.push({ kind: 'bars', text: barText(line.items, options.numbers, shapeKey) })
-        continue
-      }
-      if (options.content === 'chords') {
-        const labels = line.chords.map((chord) => symbolLabel(chord.symbol, options.numbers, shapeKey))
-        blocks.push({ kind: 'bars', text: labels.join(' | ') || '—' })
-        continue
-      }
-      if (options.content === 'lyrics') {
-        blocks.push({ kind: 'lyric', text: line.text, chords: [] })
-        continue
-      }
-      const ordered = [...line.chords]
-        .map((chord) => ({
-          label: symbolLabel(chord.symbol, options.numbers, shapeKey),
-          index: chord.index,
-          invalid: chord.symbol.kind === 'invalid',
-        }))
-        .sort((a, b) => a.index - b.index || a.label.localeCompare(b.label))
-      const padded = padCollisions(
-        line.text,
-        ordered.map((chord) => ({ label: chord.label, index: chord.index })),
-      )
-      blocks.push({
-        kind: 'lyric',
-        text: padded.text,
-        chords: padded.chords.map((chord, index) => ({ ...chord, invalid: ordered[index]?.invalid ?? false })),
-      })
+      return { blocks }
+    },
+  )
+}
+
+function wrapBlock(block: UntaggedBlock, capacity: number): UntaggedBlock[] {
+  if (block.kind !== 'lyric' || capacity < 8 || block.text.length <= capacity)
+    return [block]
+  const lines: UntaggedBlock[] = []
+  let text = block.text
+  let chords = block.chords
+  let first = true
+  while (text.length > 0) {
+    const width = first ? capacity : Math.max(1, capacity - 2)
+    let cut = text.length
+    if (text.length > width) {
+      const space = text.lastIndexOf(' ', width)
+      cut = space > 0 ? space : width
     }
-    return { blocks }
-  })
+    const head = text.slice(0, cut)
+    let next = cut
+    while (text[next] === ' ') next += 1
+    const indent = first ? 0 : 2
+    lines.push({
+      kind: 'lyric',
+      text: first ? head : `  ${head}`,
+      chords: chords
+        .filter((chord) => chord.index < cut)
+        .map((chord) => ({ ...chord, index: chord.index + indent })),
+    })
+    chords = chords
+      .filter((chord) => chord.index >= cut)
+      .map((chord) => ({
+        ...chord,
+        index: Math.max(0, chord.index - next),
+      }))
+    if (next >= text.length) break
+    text = text.slice(next)
+    first = false
+  }
+  return lines
 }
 
 function innerHeight(height: number, first: boolean): number {
   return height - MARGIN - FOOTER - (first ? 86 : 28)
 }
 
-function layoutOnce(song: Song, options: PdfOptions, size: { width: number; height: number }, fontSize: number, columns: 1 | 2, spacing: number): PdfBlock[][] {
-  const pieces = piecesFor(song, options)
-  const firstInner = innerHeight(size.height, true) * columns
-  const nextInner = innerHeight(size.height, false) * columns
-  const pages: PdfBlock[][] = [[]]
-  let used = 0
-  const limit = () => (pages.length === 1 ? firstInner : nextInner) * spacing
+function layoutOnce(
+  song: Song,
+  options: PdfOptions,
+  size: { width: number; height: number },
+  fontSize: number,
+  columns: 1 | 2,
+  spacing: number,
+): { blocks: PdfBlock[]; columnCount: 1 | 2 }[] {
+  const capacity = charsPerLine(fontSize, size.width, columns)
+  const pieces = piecesFor(song, options).map((piece) => ({
+    blocks: piece.blocks.flatMap((block) => wrapBlock(block, capacity)),
+  }))
+  const firstInner = innerHeight(size.height, true)
+  const nextInner = innerHeight(size.height, false)
+  const maxInner = Math.max(firstInner, nextInner)
+  const pages: { blocks: PdfBlock[]; columnCount: 1 | 2 }[] = [
+    { blocks: [], columnCount: 1 },
+  ]
+  let columnUsed: [number, number] = [0, 0]
+  let mode: 'empty' | 'full' | 'columns' = 'empty'
+
+  const limit = () => (pages.length === 1 ? firstInner : nextInner)
   const pushPage = () => {
-    pages.push([])
-    used = 0
+    pages.push({ blocks: [], columnCount: 1 })
+    columnUsed = [0, 0]
+    mode = 'empty'
   }
-  for (const piece of pieces) {
-    const height = piece.blocks.reduce((sum, block) => sum + blockHeight(block, fontSize), 0) * spacing
-    const fitsAlone = height <= Math.max(firstInner, nextInner) * spacing
-    if (used + height <= limit()) {
-      pages[pages.length - 1].push(...piece.blocks)
-      used += height
-      continue
+  const pieceHeight = (blocks: UntaggedBlock[]) =>
+    blocks.reduce(
+      (sum, block) => sum + blockHeight(block, fontSize, spacing),
+      0,
+    )
+
+  if (columns === 2) layoutTwoColumns(pieces)
+  else {
+    for (const piece of pieces)
+      placeFullWidth(piece.blocks, pieceHeight(piece.blocks))
+  }
+  return pages.filter((page, index) => page.blocks.length > 0 || index === 0)
+
+  function layoutTwoColumns(run: Piece[]) {
+    let index = 0
+    while (index < run.length) {
+      const height = pieceHeight(run[index].blocks)
+      if (height > maxInner) {
+        placeFullWidth(run[index].blocks, height)
+        index += 1
+        continue
+      }
+      const columnRun: Piece[] = []
+      while (index < run.length && pieceHeight(run[index].blocks) <= maxInner) {
+        columnRun.push(run[index])
+        index += 1
+      }
+      placeRun(columnRun)
     }
-    if (fitsAlone) {
-      if (used > 0 || limit() < height) pushPage()
-      pages[pages.length - 1].push(...piece.blocks)
-      used += height
-      continue
+  }
+
+  function placeRun(run: Piece[]) {
+    let start = 0
+    while (start < run.length) {
+      if (pages[pages.length - 1].blocks.length > 0) pushPage()
+      const room = limit()
+      let end = start
+      while (end < run.length) {
+        if (balancedSplit(run.slice(start, end + 1), room) === null) break
+        end += 1
+      }
+      if (end === start) {
+        placeInColumns(run[start].blocks, pieceHeight(run[start].blocks))
+        start += 1
+        continue
+      }
+      const group = run.slice(start, end)
+      const split = balancedSplit(group, room) ?? group.length
+      for (const piece of group.slice(0, split))
+        pages[pages.length - 1].blocks.push(...tag(piece.blocks, 1))
+      for (const piece of group.slice(split))
+        pages[pages.length - 1].blocks.push(...tag(piece.blocks, 2))
+      pages[pages.length - 1].columnCount = 2
+      mode = 'columns'
+      start = end
     }
-    if (used > 0) pushPage()
-    let slice: PdfBlock[] = []
+  }
+
+  function balancedSplit(group: Piece[], room: number): number | null {
+    const heights = group.map((piece) => pieceHeight(piece.blocks))
+    if (heights.some((height) => height > room)) return null
+    if (group.length === 1) return 1
+    const total = heights.reduce((sum, height) => sum + height, 0)
+    let best: number | null = null
+    let bestDiff = Infinity
+    let used = 0
+    for (let index = 0; index < heights.length - 1; index += 1) {
+      used += heights[index]
+      const right = total - used
+      const diff = Math.abs(used - right)
+      if (used <= room && right <= room && diff < bestDiff) {
+        bestDiff = diff
+        best = index + 1
+      }
+    }
+    return best
+  }
+
+  function placeInColumns(blocks: UntaggedBlock[], height: number) {
+    if (mode === 'full') {
+      if (columnUsed[0] + height <= limit()) {
+        pages[pages.length - 1].blocks.push(...tag(blocks, 1))
+        columnUsed[0] += height
+        return
+      }
+      pushPage()
+    }
+    const room = limit()
+    if (columnUsed[1] === 0 && columnUsed[0] + height <= room) {
+      pages[pages.length - 1].blocks.push(...tag(blocks, 1))
+      columnUsed[0] += height
+      mode = 'columns'
+      pages[pages.length - 1].columnCount = 2
+      return
+    }
+    if (columnUsed[1] + height <= room) {
+      pages[pages.length - 1].blocks.push(...tag(blocks, 2))
+      columnUsed[1] += height
+      mode = 'columns'
+      pages[pages.length - 1].columnCount = 2
+      return
+    }
+    pushPage()
+    if (height <= limit()) {
+      pages[pages.length - 1].blocks.push(...tag(blocks, 1))
+      columnUsed[0] = height
+      mode = 'columns'
+      pages[pages.length - 1].columnCount = 2
+      return
+    }
+    placeFullWidth(blocks, height)
+  }
+
+  function placeFullWidth(blocks: UntaggedBlock[], height: number) {
+    if (columns === 2 && mode === 'columns') pushPage()
+    if (columnUsed[0] + height <= limit() && columnUsed[1] === 0) {
+      pages[pages.length - 1].blocks.push(...tag(blocks, 1))
+      columnUsed[0] += height
+      mode = 'full'
+      return
+    }
+    if (height <= maxInner) {
+      if (columnUsed[0] > 0 || columnUsed[1] > 0 || limit() < height) pushPage()
+      pages[pages.length - 1].blocks.push(...tag(blocks, 1))
+      columnUsed[0] = height
+      mode = 'full'
+      return
+    }
+    if (columnUsed[0] > 0 || columnUsed[1] > 0) pushPage()
+    let slice: UntaggedBlock[] = []
     let sliceHeight = 0
     let continued = false
-    const heading = piece.blocks.find((block) => block.kind === 'section')
-    const headingText = heading && heading.kind === 'section' ? heading.label : 'SECTION'
-    for (const block of piece.blocks) {
-      const blockSize = blockHeight(block, fontSize) * spacing
+    const heading = blocks.find((block) => block.kind === 'section')
+    const headingText =
+      heading && heading.kind === 'section' ? heading.label : 'SECTION'
+    for (const block of blocks) {
+      const blockSize = blockHeight(block, fontSize, spacing)
       if (slice.length > 0 && sliceHeight + blockSize > limit()) {
-        pages[pages.length - 1].push(...slice)
+        pages[pages.length - 1].blocks.push(...tag(slice, 1))
         pushPage()
-        const marker: PdfBlock = { kind: 'section', label: `${headingText} (CONT.)`, continued: true }
+        const marker: UntaggedBlock = {
+          kind: 'section',
+          label: `${headingText} (CONT.)`,
+          continued: true,
+        }
         slice = [marker]
-        sliceHeight = blockHeight(marker, fontSize) * spacing
+        sliceHeight = blockHeight(marker, fontSize, spacing)
         continued = true
       }
       if (continued && block.kind === 'section') continue
       slice.push(block)
       sliceHeight += blockSize
     }
-    pages[pages.length - 1].push(...slice)
-    used = sliceHeight
+    pages[pages.length - 1].blocks.push(...tag(slice, 1))
+    columnUsed = [sliceHeight, 0]
+    mode = 'full'
   }
-  return pages.filter((blocks, index) => blocks.length > 0 || index === 0)
 }
 
-function tooWide(pages: PdfBlock[][], fontSize: number, width: number, columns: 1 | 2): boolean {
+function tooWide(
+  pages: { blocks: PdfBlock[] }[],
+  fontSize: number,
+  width: number,
+  columns: 1 | 2,
+): boolean {
   const capacity = charsPerLine(fontSize, width, columns)
-  return pages.some((blocks) => blocks.some((block) => block.kind === 'lyric' && block.text.length > capacity))
+  return pages.some((page) =>
+    page.blocks.some(
+      (block) => block.kind === 'lyric' && block.text.length > capacity,
+    ),
+  )
 }
 
 export function layoutPdf(song: Song, options: PdfOptions): PdfDocument {
@@ -214,7 +475,10 @@ export function layoutPdf(song: Song, options: PdfOptions): PdfDocument {
   let columns = options.columns
   let spacing = 1
   let pages = layoutOnce(song, options, size, fontSize, columns, spacing)
-  const wantsShrink = () => (options.fit === 'auto' ? tooWide(pages, fontSize, size.width, columns) : pages.length > options.fit)
+  const wantsShrink = () =>
+    options.fit === 'auto'
+      ? tooWide(pages, fontSize, size.width, columns)
+      : pages.length > options.fit
   while (wantsShrink()) {
     if (spacing > 0.8) spacing = Math.round((spacing - 0.1) * 10) / 10
     else if (columns === 1 && options.allowTwoColumns) columns = 2
@@ -222,7 +486,13 @@ export function layoutPdf(song: Song, options: PdfOptions): PdfDocument {
     else break
     pages = layoutOnce(song, options, size, fontSize, columns, spacing)
   }
-  return stamp(pages, song, options, size, fontSize, columns)
+  return stamp(pages, song, options, size, fontSize, columns, spacing)
+}
+
+function fitWarning(fit: 1 | 2, count: number, fontSize: number): string {
+  const target = fit === 1 ? '1 page' : `${fit} pages`
+  const shown = count === 1 ? '1 page' : `${count} pages`
+  return `Doesn't fit in ${target} at ${fontSize} pt. Showing ${shown}. Chords only, or Repeat Chorus, will shorten it.`
 }
 
 function fileName(song: Song, options: PdfOptions): string {
@@ -230,35 +500,65 @@ function fileName(song: Song, options: PdfOptions): string {
   return `${song.title} - ${formatKey(options.concert)}${capo}.pdf`
 }
 
-function stamp(pages: PdfBlock[][], song: Song, options: PdfOptions, size: { width: number; height: number }, fontSize: number, columns: 1 | 2): PdfDocument {
+function stamp(
+  pages: { blocks: PdfBlock[]; columnCount: 1 | 2 }[],
+  song: Song,
+  options: PdfOptions,
+  size: { width: number; height: number },
+  fontSize: number,
+  columns: 1 | 2,
+  spacing: number,
+): PdfDocument {
   const total = pages.length
   const keyName = formatKey(options.concert)
   const shape = formatKey(shiftKey(options.concert, -options.capo))
-  const capoLabel = options.capo > 0 ? `CAPO ${options.capo} · PLAY ${shape.replace(/m$/, '')} SHAPES` : null
+  const capoLabel =
+    options.capo > 0
+      ? `CAPO ${options.capo} · PLAY ${shape.replace(/m$/, '')} SHAPES`
+      : null
   const order = song.arrangement
-    .map((item) => song.sections.find((section) => section.id === item.sectionId)?.label ?? '')
+    .map(
+      (item) =>
+        song.sections.find((section) => section.id === item.sectionId)?.label ??
+        '',
+    )
     .filter(Boolean)
     .join(' · ')
-  const meta = [`Key ${keyName}`, song.timeSignature, song.tempo ? `${song.tempo} bpm` : null, options.numbers ? `Numbers in ${options.capo > 0 ? shape : keyName}` : null]
+  const meta = [
+    `Key ${keyName}`,
+    song.timeSignature,
+    song.tempo ? `${song.tempo} bpm` : null,
+    options.numbers ? `Numbers in ${options.capo > 0 ? shape : keyName}` : null,
+  ]
     .filter(Boolean)
     .join('    ')
   return {
     fontSize,
     columns,
+    spacing,
+    fitWarning:
+      options.fit === 'auto' || pages.length <= options.fit
+        ? null
+        : fitWarning(options.fit, pages.length, fontSize),
     fileName: fileName(song, options),
-    pages: pages.map((blocks, index) => {
-      const nextHeading = pages[index + 1]?.find((block) => block.kind === 'section')
+    pages: pages.map((page, index) => {
+      const nextHeading = pages[index + 1]?.blocks.find(
+        (block) => block.kind === 'section',
+      )
       const cue =
         index === total - 1
           ? 'End of song'
           : nextHeading && nextHeading.kind === 'section'
             ? `Next page: ${titleCase(nextHeading.label)} →`
             : 'Next page →'
-      const position = options.songPosition ? `Song ${options.songPosition.index} of ${options.songPosition.total} · ` : ''
+      const position = options.songPosition
+        ? `Song ${options.songPosition.index} of ${options.songPosition.total} · `
+        : ''
       return {
         width: size.width,
         height: size.height,
-        blocks,
+        blocks: page.blocks,
+        columnCount: page.columnCount,
         runningHeader: index === 0 ? null : `${song.title} (cont.)`,
         title: song.title,
         artist: song.artist ?? null,

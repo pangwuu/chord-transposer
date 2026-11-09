@@ -282,6 +282,54 @@ describe('pdf', () => {
     expect(String.fromCharCode(...bytes.subarray(0, 4))).toBe('%PDF')
   })
 
+  it('shrinks type to fit one page and stops at 10 pt', () => {
+    const layout = layoutPdf(verseOf(80), { ...pdfOptions(parseKey('C')), fit: 1, fontSize: 16 })
+    expect(layout.fontSize).toBe(10)
+    expect(layout.pages.length).toBeGreaterThan(1)
+    expect(layout.fitWarning).toBe(`Doesn't fit in 1 page at 10 pt. Showing ${layout.pages.length} pages. Chords only, or Repeat Chorus, will shorten it.`)
+  })
+
+  it('tightens spacing before it changes the lyric size', () => {
+    const layout = layoutPdf(verseOf(42), { ...pdfOptions(parseKey('C')), fit: 1, fontSize: 12 })
+    expect(layout.fontSize).toBe(12)
+    expect(layout.spacing).toBe(0.8)
+    expect(layout.columns).toBe(1)
+    expect(layout.pages).toHaveLength(1)
+    expect(layout.fitWarning).toBeNull()
+  })
+
+  it('splits later sections into the second column and keeps the type size', () => {
+    const layout = layoutPdf(amazingGrace, { ...pdfOptions(amazingGrace.originalKey), columns: 2 })
+    expect(layout.fontSize).toBe(12)
+    expect(layout.pages).toHaveLength(1)
+    expect(layout.pages[0].columnCount).toBe(2)
+    const blocks = layout.pages[0].blocks
+    const first = blocks.find((block) => block.kind === 'section')
+    const secondColumn = blocks.find((block) => block.kind === 'section' && block.column === 2)
+    expect(first?.column).toBe(1)
+    expect(secondColumn?.kind === 'section' && secondColumn.label).toBe('VERSE 3')
+  })
+
+  it('draws an explicit two-column choice as two columns', () => {
+    const layout = layoutPdf(verseOf(4), { ...pdfOptions(parseKey('C')), columns: 2 })
+    expect(layout.columns).toBe(2)
+    expect(layout.pages[0].columnCount).toBe(2)
+    expect(layout.pages[0].blocks.every((block) => block.column === 1)).toBe(true)
+  })
+
+  it('uses a real second column before it changes the lyric size', () => {
+    const layout = layoutPdf(longSong(44), { ...pdfOptions(parseKey('C')), fit: 1, fontSize: 12, allowTwoColumns: true })
+    expect(layout.fontSize).toBe(12)
+    expect(layout.columns).toBe(2)
+    expect(layout.spacing).toBe(0.8)
+    expect(layout.pages).toHaveLength(1)
+    const blocks = layout.pages[0].blocks
+    const chorusAt = blocks.findIndex((block) => block.kind === 'section' && block.label === 'CHORUS')
+    expect(chorusAt).toBeGreaterThan(0)
+    expect(blocks.slice(0, chorusAt).every((block) => block.column === 1)).toBe(true)
+    expect(blocks.slice(chorusAt).every((block) => block.column === 2)).toBe(true)
+  })
+
   it('starts the next setlist song on a right-hand page', async () => {
     const fonts = {
       sans: readFileSync('public/fonts/Inter-Regular.ttf'),
@@ -338,6 +386,19 @@ function symbolsOf(song: Song): string[] {
       return []
     }),
   )
+}
+
+function verseOf(lines: number): Song {
+  const song = emptySong({ title: 'Fit', originalKey: parseKey('C') }, idSequence('fit'))
+  song.sections[0].lines = Array.from({ length: lines }, (_, index) => ({
+    id: `fit-line-${index}`,
+    type: 'lyric' as const,
+    text: `Line ${index} stays whole`,
+    chords: [],
+    needsCheck: false,
+  }))
+  song.arrangement = [{ sectionId: song.sections[0].id }]
+  return song
 }
 
 function longSong(lines: number): Song {

@@ -1,7 +1,20 @@
 import { useEffect, useRef, useState } from 'react'
-import type { PdfDocument } from '../domain/pdf-layout'
+import {
+  blockHeight,
+  layoutStatus,
+  type PdfBlock,
+  type PdfDocument,
+} from '../domain/pdf-layout'
 
-export function PreviewPane({ layout, onExport, onBack }: { layout: PdfDocument; onExport: () => void; onBack?: () => void }) {
+export function PreviewPane({
+  layout,
+  onExport,
+  onBack,
+}: {
+  layout: PdfDocument
+  onExport: () => void
+  onBack?: () => void
+}) {
   const scrollRef = useRef<HTMLDivElement>(null)
   const [paneWidth, setPaneWidth] = useState(0)
 
@@ -18,44 +31,68 @@ export function PreviewPane({ layout, onExport, onBack }: { layout: PdfDocument;
   return (
     <aside className="preview">
       <div className="preview-bar">
-        {onBack && <button className="text-button" type="button" onClick={onBack}>Back</button>}
+        {onBack && (
+          <button className="text-button" type="button" onClick={onBack}>
+            Back
+          </button>
+        )}
         <strong>Preview</strong>
-        <span className="meta">{layout.pages.length} {layout.pages.length === 1 ? 'page' : 'pages'}</span>
+        <span className="meta">{layoutStatus(layout)}</span>
         <span className="grow" />
-        <button className="primary" type="button" onClick={onExport}>Export PDF</button>
+        <button className="primary" type="button" onClick={onExport}>
+          Export PDF
+        </button>
       </div>
+      {layout.fitWarning && <p className="fit-warning">{layout.fitWarning}</p>}
       <div className="preview-scroll" ref={scrollRef}>
         {layout.pages.map((page, index) => {
           const scale = paneWidth > 0 ? Math.min(1, (paneWidth - 24) / page.width) : 1
           return (
             <div key={page.pageLabel}>
-              <p className="meta" style={{ textAlign: 'center' }}>Page {index + 1}</p>
-              <article className="paper" style={{ width: page.width * scale, height: page.height * scale }}>
-                <div className="paper-inner" style={{ width: page.width, height: page.height, transform: `scale(${scale})`, transformOrigin: 'top left' }}>
-                  {page.runningHeader ? <p className="run"><strong>{page.runningHeader}</strong> {page.meta}</p> : (
+              <p className="meta" style={{ textAlign: 'center' }}>
+                Page {index + 1}
+              </p>
+              <article
+                className="paper"
+                style={{
+                  width: page.width * scale,
+                  height: page.height * scale,
+                }}
+              >
+                <div
+                  className="paper-inner"
+                  style={{
+                    width: page.width,
+                    height: page.height,
+                    transform: `scale(${scale})`,
+                    transformOrigin: 'top left',
+                  }}
+                >
+                  {page.runningHeader ? (
+                    <p className="run">
+                      <strong>{page.runningHeader}</strong> {page.meta}
+                    </p>
+                  ) : (
                     <>
                       <h2>{page.title}</h2>
                       {page.artist && <p>{page.artist}</p>}
-                      <p>{page.meta} {page.capoLabel ? ` ${page.capoLabel}` : ''}</p>
+                      <p>
+                        {page.meta} {page.capoLabel ? ` ${page.capoLabel}` : ''}
+                      </p>
                       {page.order && <p>{page.order}</p>}
                     </>
                   )}
                   <div className="rule" />
-                  {page.blocks.map((block, blockIndex) => {
-                    if (block.kind === 'section') return <div className="section-rule" key={blockIndex}>{block.label}</div>
-                    if (block.kind === 'comment' || block.kind === 'pointer') return <p key={blockIndex}><em>{block.text}</em></p>
-                    if (block.kind === 'bars') return <p key={blockIndex} style={{ fontFamily: 'JetBrains Mono, monospace' }}>{block.text}</p>
-                    return (
-                      <div key={blockIndex}>
-                        <div style={{ position: 'relative', height: block.chords.length ? 16 : 0, fontFamily: 'JetBrains Mono, monospace', fontWeight: 800 }}>
-                          {block.chords.map((chord, chordIndex) => <span key={chordIndex} className={chord.invalid ? 'invalid' : ''} style={{ position: 'absolute', left: `${chord.index}ch` }}>{chord.label}</span>)}
-                        </div>
-                        <div style={{ fontFamily: 'JetBrains Mono, monospace', whiteSpace: 'pre' }}>{block.text}</div>
-                      </div>
-                    )
-                  })}
+                  <PreviewBody
+                    blocks={page.blocks}
+                    columnCount={page.columnCount}
+                    fontSize={layout.fontSize}
+                    spacing={layout.spacing}
+                  />
                   <p>{page.cue}</p>
-                  <p><strong>{page.pageLabel}</strong></p>
+                  <p>
+                    <strong>{page.pageLabel}</strong>
+                  </p>
                 </div>
               </article>
             </div>
@@ -63,5 +100,123 @@ export function PreviewPane({ layout, onExport, onBack }: { layout: PdfDocument;
         })}
       </div>
     </aside>
+  )
+}
+
+function PreviewBody({
+  blocks,
+  columnCount,
+  fontSize,
+  spacing,
+}: {
+  blocks: PdfBlock[]
+  columnCount: 1 | 2
+  fontSize: number
+  spacing: number
+}) {
+  if (columnCount === 1)
+    return (
+      <div>
+        {blocks.map((block, index) => (
+          <PreviewBlock
+            key={index}
+            block={block}
+            fontSize={fontSize}
+            spacing={spacing}
+          />
+        ))}
+      </div>
+    )
+  const left = blocks.filter((block) => block.column !== 2)
+  const right = blocks.filter((block) => block.column === 2)
+  return (
+    <div className="columns">
+      <div>
+        {left.map((block, index) => (
+          <PreviewBlock
+            key={index}
+            block={block}
+            fontSize={fontSize}
+            spacing={spacing}
+          />
+        ))}
+      </div>
+      <div>
+        {right.map((block, index) => (
+          <PreviewBlock
+            key={index}
+            block={block}
+            fontSize={fontSize}
+            spacing={spacing}
+          />
+        ))}
+      </div>
+    </div>
+  )
+}
+
+function PreviewBlock({
+  block,
+  fontSize,
+  spacing,
+}: {
+  block: PdfBlock
+  fontSize: number
+  spacing: number
+}) {
+  const height = blockHeight(block, fontSize, spacing)
+  if (block.kind === 'section')
+    return (
+      <div className="section-rule" style={{ height }}>
+        {block.label}
+      </div>
+    )
+  if (block.kind === 'comment' || block.kind === 'pointer')
+    return (
+      <p style={{ height, margin: 0 }}>
+        <em>{block.text}</em>
+      </p>
+    )
+  if (block.kind === 'bars')
+    return (
+      <p
+        style={{
+          height,
+          margin: 0,
+          fontFamily: 'JetBrains Mono, monospace',
+          fontSize,
+        }}
+      >
+        {block.text}
+      </p>
+    )
+  return (
+    <div
+      style={{
+        height,
+        fontSize,
+        fontFamily: 'JetBrains Mono, monospace',
+        lineHeight: 1.05,
+      }}
+    >
+      <div
+        style={{
+          position: 'relative',
+          height: block.chords.length ? fontSize : 0,
+          fontWeight: 800,
+        }}
+      >
+        {block.chords.map((chord, chordIndex) => (
+          <span
+            key={chordIndex}
+            className={chord.invalid ? 'invalid' : ''}
+            style={{ position: 'absolute', left: `${chord.index}ch` }}
+          >
+            {chord.label}
+          </span>
+        ))}
+      </div>
+      <div style={{ whiteSpace: 'pre' }}>{block.text}</div>
+    </div>
   )
 }

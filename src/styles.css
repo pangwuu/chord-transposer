@@ -101,7 +101,7 @@ button { cursor: pointer; }
 .lyric-row button.letter { border: 0; background: transparent; font: inherit; padding: 0; min-width: 1ch; }
 .check-line { color: var(--danger); font-size: 12px; }
 .bars { font-family: var(--mono); white-space: pre-wrap; }
-.bars button { font-weight: 700; }
+.bars .chord { position: static; }
 .comment { font-style: italic; margin: 4px 0; }
 .lyric-block:has(.toolbar) { padding-top: 40px; }
 .toolbar { position: absolute; z-index: 3; top: 2px; left: 0; display: flex; gap: 2px; background: var(--bg-raised); box-shadow: var(--shadow-md); border-radius: 8px; padding: 4px; }
@@ -120,7 +120,12 @@ button { cursor: pointer; }
 .paper h2, .paper p, .paper .run { font-family: Inter, sans-serif; color: black; }
 .paper h2 { font-size: 21px; margin: 0 0 6px; }
 .paper .rule { border-top: 1px solid black; margin: 8px 0; }
-.paper .section-rule { font-family: Inter, sans-serif; font-weight: 700; font-size: 11px; letter-spacing: .06em; border-bottom: 1px solid #999; margin: 12px 0 8px; }
+.paper .section-rule { font-family: Inter, sans-serif; font-weight: 700; font-size: 11px; letter-spacing: .06em; border-bottom: 1px solid #999; margin: 0; display: flex; align-items: flex-end; }
+.paper .columns { display: flex; gap: 18px; align-items: flex-start; }
+.paper .columns > div { flex: 1; min-width: 0; }
+.paper .columns > div + div { border-left: 1px solid #999; padding-left: 8px; }
+.fit-warning { margin: 8px 12px 0; padding: 6px 8px; border-radius: 6px; background: #fbf3d5; color: #6b5300; font-size: 12px; }
+.dialog .fit-warning { margin: 12px 0 0; }
 .paper .invalid { text-decoration: underline wavy; }
 .chips { display: flex; gap: 6px; flex-wrap: wrap; }
 .chip { border-radius: 999px; padding: 4px 8px; background: var(--bg-subtle); }
