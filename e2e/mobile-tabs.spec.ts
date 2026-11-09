@@ -1,7 +1,7 @@
 import { expect, test } from '@playwright/test'
 
 test.describe('phone bottom tabs', () => {
-  test.beforeEach((_args, testInfo) => {
+  test.beforeEach(({ page: _page }, testInfo) => {
     test.skip(testInfo.project.name !== 'mobile', 'Bottom tabs are phone-only')
   })
 
