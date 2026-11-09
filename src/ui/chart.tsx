@@ -152,6 +152,7 @@ export function Chart({
                       key={`${line.id}-${index}`}
                       type="button"
                       className="letter"
+                      aria-label={character === ' ' ? 'Add a chord on the space' : `Add a chord on ${character}`}
                       disabled={readOnly || padded.origins[index] < 0}
                       onClick={(event) => { event.stopPropagation(); if (padded.origins[index] >= 0) onAdd(line.id, padded.origins[index]) }}
                     >
