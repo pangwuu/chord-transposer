@@ -95,7 +95,7 @@ button { cursor: pointer; }
 .lyric-row button.letter { border: 0; background: transparent; font: inherit; padding: 0; min-width: 1ch; }
 .check-line { color: var(--danger); font-size: 12px; }
 .bars { font-family: var(--mono); white-space: pre-wrap; }
-.bars button { font-weight: 700; }
+.bars .chord { position: static; }
 .comment { font-style: italic; margin: 4px 0; }
 .lyric-block:has(.toolbar) { padding-top: 40px; }
 .toolbar { position: absolute; z-index: 3; top: 2px; left: 0; display: flex; gap: 2px; background: var(--bg-raised); box-shadow: var(--shadow-md); border-radius: 8px; padding: 4px; }
