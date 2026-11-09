@@ -5,7 +5,7 @@ function mobile(name: string) {
 }
 
 async function songs(page: Page, project: string) {
-  if (mobile(project)) await page.getByRole('button', { name: 'Songs' }).click()
+  if (mobile(project)) await page.locator('.phone-tabs').getByRole('button', { name: 'Songs' }).click()
 }
 
 async function editorAction(page: Page, project: string, name: string | RegExp) {

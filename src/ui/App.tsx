@@ -316,8 +316,12 @@ export function App() {
   const selectedId = editor?.selectedIds[0] ?? null
   const concertLabel = editor && view && selectedId && editor.capo > 0 ? concertName(editor, selectedId) : null
 
+  const phoneScreen = place === 'songs' ? 'songs' : place
+  const phonePerformance = performance ? `phone-${performance.mode}` : ''
+  const songsTabActive = place === 'songs' || place === 'editor' || place === 'import'
+
   return (
-    <div className={['app', phone ? `phone-${place === 'songs' ? 'songs' : place}` : '', showPreview ? 'show-preview' : ''].filter(Boolean).join(' ')}>
+    <div className={['app', phone ? `phone-${phoneScreen}` : '', phonePerformance, showPreview ? 'show-preview' : ''].filter(Boolean).join(' ')}>
       <aside className="library">
         <div className="brand"><span>Chord Sheet Maker</span></div>
         <input ref={searchRef} className="search" aria-label="Search songs" placeholder="Search songs" value={query} onChange={(event) => setQuery(event.target.value)} />
@@ -340,7 +344,7 @@ export function App() {
       {(place === 'editor' || place === 'songs') && editor && view && shapeKey && layout && (
         <main className="editor">
           <header className="editor-bar">
-            {phone && <button className="text-button" type="button" onClick={() => setPlace('songs')}>Songs</button>}
+            {phone && <button className="text-button" type="button" aria-label="Back to songs" onClick={() => setPlace('songs')}>‹</button>}
             <strong>{editor.song.title}</strong>
             <span className="meta">{status === 'Not saved' ? '· Not saved' : status === 'Saving…' ? '· Saving…' : '· Saved'}</span>
             <span className="grow" />
@@ -477,7 +481,7 @@ export function App() {
       {performance?.mode === 'stage' && <StageView songs={performance.songs} onExit={() => setPerformance(null)} />}
       {performance?.mode === 'projector' && performance.songs[0] && <ProjectorView song={performance.songs[0]} onExit={() => setPerformance(null)} />}
       <div className="phone-tabs">
-        <button type="button" aria-pressed={place === 'songs'} onClick={() => setPlace('songs')}>Songs</button>
+        <button type="button" aria-pressed={songsTabActive} onClick={() => setPlace('songs')}>Songs</button>
         <button type="button" aria-pressed={place === 'sets'} onClick={() => setPlace('sets')}>Setlists</button>
         <button type="button" aria-pressed={place === 'settings'} onClick={() => setPlace('settings')}>Settings</button>
       </div>
