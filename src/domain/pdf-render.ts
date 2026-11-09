@@ -25,6 +25,16 @@ export async function renderPdf(layout: PdfDocument, fonts: PdfFonts): Promise<U
   return document.save()
 }
 
+export async function mergePdfs(parts: Uint8Array[]): Promise<Uint8Array> {
+  const out = await PDFDocument.create()
+  for (const part of parts) {
+    const doc = await PDFDocument.load(part)
+    const copied = await out.copyPages(doc, doc.getPageIndices())
+    copied.forEach((page) => out.addPage(page))
+  }
+  return out.save()
+}
+
 function drawPage(page: PDFPage, layout: PdfPage, fontSize: number, fonts: { sans: PDFFont; sansBold: PDFFont; sansItalic: PDFFont; mono: PDFFont; monoBold: PDFFont }) {
   const ink = rgb(0, 0, 0)
   const secondary = rgb(0.2, 0.2, 0.2)
