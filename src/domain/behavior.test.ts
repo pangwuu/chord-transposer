@@ -3,7 +3,7 @@ import { describe, expect, it } from 'vitest'
 import { PDFDocument } from 'pdf-lib'
 import { formatSymbol, parseChord, parseKey } from './chord'
 import { applyRestore, planRestore } from './backup'
-import { addAt, changeLyric, checkLine, nudge, openEditor, removeSelected, saveConcertAsSongKey, setChordText, stepConcert, undo, viewSong, chooseCapo } from './editor'
+import { addAt, addSectionOf, changeLyric, checkLine, deleteSectionOf, duplicateSectionOf, moveSectionOf, nudge, openEditor, removeSelected, renameSectionOf, saveConcertAsSongKey, setChordText, setSongDetails, stepConcert, undo, viewSong, chooseCapo } from './editor'
 import { amazingGrace, firstLight } from '../fixtures/charts'
 import { importText } from './import-text'
 import { padCollisions } from './line-layout'
@@ -129,6 +129,38 @@ describe('editing', () => {
     expect(line.text.slice(line.chords[0].index)).toBe('sound')
     state = checkLine(state, lineId)
     expect(lyric(state.song).needsCheck).toBe(false)
+  })
+
+  it('renames, reorders, and restores a section', () => {
+    const song = fromChordPro('{title: Demo}\n{key: C}\n{start_of_verse: Verse 1}\nHello\n{end_of_verse}', idSequence('section'))
+    const original = song.sections[0].id
+    let state = renameSectionOf(openEditor(song), original, 'Chorus')
+    expect(state.song.sections[0].label).toBe('Chorus')
+    expect(state.song.sections[0].kind).toBe('chorus')
+    state = addSectionOf(state, 'bridge', 'Bridge')
+    expect(state.song.sections.map((section) => section.label)).toEqual(['Chorus', 'Bridge'])
+    state = moveSectionOf(state, original, 1)
+    expect(state.song.sections.map((section) => section.id)[1]).toBe(original)
+    state = duplicateSectionOf(state, state.song.sections[0].id)
+    expect(state.song.sections[1].label).toBe('Bridge copy')
+    state = deleteSectionOf(state, state.song.sections[1].id)
+    expect(state.song.sections).toHaveLength(2)
+    state = undo(state)
+    expect(state.song.sections[1].label).toBe('Bridge copy')
+  })
+
+  it('edits the title, artist, tempo, and time, then undo restores them', () => {
+    const song = fromChordPro('{title: Demo}\n{artist: Ada}\n{key: C}\n{tempo: 90}\n{time: 4/4}\nHello\n', idSequence('details'))
+    let state = setSongDetails(openEditor(song), { title: 'Dawn', artist: 'Bea', tempo: 72, timeSignature: '6/8' })
+    expect(state.song.title).toBe('Dawn')
+    expect(state.song.artist).toBe('Bea')
+    expect(state.song.tempo).toBe(72)
+    expect(state.song.timeSignature).toBe('6/8')
+    state = undo(state)
+    expect(state.song.title).toBe('Demo')
+    expect(state.song.artist).toBe('Ada')
+    expect(state.song.tempo).toBe(90)
+    expect(state.song.timeSignature).toBe('4/4')
   })
 
   it('adds, deletes, and restores a chord', () => {

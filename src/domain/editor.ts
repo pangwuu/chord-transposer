@@ -1,17 +1,23 @@
 import { parseChord, shiftKey, type Key, type SpellingPrefs, DEFAULT_PREFS } from './chord'
 import {
   addChord,
+  addSection,
   deletePlacements,
+  deleteSection,
   displayedSong,
+  duplicateSection,
   editLyric,
   markLineChecked,
   movePlacementTo,
   movePlacements,
+  moveSection,
   nearestSymbol,
+  renameSection,
   replaceAll,
   setPlacementSymbol,
   storeSymbol,
   tonicSymbol,
+  type SectionKind,
   type Song,
 } from './song'
 
@@ -128,6 +134,44 @@ export function chooseConcert(state: EditorState, key: Key): EditorState {
 
 export function chooseCapo(state: EditorState, capo: number): EditorState {
   return { ...state, capo: Math.max(0, Math.min(11, capo)) }
+}
+
+export function renameSectionOf(state: EditorState, sectionId: string, label: string): EditorState {
+  const next = label.trim()
+  const current = state.song.sections.find((section) => section.id === sectionId)
+  if (!current || next.length === 0 || current.label === next) return state
+  return commit(state, renameSection(state.song, sectionId, next))
+}
+
+export function addSectionOf(state: EditorState, kind: SectionKind, label: string): EditorState {
+  return commit(state, addSection(state.song, kind, label))
+}
+
+export function duplicateSectionOf(state: EditorState, sectionId: string): EditorState {
+  const song = duplicateSection(state.song, sectionId)
+  if (song === state.song) return state
+  return commit(state, song)
+}
+
+export function deleteSectionOf(state: EditorState, sectionId: string): EditorState {
+  if (!state.song.sections.some((section) => section.id === sectionId)) return state
+  return commit(state, deleteSection(state.song, sectionId))
+}
+
+export function moveSectionOf(state: EditorState, sectionId: string, direction: -1 | 1): EditorState {
+  const song = moveSection(state.song, sectionId, direction)
+  if (song === state.song) return state
+  return commit(state, song)
+}
+
+export function setSongDetails(
+  state: EditorState,
+  details: Partial<Pick<Song, 'title' | 'artist' | 'writers' | 'tempo' | 'timeSignature' | 'ccli' | 'notes'>>,
+): EditorState {
+  const song: Song = { ...state.song, ...details, updatedAt: new Date().toISOString() }
+  const same = (Object.keys(details) as (keyof typeof details)[]).every((key) => state.song[key] === details[key])
+  if (same) return state
+  return commit(state, song)
 }
 
 export function saveConcertAsSongKey(state: EditorState): EditorState {
