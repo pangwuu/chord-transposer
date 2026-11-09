@@ -35,7 +35,10 @@ export function Chart({
   onDuplicate,
   onDeleteSection,
   onMoveSection,
+  onPlaceSection,
   onAddSection,
+  onComment,
+  onBars,
   onNudge,
   onMove,
   onEdit,
@@ -54,7 +57,10 @@ export function Chart({
   onDuplicate: (sectionId: string) => void
   onDeleteSection: (sectionId: string) => void
   onMoveSection: (sectionId: string, direction: -1 | 1) => void
+  onPlaceSection: (sectionId: string, index: number) => void
   onAddSection: (kind: SectionKind, label: string) => void
+  onComment: (sectionId: string, text: string) => void
+  onBars: (sectionId: string, text: string) => void
   onNudge: (how: NudgeHow) => void
   onMove: (id: string, lineId: string, index: number) => void
   onEdit: (id: string) => void
@@ -64,6 +70,7 @@ export function Chart({
   const [dragging, setDragging] = useState(false)
   const [caret, setCaret] = useState<{ lineId: string; index: number } | null>(null)
   const [sectionMenu, setSectionMenu] = useState(false)
+  const [lineDraft, setLineDraft] = useState<{ id: string; kind: 'comment' | 'bars' } | null>(null)
   return (
     <div className={dragging ? 'document dragging' : 'document'} onClick={() => onSelect(null)}>
       {song.sections.map((section) => (
@@ -72,13 +79,21 @@ export function Chart({
             <input key={`${section.id}:${section.label}`} className="section-label" aria-label={`${section.label} name`} defaultValue={section.label} disabled={readOnly} onBlur={(event) => onRename(section.id, event.target.value)} onKeyDown={(event) => { if (event.key === 'Enter') event.currentTarget.blur() }} />
             {!readOnly && (
               <span className="section-actions">
+                <button className="text-button" type="button" aria-label={`Drag ${section.label}`} onPointerDown={(event) => { event.stopPropagation(); beginSectionDrag(event, section.id, onPlaceSection) }}>Drag</button>
                 <button className="text-button" type="button" aria-label={`Move ${section.label} up`} onClick={() => onMoveSection(section.id, -1)}>Up</button>
                 <button className="text-button" type="button" aria-label={`Move ${section.label} down`} onClick={() => onMoveSection(section.id, 1)}>Down</button>
                 <button className="text-button" type="button" onClick={() => onDuplicate(section.id)}>Duplicate</button>
                 <button className="text-button" type="button" onClick={() => onDeleteSection(section.id)}>Delete</button>
+                <button className="text-button" type="button" onClick={() => setLineDraft({ id: section.id, kind: 'comment' })}>Comment</button>
+                <button className="text-button" type="button" onClick={() => setLineDraft({ id: section.id, kind: 'bars' })}>Bars</button>
               </span>
             )}
           </div>
+          {lineDraft?.id === section.id && (
+            <form onSubmit={(event) => { event.preventDefault(); const data = new FormData(event.currentTarget); const text = String(data.get('line') ?? ''); if (lineDraft.kind === 'comment') onComment(section.id, text); else onBars(section.id, text); setLineDraft(null) }}>
+              <input className="field" name="line" aria-label={lineDraft.kind === 'comment' ? 'Comment' : 'Bar line'} placeholder={lineDraft.kind === 'comment' ? 'Repeat ×2' : '| C - - - | F/A - - - |'} autoFocus />
+            </form>
+          )}
           {section.lines.length === 0 && <p className="hint">Empty section. Add a line</p>}
           {section.lines.map((line, lineNumber) => {
             if (line.type === 'comment') return <p className="comment" key={line.id}>{line.text}</p>
@@ -123,7 +138,7 @@ export function Chart({
                         aria-label={`Chord ${symbolLabel(chord.symbol, false, shapeKey)} over "${wordAt(line.text, chord.index)}", ${section.label} line ${lineNumber + 1}`}
                         onClick={(event) => { event.stopPropagation(); onSelect(chord.id, event.shiftKey) }}
                         onDoubleClick={(event) => { event.stopPropagation(); onEdit(chord.id) }}
-                        onPointerDown={(event) => beginDrag(event, chord.id, onMove, setDragging, setCaret)}
+                        onPointerDown={(event) => beginDrag(event, chord.id, onMove, () => onEdit(chord.id), setDragging, setCaret)}
                       >
                         {symbolLabel(chord.symbol, numbers, shapeKey)}
                       </button>
@@ -185,10 +200,38 @@ export function Chart({
   )
 }
 
+function beginSectionDrag(
+  event: ReactPointerEvent<HTMLButtonElement>,
+  id: string,
+  onPlace: (sectionId: string, index: number) => void,
+) {
+  if (event.button !== 0) return
+  const startY = event.clientY
+  let moved = false
+  let index = 0
+  const target = event.currentTarget
+  target.setPointerCapture(event.pointerId)
+  const move = (ev: PointerEvent) => {
+    if (!moved && Math.abs(ev.clientY - startY) < 4) return
+    moved = true
+    const sections = [...document.querySelectorAll<HTMLElement>('.section')]
+    const found = sections.findIndex((section) => ev.clientY < section.getBoundingClientRect().top + section.getBoundingClientRect().height / 2)
+    index = found < 0 ? Math.max(0, sections.length - 1) : found
+  }
+  const up = () => {
+    target.removeEventListener('pointermove', move)
+    target.removeEventListener('pointerup', up)
+    if (moved) onPlace(id, index)
+  }
+  target.addEventListener('pointermove', move)
+  target.addEventListener('pointerup', up)
+}
+
 function beginDrag(
   event: ReactPointerEvent<HTMLButtonElement>,
   id: string,
   onMove: (id: string, lineId: string, index: number) => void,
+  onHold: () => void,
   setDragging: (dragging: boolean) => void,
   setCaret: (caret: { lineId: string; index: number } | null) => void,
 ) {
@@ -199,15 +242,18 @@ function beginDrag(
   let drop: { lineId: string; index: number } | null = null
   const target = event.currentTarget
   target.setPointerCapture(event.pointerId)
+  const hold = window.setTimeout(() => { if (!moved) onHold() }, 500)
   const move = (ev: PointerEvent) => {
     if (!moved && Math.hypot(ev.clientX - startX, ev.clientY - startY) < 4) return
     moved = true
+    window.clearTimeout(hold)
     document.documentElement.classList.add('chord-dragging')
     setDragging(true)
     drop = dropAt(ev.clientX, ev.clientY)
     setCaret(drop)
   }
   const up = () => {
+    window.clearTimeout(hold)
     target.removeEventListener('pointermove', move)
     target.removeEventListener('pointerup', up)
     document.documentElement.classList.remove('chord-dragging')

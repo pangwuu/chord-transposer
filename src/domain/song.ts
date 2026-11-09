@@ -458,6 +458,15 @@ export function duplicateSection(song: Song, sectionId: string, ids: IdGen = cre
   return next
 }
 
+export function placeSection(song: Song, sectionId: string, index: number): Song {
+  const next = structuredClone(song)
+  const from = next.sections.findIndex((section) => section.id === sectionId)
+  if (from < 0 || index < 0 || index >= next.sections.length || from === index) return song
+  const [section] = next.sections.splice(from, 1)
+  next.sections.splice(index, 0, section)
+  return next
+}
+
 export function moveSection(song: Song, sectionId: string, direction: -1 | 1): Song {
   const next = structuredClone(song)
   const index = next.sections.findIndex((section) => section.id === sectionId)
@@ -465,6 +474,16 @@ export function moveSection(song: Song, sectionId: string, direction: -1 | 1): S
   if (index < 0 || target < 0 || target >= next.sections.length) return song
   const [section] = next.sections.splice(index, 1)
   next.sections.splice(target, 0, section)
+  return next
+}
+
+export function setArrangementRepeat(song: Song, index: number, repeat: number): Song {
+  if (index < 0 || index >= song.arrangement.length) return song
+  const count = Math.max(1, Math.min(8, Math.round(repeat)))
+  const current = song.arrangement[index].repeat ?? 1
+  if (current === count) return song
+  const next = structuredClone(song)
+  next.arrangement[index].repeat = count === 1 ? undefined : count
   return next
 }
 

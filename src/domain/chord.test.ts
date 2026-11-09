@@ -2,8 +2,10 @@ import { describe, expect, it } from 'vitest'
 import {
   formatChord,
   formatKey,
+  formatNote,
   formatSymbol,
   friendlyCapos,
+  normaliseSymbol,
   nashville,
   parseChord,
   parseKey,
@@ -42,6 +44,14 @@ describe('parseChord', () => {
     expect(parseChord('H7')).toEqual({ kind: 'invalid', raw: 'H7' })
     expect(parseChord('Cfoo')).toEqual({ kind: 'invalid', raw: 'Cfoo' })
   })
+
+  it('normalises aliases only when asked', () => {
+    expect(formatSymbol(normaliseSymbol(parseChord('Cmin')))).toBe('Cm')
+    expect(formatSymbol(normaliseSymbol(parseChord('CM7')))).toBe('Cmaj7')
+    expect(formatSymbol(normaliseSymbol(parseChord('CΔ7')))).toBe('Cmaj7')
+    expect(formatSymbol(normaliseSymbol(parseChord('Csus')))).toBe('Csus4')
+    expect(formatSymbol(parseChord('Cmin'))).toBe('Cmin')
+  })
 })
 
 describe('spelling and transpose', () => {
@@ -72,6 +82,26 @@ describe('spelling and transpose', () => {
     expect(formatKey(shapes)).toBe('G')
     expect(formatSymbol(transposeSymbol(parseChord('F#sus'), -4, shapes))).toBe('Dsus')
     expect(friendlyCapos(B)).toContainEqual({ capo: 4, shapes: 'G' })
+  })
+
+  it('returns every generated chord after moving up and back', () => {
+    const qualities = ['', 'm', '7', 'maj7', 'm7', 'sus', 'sus2', 'sus4', 'add9', '2', '5', '6', 'm6', '9', 'dim', 'dim7', 'aug', 'm7b5']
+    const notes = Array.from({ length: 12 }, (_, pitch) => formatNote(spellPitch(pitch, C)))
+    for (const root of notes) {
+      for (const quality of qualities) {
+        for (const bass of ['', ...notes.map((note) => `/${note}`)]) {
+          const parsed = parseChord(`${root}${quality}${bass}`)
+          for (let steps = 1; steps <= 11; steps += 1) {
+            const back = transposeSymbol(transposeSymbol(parsed, steps, shiftKey(C, steps)), -steps, C)
+            expect(formatSymbol(back)).toBe(formatSymbol(parsed))
+          }
+        }
+      }
+    }
+    expect(formatSymbol(transposeSymbol(transposeSymbol(parseChord('Cb'), 3, shiftKey(C, 3)), -3, C))).toBe('B')
+    expect(formatSymbol(transposeSymbol(transposeSymbol(parseChord('B#'), 5, shiftKey(C, 5)), -5, C))).toBe('C')
+    expect(formatSymbol(transposeSymbol(transposeSymbol(parseChord('Fbmaj7'), 2, shiftKey(C, 2)), -2, C))).toBe('Emaj7')
+    expect(formatSymbol(transposeSymbol(parseChord('N.C.'), 5, G))).toBe('N.C.')
   })
 
   it('returns the original chord text after moving up and back', () => {

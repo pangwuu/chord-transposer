@@ -41,6 +41,35 @@ function isHeading(line: string): boolean {
   return /^(intro|verse|chorus|bridge|tag|pre-?chorus|instrumental|interlude|outro|ending)\b/i.test(trimmed)
 }
 
+const PDF_CHAR = 6
+
+export function chordTextFromPdfItems(items: { str: string; x: number; y: number }[]): string {
+  const rows: { y: number; parts: { x: number; str: string }[] }[] = []
+  for (const item of items) {
+    if (!item.str.trim()) continue
+    let row = rows.find((candidate) => Math.abs(candidate.y - item.y) < 3)
+    if (!row) {
+      row = { y: item.y, parts: [] }
+      rows.push(row)
+    }
+    row.parts.push({ x: item.x, str: item.str })
+  }
+  rows.sort((a, b) => b.y - a.y)
+  return rows
+    .map((row) => {
+      const parts = [...row.parts].sort((a, b) => a.x - b.x)
+      const origin = parts[0]?.x ?? 0
+      let line = ''
+      for (const part of parts) {
+        const column = Math.max(line.length, Math.round((part.x - origin) / PDF_CHAR))
+        while (line.length < column) line += ' '
+        line += part.str
+      }
+      return line
+    })
+    .join('\n')
+}
+
 export function importText(text: string, ids: IdGen = createId): ImportResult {
   if (/\{[a-z_]+(?::|\})/i.test(text) || /\[[A-Ga-g]/.test(text)) {
     const song = fromChordPro(text, ids)

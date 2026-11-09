@@ -127,6 +127,24 @@ export function formatSymbol(symbol: ChordSymbol): string {
   return symbol.raw
 }
 
+const QUALITY_ALIASES: Record<string, string> = {
+  min: 'm',
+  M7: 'maj7',
+  Δ: 'maj7',
+  Δ7: 'maj7',
+  sus: 'sus4',
+  min7: 'm7',
+}
+
+export function normaliseSymbol(symbol: ChordSymbol): ChordSymbol {
+  if (symbol.kind !== 'chord') return symbol
+  const quality = QUALITY_ALIASES[symbol.chord.quality] ?? symbol.chord.quality
+  if (quality === symbol.chord.quality) return symbol
+  const chord: Chord = { ...symbol.chord, quality, raw: '' }
+  chord.raw = formatChord(chord)
+  return { kind: 'chord', chord }
+}
+
 function isQuality(quality: string): boolean {
   if (QUALITIES.has(quality)) return true
   const stripped = quality.replace(/(#|b)\d+$/, '')

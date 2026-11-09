@@ -1,6 +1,8 @@
 import { parseChord, shiftKey, type Key, type SpellingPrefs, DEFAULT_PREFS } from './chord'
+import { fromChordPro } from './chordpro'
 import {
   addChord,
+  addLine,
   addSection,
   deletePlacements,
   deleteSection,
@@ -11,12 +13,16 @@ import {
   movePlacementTo,
   movePlacements,
   moveSection,
+  placeSection,
   nearestSymbol,
   renameSection,
   replaceAll,
+  setArrangementRepeat,
   setPlacementSymbol,
   storeSymbol,
   tonicSymbol,
+  createId,
+  type CommentLine,
   type SectionKind,
   type Song,
 } from './song'
@@ -158,15 +164,60 @@ export function deleteSectionOf(state: EditorState, sectionId: string): EditorSt
   return commit(state, deleteSection(state.song, sectionId))
 }
 
+export function placeSectionOf(state: EditorState, sectionId: string, index: number): EditorState {
+  const song = placeSection(state.song, sectionId, index)
+  if (song === state.song) return state
+  return commit(state, song)
+}
+
 export function moveSectionOf(state: EditorState, sectionId: string, direction: -1 | 1): EditorState {
   const song = moveSection(state.song, sectionId, direction)
   if (song === state.song) return state
   return commit(state, song)
 }
 
+export function repeatArrangementOf(state: EditorState, index: number, repeat: number): EditorState {
+  const song = setArrangementRepeat(state.song, index, repeat)
+  if (song === state.song) return state
+  return commit(state, song)
+}
+
+export function addCommentOf(state: EditorState, sectionId: string, text: string): EditorState {
+  const comment = text.trim()
+  if (!comment) return state
+  const line: CommentLine = { id: createId(), type: 'comment', text: comment }
+  return commit(state, addLine(state.song, sectionId, line))
+}
+
+export function addBarsOf(state: EditorState, sectionId: string, text: string): EditorState {
+  const probe = fromChordPro(`{title: Bars}\n{key: C}\n${text}\n`)
+  const line = probe.sections[0]?.lines[0]
+  if (!line || line.type !== 'bars') return state
+  line.id = createId()
+  line.items = line.items.map((item) => ({ ...item, id: createId() }))
+  return commit(state, addLine(state.song, sectionId, line))
+}
+
+export function applyChordProOf(state: EditorState, text: string): EditorState {
+  try {
+    const parsed = fromChordPro(text)
+    if (parsed.sections.length === 0) return state
+    const song: Song = {
+      ...parsed,
+      id: state.song.id,
+      views: state.song.views,
+      notes: state.song.notes,
+      updatedAt: new Date().toISOString(),
+    }
+    return commit(state, song)
+  } catch {
+    return state
+  }
+}
+
 export function setSongDetails(
   state: EditorState,
-  details: Partial<Pick<Song, 'title' | 'artist' | 'writers' | 'tempo' | 'timeSignature' | 'ccli' | 'notes'>>,
+  details: Partial<Pick<Song, 'title' | 'artist' | 'writers' | 'tempo' | 'timeSignature' | 'ccli' | 'notes' | 'originalKey'>>,
 ): EditorState {
   const song: Song = { ...state.song, ...details, updatedAt: new Date().toISOString() }
   const same = (Object.keys(details) as (keyof typeof details)[]).every((key) => state.song[key] === details[key])

@@ -1,18 +1,18 @@
 import { readFileSync } from 'node:fs'
 import { describe, expect, it } from 'vitest'
 import { PDFDocument } from 'pdf-lib'
-import { formatSymbol, parseChord, parseKey } from './chord'
+import { formatKey, formatSymbol, parseChord, parseKey } from './chord'
 import { applyRestore, planRestore } from './backup'
-import { addAt, addSectionOf, changeLyric, checkLine, deleteSectionOf, duplicateSectionOf, moveSectionOf, nudge, openEditor, removeSelected, renameSectionOf, saveConcertAsSongKey, setChordText, setSongDetails, stepConcert, undo, viewSong, chooseCapo } from './editor'
+import { addAt, addBarsOf, addCommentOf, addSectionOf, applyChordProOf, changeLyric, checkLine, deleteSectionOf, duplicateSectionOf, moveSectionOf, nudge, openEditor, placeSectionOf, removeSelected, renameSectionOf, repeatArrangementOf, saveConcertAsSongKey, setChordText, setSongDetails, stepConcert, undo, viewSong, chooseCapo } from './editor'
 import { amazingGrace, firstLight } from '../fixtures/charts'
-import { importText } from './import-text'
+import { chordTextFromPdfItems, importText } from './import-text'
 import { padCollisions } from './line-layout'
 import { memoryLibrary } from './memory-library'
 import { formatLyric, fromChordPro, toChordPro } from './chordpro'
 import { layoutPdf } from './pdf-layout'
-import { renderPdf } from './pdf-render'
+import { renderPdf, rightHandParts, mergePdfs } from './pdf-render'
 import { decodeShare, encodeShare } from './share'
-import { emptySong, idSequence, type Song } from './song'
+import { emptySong, idSequence, performance, type Song } from './song'
 
 const ids = idSequence('test')
 
@@ -63,6 +63,24 @@ describe('plain import', () => {
     expect(line.type).toBe('lyric')
     if (line.type !== 'lyric') return
     expect(line.chords.map((chord) => chord.index)).toEqual([0, 9])
+  })
+
+  it('rebuilds a chords-over-lyrics chart from PDF text positions', () => {
+    const text = chordTextFromPdfItems([
+      { str: 'D', x: 0, y: 700 },
+      { str: 'G', x: 54, y: 700 },
+      { str: 'Morning on the kitchen table', x: 0, y: 680 },
+    ])
+    const result = importText(text, idSequence('pdf'))
+    expect(result.format).toBe('chords-over-lyrics')
+    const line = result.song.sections[0].lines[0]
+    expect(line.type).toBe('lyric')
+    if (line.type !== 'lyric') return
+    expect(line.text).toBe('Morning on the kitchen table')
+    expect(line.chords.map((chord) => [formatSymbol(chord.symbol), chord.index])).toEqual([
+      ['D', 0],
+      ['G', 9],
+    ])
   })
 
   it('keeps an unrecognised token and reports it', () => {
@@ -147,20 +165,59 @@ describe('editing', () => {
     expect(state.song.sections).toHaveLength(2)
     state = undo(state)
     expect(state.song.sections[1].label).toBe('Bridge copy')
+    const bridge = state.song.sections.find((section) => section.label === 'Bridge copy')
+    state = placeSectionOf(state, bridge?.id ?? '', 0)
+    expect(state.song.sections[0].label).toBe('Bridge copy')
+    state = undo(state)
+    expect(state.song.sections[0].label).not.toBe('Bridge copy')
   })
 
   it('edits the title, artist, tempo, and time, then undo restores them', () => {
-    const song = fromChordPro('{title: Demo}\n{artist: Ada}\n{key: C}\n{tempo: 90}\n{time: 4/4}\nHello\n', idSequence('details'))
+    const song = fromChordPro('{title: Demo}\n{artist: Ada}\n{key: C}\n{tempo: 90}\n{time: 4/4}\n[G]Hello\n', idSequence('details'))
     let state = setSongDetails(openEditor(song), { title: 'Dawn', artist: 'Bea', tempo: 72, timeSignature: '6/8' })
     expect(state.song.title).toBe('Dawn')
     expect(state.song.artist).toBe('Bea')
     expect(state.song.tempo).toBe(72)
     expect(state.song.timeSignature).toBe('6/8')
+    state = setSongDetails(state, { originalKey: parseKey('D'), writers: 'Ada', ccli: '12', notes: 'Soft' })
+    expect(formatKey(state.song.originalKey)).toBe('D')
+    expect(state.song.writers).toBe('Ada')
+    expect(state.song.ccli).toBe('12')
+    expect(state.song.notes).toBe('Soft')
+    expect(formatSymbol(state.song.sections[0].lines[0] && state.song.sections[0].lines[0].type === 'lyric' ? state.song.sections[0].lines[0].chords[0].symbol : parseChord(''))).toBe('G')
+    state = undo(state)
+    expect(formatKey(state.song.originalKey)).toBe('C')
     state = undo(state)
     expect(state.song.title).toBe('Demo')
     expect(state.song.artist).toBe('Ada')
     expect(state.song.tempo).toBe(90)
     expect(state.song.timeSignature).toBe('4/4')
+  })
+
+  it('repeats a section in the arrangement without copying its lines', () => {
+    const song = fromChordPro('{title: Demo}\n{key: C}\n{start_of_chorus: Chorus}\nHello\n{end_of_chorus}', idSequence('repeat'))
+    const id = song.sections[0].id
+    let state = repeatArrangementOf(openEditor(song), 0, 2)
+    expect(state.song.sections).toHaveLength(1)
+    expect(state.song.arrangement[0]).toEqual({ sectionId: id, repeat: 2 })
+    expect(performance(state.song).filter((item) => item.section.id === id)).toHaveLength(2)
+    state = undo(state)
+    expect(state.song.arrangement[0].repeat).toBeUndefined()
+  })
+
+  it('adds a comment and a bar line, then ChordPro text edits the lyric', () => {
+    const song = fromChordPro('{title: Demo}\n{key: C}\nHello\n', idSequence('lines'))
+    const sectionId = song.sections[0].id
+    let state = addCommentOf(openEditor(song), sectionId, 'Build')
+    expect(state.song.sections[0].lines.at(-1)).toMatchObject({ type: 'comment', text: 'Build' })
+    state = addBarsOf(state, sectionId, '| C - - - | F/A - - - |')
+    const bars = state.song.sections[0].lines.at(-1)
+    expect(bars?.type).toBe('bars')
+    state = applyChordProOf(state, '{title: Demo}\n{key: C}\nHello there\n')
+    expect(state.song.id).toBe(song.id)
+    expect(state.song.sections[0].lines[0]).toMatchObject({ type: 'lyric', text: 'Hello there' })
+    state = undo(state)
+    expect(state.song.sections[0].lines.some((line) => line.type === 'bars')).toBe(true)
   })
 
   it('adds, deletes, and restores a chord', () => {
@@ -219,6 +276,20 @@ describe('pdf', () => {
     const document = await PDFDocument.load(bytes)
     expect(document.getPageCount()).toBe(layout.pages.length)
     expect(String.fromCharCode(...bytes.subarray(0, 4))).toBe('%PDF')
+  })
+
+  it('starts the next setlist song on a right-hand page', async () => {
+    const fonts = {
+      sans: readFileSync('public/fonts/Inter-Regular.ttf'),
+      sansBold: readFileSync('public/fonts/Inter-Bold.ttf'),
+      sansItalic: readFileSync('public/fonts/Inter-Italic.ttf'),
+      mono: readFileSync('public/fonts/JetBrainsMono-Regular.ttf'),
+      monoBold: readFileSync('public/fonts/JetBrainsMono-ExtraBold.ttf'),
+    }
+    const bytes = await renderPdf(layoutPdf(firstLight, pdfOptions(firstLight.originalKey)), fonts)
+    const pages = (await PDFDocument.load(bytes)).getPageCount()
+    const merged = await PDFDocument.load(await mergePdfs(await rightHandParts([bytes, bytes])))
+    expect(merged.getPageCount()).toBe(pages + (pages % 2) + pages)
   })
 })
 

@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
-import { formatKey, formatSymbol, friendlyCapos, parseChord, parseKey, shiftKey } from '../domain/chord'
+import { formatKey, formatSymbol, friendlyCapos, keyFromPitch, normaliseSymbol, notePitch, parseChord, parseKey, shiftKey } from '../domain/chord'
 import {
   addAt,
   addSectionOf,
@@ -9,13 +9,18 @@ import {
   chooseConcert,
   deleteSectionOf,
   duplicateSectionOf,
+  addBarsOf,
+  addCommentOf,
+  applyChordProOf,
   moveChord,
   moveSectionOf,
   nudge,
   openEditor,
+  placeSectionOf,
   redo,
   removeSelected,
   renameSectionOf,
+  repeatArrangementOf,
   replaceSelected,
   saveConcertAsSongKey,
   selectChord,
@@ -26,14 +31,24 @@ import {
   viewSong,
   type EditorState,
 } from '../domain/editor'
+import { applyRestore, planRestore, type BackupFile } from '../domain/backup'
+import { toChordPro } from '../domain/chordpro'
 import { idbLibrary } from '../domain/idb-library'
+import { defaultSettings, type Setlist, type Settings } from '../domain/library-types'
 import { layoutPdf } from '../domain/pdf-layout'
-import { findPlacement, issuesIn, type Song } from '../domain/song'
+import { encodeShare, decodeShare } from '../domain/share'
+import { displayedSong, findPlacement, issuesIn, mapSymbols, type Song } from '../domain/song'
 import { amazingGrace, firstLight } from '../fixtures/charts'
 import { emptySong } from '../domain/song'
 import { Chart, type NudgeHow } from './chart'
+import { ChordProPane } from './chordpro-pane'
+import { ExportDialog, type PdfChoices } from './export-dialog'
+import { ImportScreen } from './import-screen'
 import { Inspector } from './inspector'
 import { PreviewPane } from './preview-pane'
+import { ProjectorView, StageView } from './performance'
+import { SetlistScreen } from './setlist-screen'
+import { SettingsScreen } from './settings-screen'
 
 const KEYS = ['C', 'Db', 'D', 'Eb', 'E', 'F', 'F#', 'G', 'Ab', 'A', 'Bb', 'B']
 
@@ -42,9 +57,15 @@ export function App() {
   const editorRef = useRef<EditorState | null>(null)
   const searchRef = useRef<HTMLInputElement>(null)
   const phone = usePhone()
-  const [tab, setTab] = useState<'songs' | 'editor'>('editor')
+  const [place, setPlace] = useState<'songs' | 'editor' | 'sets' | 'settings' | 'import'>('editor')
   const [showPreview, setShowPreview] = useState(false)
+  const [mode, setMode] = useState<'visual' | 'chordpro'>('visual')
+  const [performance, setPerformance] = useState<{ mode: 'stage' | 'projector'; songs: Song[] } | null>(null)
+  const [exportOpen, setExportOpen] = useState(false)
   const [songs, setSongs] = useState<Song[]>([])
+  const [setlists, setSetlists] = useState<Setlist[]>([])
+  const [settings, setSettings] = useState<Settings>(defaultSettings())
+  const [pdfChoices, setPdfChoices] = useState<PdfChoices>({ paper: 'a4', fontSize: 12, columns: 1, fit: 'auto', content: 'full', repeats: 'full' })
   const [editor, setEditor] = useState<EditorState | null>(null)
   const [query, setQuery] = useState('')
   const [status, setStatus] = useState('Saved')
@@ -64,8 +85,22 @@ export function App() {
           list = [amazingGrace, firstLight]
           await Promise.all(list.map((song) => library.current.saveSong(song)))
         }
+        const hash = location.hash.replace(/^#/, '')
+        if (hash.startsWith('1.')) {
+          try {
+            const shared = decodeShare(hash)
+            if (!list.some((song) => song.id === shared.id)) {
+              list = [shared, ...list]
+              await library.current.saveSong(shared)
+            }
+            history.replaceState(null, '', location.pathname)
+          } catch { /* ignore a bad share link */ }
+        }
         if (cancel) return
         setSongs(list)
+        setSetlists(snapshot.setlists)
+        setSettings(snapshot.settings)
+        setPdfChoices((choices) => ({ ...choices, paper: snapshot.settings.paper, fontSize: snapshot.settings.lyricSize }))
         setEditor(openEditor(list[0]))
         setReady(true)
       } catch {
@@ -169,18 +204,18 @@ export function App() {
   const layout = useMemo(() => {
     if (!editor) return null
     return layoutPdf(editor.song, {
-      paper: 'a4',
-      fontSize: 12,
-      columns: 1,
-      fit: 'auto',
-      content: 'full',
+      paper: pdfChoices.paper,
+      fontSize: pdfChoices.fontSize,
+      columns: pdfChoices.columns,
+      fit: pdfChoices.fit,
+      content: pdfChoices.content,
       numbers: editor.nashville,
       capo: editor.capo,
       concert: editor.concert,
-      repeats: 'full',
-      allowTwoColumns: true,
+      repeats: pdfChoices.repeats,
+      allowTwoColumns: settings.allowTwoColumns,
     })
-  }, [editor])
+  }, [editor, pdfChoices, settings.allowTwoColumns])
 
   function announce(text: string) {
     setLive(text)
@@ -210,25 +245,61 @@ export function App() {
     announce(`Replaced ${result.count} with ${text}`)
   }
 
+  async function downloadBytes(bytes: Uint8Array, name: string) {
+    const url = URL.createObjectURL(new Blob([new Uint8Array(bytes)], { type: 'application/pdf' }))
+    const link = document.createElement('a')
+    link.href = url
+    link.download = name
+    link.click()
+    URL.revokeObjectURL(url)
+  }
+
   async function exportPdf() {
     if (!layout) return
     const [{ renderPdf }, { loadPdfFonts }] = await Promise.all([import('../domain/pdf-render'), import('./fonts')])
     const fonts = await loadPdfFonts()
-    const bytes = await renderPdf(layout, fonts)
-    const url = URL.createObjectURL(new Blob([new Uint8Array(bytes)], { type: 'application/pdf' }))
-    const link = document.createElement('a')
-    link.href = url
-    link.download = layout.fileName
-    link.click()
-    URL.revokeObjectURL(url)
+    await downloadBytes(await renderPdf(layout, fonts), layout.fileName)
+    setExportOpen(false)
+  }
+
+  async function exportSetlist(setlist: Setlist, rightHand = false) {
+    const [{ renderPdf, mergePdfs, rightHandParts }, { loadPdfFonts }] = await Promise.all([import('../domain/pdf-render'), import('./fonts')])
+    const fonts = await loadPdfFonts()
+    const parts: Uint8Array[] = []
+    for (const [index, entry] of setlist.entries.entries()) {
+      const song = songs.find((item) => item.id === entry.songId)
+      if (!song) continue
+      const laid = layoutPdf(song, { ...pdfChoices, numbers: settings.numbers, capo: entry.capo ?? 0, concert: entry.key ?? song.originalKey, allowTwoColumns: settings.allowTwoColumns, songPosition: { index: index + 1, total: setlist.entries.length } })
+      parts.push(await renderPdf(laid, fonts))
+    }
+    if (parts.length === 0) return
+    const pages = rightHand ? await rightHandParts(parts) : parts
+    await downloadBytes(await mergePdfs(pages), `${setlist.name} - ${setlist.date}.pdf`)
   }
 
   async function openSong(song: Song) {
     const current = editorRef.current
     if (current) await library.current.saveSong(current.song)
-    setEditor(openEditor(song))
-    setTab('editor')
+    const opened = openEditor(song)
+    setEditor({ ...opened, prefs: settings.prefs, concert: keyFromPitch(notePitch(opened.concert.tonic), opened.concert.mode, settings.prefs) })
+    setPlace('editor')
     setShowPreview(false)
+  }
+
+  async function restoreBackup(file: File) {
+    const backup = JSON.parse(await file.text()) as BackupFile
+    const plan = planRestore(songs, backup.songs ?? [])
+    const choices: Record<string, 'replace' | 'keep'> = {}
+    for (const id of plan.conflicts) {
+      const title = backup.songs.find((song) => song.id === id)?.title ?? 'this song'
+      if (window.confirm(`A song already uses this copy of “${title}”. Replace it?`)) choices[id] = 'replace'
+    }
+    const next = applyRestore(songs, backup.songs ?? [], choices)
+    setSongs(next)
+    await Promise.all(next.map((song) => library.current.saveSong(song)))
+    for (const setlist of backup.setlists ?? []) await library.current.saveSetlist(setlist)
+    if (backup.setlists) setSetlists(backup.setlists)
+    announce('Backup restored')
   }
 
   async function createSong() {
@@ -236,7 +307,7 @@ export function App() {
     await library.current.saveSong(song)
     setSongs((current) => [song, ...current])
     setEditor(openEditor(song))
-    setTab('editor')
+    setPlace('editor')
   }
 
   const visible = songs.filter((song) => song.title.toLowerCase().includes(query.trim().toLowerCase()))
@@ -246,7 +317,7 @@ export function App() {
   const concertLabel = editor && view && selectedId && editor.capo > 0 ? concertName(editor, selectedId) : null
 
   return (
-    <div className={['app', phone ? (tab === 'songs' ? 'phone-songs' : 'phone-editor') : '', showPreview ? 'show-preview' : ''].filter(Boolean).join(' ')}>
+    <div className={['app', phone ? `phone-${place === 'songs' ? 'songs' : place}` : '', showPreview ? 'show-preview' : ''].filter(Boolean).join(' ')}>
       <aside className="library">
         <div className="brand"><span>Chord Sheet Maker</span></div>
         <input ref={searchRef} className="search" aria-label="Search songs" placeholder="Search songs" value={query} onChange={(event) => setQuery(event.target.value)} />
@@ -261,17 +332,25 @@ export function App() {
         </div>
         <div className="side-nav">
           <button className="nav-button" type="button" onClick={createSong}>+ New song</button>
+          <button className="nav-button" type="button" aria-pressed={place === 'import'} onClick={() => setPlace('import')}>Import</button>
+          <button className="nav-button" type="button" aria-pressed={place === 'sets'} onClick={() => setPlace('sets')}>Setlists</button>
+          <button className="nav-button" type="button" aria-pressed={place === 'settings'} onClick={() => setPlace('settings')}>Settings</button>
         </div>
       </aside>
-      {editor && view && shapeKey && layout && (
+      {(place === 'editor' || place === 'songs') && editor && view && shapeKey && layout && (
         <main className="editor">
           <header className="editor-bar">
-            {phone && <button className="text-button" type="button" onClick={() => setTab('songs')}>Songs</button>}
+            {phone && <button className="text-button" type="button" onClick={() => setPlace('songs')}>Songs</button>}
             <strong>{editor.song.title}</strong>
             <span className="meta">{status === 'Not saved' ? '· Not saved' : status === 'Saving…' ? '· Saving…' : '· Saved'}</span>
             <span className="grow" />
             <button className="text-button" type="button" onClick={() => { setEditor(undo(editor)); announce('Undid') }}>Undo</button>
             <button className="text-button" type="button" onClick={() => { setEditor(redo(editor)); announce('Redid') }}>Redo</button>
+            <button className="text-button" type="button" aria-pressed={mode === 'chordpro'} onClick={() => setMode((value) => value === 'visual' ? 'chordpro' : 'visual')}>{mode === 'visual' ? 'ChordPro' : 'Visual'}</button>
+            <button className="text-button" type="button" onClick={() => { const blob = new Blob([toChordPro(editor.song)], { type: 'text/plain' }); const url = URL.createObjectURL(blob); const link = document.createElement('a'); link.href = url; link.download = `${editor.song.title}.cho`; link.click(); URL.revokeObjectURL(url) }}>.cho</button>
+            <button className="text-button" type="button" onClick={() => { const encoded = encodeShare(editor.song); if (!encoded.ok) { announce('This song is too large for a link'); return } void navigator.clipboard.writeText(`${location.origin}${location.pathname}#${encoded.hash}`); announce('Share link copied') }}>Share</button>
+            <button className="text-button" type="button" onClick={() => view && setPerformance({ mode: 'stage', songs: [view] })}>Stage</button>
+            <button className="text-button" type="button" onClick={() => view && setPerformance({ mode: 'projector', songs: [view] })}>Projector</button>
             <button className="text-button" type="button" aria-pressed={showPreview} onClick={() => setShowPreview((value) => !value)}>Preview</button>
           </header>
           <div className="transport">
@@ -292,7 +371,8 @@ export function App() {
               {issues.length ? `${issues.length} to check` : 'All chords valid'}
             </button>
           </div>
-          <div className="editor-body">
+          <div className={mode === 'chordpro' ? 'editor-body chordpro-mode' : 'editor-body'}>
+            {mode === 'chordpro' && <ChordProPane song={editor.song} onApply={(text) => setEditor((state) => state ? applyChordProOf(state, text) : state)} />}
             <div className="editor-scroll">
               <DetailField className="title-input" label="Title" value={editor.song.title} onCommit={(title) => setEditor(setSongDetails(editor, { title }))} />
               <div className="properties">
@@ -302,6 +382,22 @@ export function App() {
                 <DetailField label="Tempo" value={editor.song.tempo ? String(editor.song.tempo) : ''} onCommit={(tempo) => { const value = Number(tempo); setEditor(setSongDetails(editor, { tempo: tempo.trim() && Number.isFinite(value) ? value : undefined })) }} />
                 <span className="meta">Time</span>
                 <DetailField label="Time signature" value={editor.song.timeSignature ?? ''} onCommit={(timeSignature) => setEditor(setSongDetails(editor, { timeSignature }))} />
+                <span className="meta">Writers</span>
+                <DetailField label="Writers" value={editor.song.writers ?? ''} onCommit={(writers) => setEditor(setSongDetails(editor, { writers }))} />
+                <span className="meta">CCLI</span>
+                <DetailField label="CCLI number" value={editor.song.ccli ?? ''} onCommit={(ccli) => setEditor(setSongDetails(editor, { ccli }))} />
+                <span className="meta">Notes</span>
+                <DetailField label="Notes" value={editor.song.notes ?? ''} onCommit={(notes) => setEditor(setSongDetails(editor, { notes }))} />
+                <span className="meta">Original key</span>
+                <DetailField label="Original key" value={formatKey(editor.song.originalKey)} onCommit={(text) => { try { setEditor(setSongDetails(editor, { originalKey: parseKey(text) })) } catch { announce(`‘${text}’ isn't a key`) } }} />
+              </div>
+              <div className="chips" aria-label="Arrangement">
+                {editor.song.arrangement.map((item, index) => {
+                  const section = editor.song.sections.find((candidate) => candidate.id === item.sectionId)
+                  if (!section) return null
+                  const times = item.repeat ?? 1
+                  return <button key={`${item.sectionId}-${index}`} className="chip" type="button" onClick={() => setEditor(repeatArrangementOf(editor, index, times >= 4 ? 1 : times + 1))}>{section.label}{times > 1 ? ` ×${times}` : ''}</button>
+                })}
               </div>
               {editor.capo > 0 && <p className="capo-banner">Capo {editor.capo} · showing {formatKey(shapeKey).replace(/m$/, '')} shapes · sounds in {formatKey(editor.concert)}</p>}
               <div className="chips">
@@ -310,7 +406,7 @@ export function App() {
                 ))}
               </div>
               <Chart
-                song={view}
+                song={settings.normalise ? mapSymbols(view, normaliseSymbol) : view}
                 shapeKey={shapeKey}
                 numbers={editor.nashville}
                 selectedIds={editor.selectedIds}
@@ -328,7 +424,10 @@ export function App() {
                 onDuplicate={(sectionId) => setEditor(duplicateSectionOf(editor, sectionId))}
                 onDeleteSection={(sectionId) => setEditor(deleteSectionOf(editor, sectionId))}
                 onMoveSection={(sectionId, direction) => setEditor(moveSectionOf(editor, sectionId, direction))}
+                onPlaceSection={(sectionId, index) => setEditor(placeSectionOf(editor, sectionId, index))}
                 onAddSection={(kind, label) => setEditor(addSectionOf(editor, kind, label))}
+                onComment={(sectionId, text) => setEditor(addCommentOf(editor, sectionId, text))}
+                onBars={(sectionId, text) => setEditor(addBarsOf(editor, sectionId, text))}
                 onNudge={(how) => { setEditor(nudge(editor, how)); announce('Chord moved') }}
                 onMove={(id, lineId, index) => {
                   const found = findPlacement(editor.song, id)
@@ -341,7 +440,7 @@ export function App() {
                 onDelete={() => removeChord(editor)}
               />
             </div>
-            <Inspector
+            {mode === 'visual' && <Inspector
               song={view}
               shapeKey={shapeKey}
               selectedId={selectedId}
@@ -351,15 +450,21 @@ export function App() {
               onReplace={replaceChord}
               onDelete={() => removeChord(editor)}
               onClose={() => setEditor(selectChord(editor, null))}
-            />
+            />}
           </div>
         </main>
       )}
-      {layout && <PreviewPane layout={layout} onExport={exportPdf} />}
+      {place === 'import' && <main className="editor"><ImportScreen onCancel={() => setPlace('editor')} onSave={(song) => { void library.current.saveSong(song); setSongs((current) => [song, ...current.filter((item) => item.id !== song.id)]); const opened = openEditor(song); setEditor({ ...opened, prefs: settings.prefs }); setPlace('editor') }} /></main>}
+      {place === 'sets' && <main className="editor"><SetlistScreen songs={songs} setlists={setlists} onCreate={() => { const setlist: Setlist = { id: crypto.randomUUID(), name: 'Sunday', date: new Date().toISOString().slice(0, 10), entries: [] }; setSetlists((current) => [...current, setlist]); void library.current.saveSetlist(setlist) }} onChange={(setlist) => { setSetlists((current) => current.map((item) => item.id === setlist.id ? setlist : item)); void library.current.saveSetlist(setlist) }} onDelete={(id) => { setSetlists((current) => current.filter((item) => item.id !== id)); void library.current.deleteSetlist(id) }} onExport={(setlist, rightHand) => void exportSetlist(setlist, rightHand)} onStage={(setlist) => { const ordered = setlist.entries.flatMap((entry) => { const song = songs.find((item) => item.id === entry.songId); return song ? [displayedSong(song, entry.key ?? song.originalKey, entry.capo ?? 0, settings.prefs)] : [] }); if (ordered.length > 0) setPerformance({ mode: 'stage', songs: ordered }) }} /></main>}
+      {place === 'settings' && <main className="editor"><SettingsScreen settings={settings} onChange={(next) => { setSettings(next); void library.current.saveSettings(next); document.documentElement.dataset.theme = next.theme === 'system' ? '' : next.theme; document.documentElement.dataset.size = next.textSize; try { localStorage.setItem('csm-theme', next.theme) } catch { /* ignore */ } setEditor((state) => state && { ...state, prefs: next.prefs, concert: keyFromPitch(notePitch(state.concert.tonic), state.concert.mode, next.prefs) }) }} onBackup={() => { const backup: BackupFile = { version: 1, songs, setlists, settings }; const blob = new Blob([JSON.stringify(backup, null, 2)], { type: 'application/json' }); const url = URL.createObjectURL(blob); const link = document.createElement('a'); link.href = url; link.download = 'chord-sheet-backup.json'; link.click(); URL.revokeObjectURL(url) }} onRestore={(file) => void restoreBackup(file)} /></main>}
+      {place === 'editor' && layout && <PreviewPane layout={layout} onExport={() => setExportOpen(true)} />}
+      {exportOpen && layout && <ExportDialog layout={layout} choices={pdfChoices} onChange={setPdfChoices} onClose={() => setExportOpen(false)} onDownload={() => void exportPdf()} />}
+      {performance?.mode === 'stage' && <StageView songs={performance.songs} onExit={() => setPerformance(null)} />}
+      {performance?.mode === 'projector' && performance.songs[0] && <ProjectorView song={performance.songs[0]} onExit={() => setPerformance(null)} />}
       <div className="phone-tabs">
-        <button type="button" aria-pressed={tab === 'songs'} onClick={() => setTab('songs')}>Songs</button>
-        <button type="button" aria-pressed={tab === 'editor'} onClick={() => setTab('editor')}>Editor</button>
-        <button type="button" aria-pressed={showPreview} onClick={() => { setTab('editor'); setShowPreview((value) => !value) }}>Preview</button>
+        <button type="button" aria-pressed={place === 'songs'} onClick={() => setPlace('songs')}>Songs</button>
+        <button type="button" aria-pressed={place === 'sets'} onClick={() => setPlace('sets')}>Setlists</button>
+        <button type="button" aria-pressed={place === 'settings'} onClick={() => setPlace('settings')}>Settings</button>
       </div>
       <p className="live" aria-live="polite">{live}</p>
       {toast && (

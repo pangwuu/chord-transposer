@@ -25,6 +25,19 @@ export async function renderPdf(layout: PdfDocument, fonts: PdfFonts): Promise<U
   return document.save()
 }
 
+export async function rightHandParts(parts: Uint8Array[]): Promise<Uint8Array[]> {
+  const padded: Uint8Array[] = []
+  for (let index = 0; index < parts.length; index += 1) {
+    const doc = await PDFDocument.load(parts[index])
+    if (index < parts.length - 1 && doc.getPageCount() % 2 === 1) {
+      const size = doc.getPage(0).getSize()
+      doc.addPage([size.width, size.height])
+    }
+    padded.push(await doc.save())
+  }
+  return padded
+}
+
 export async function mergePdfs(parts: Uint8Array[]): Promise<Uint8Array> {
   const out = await PDFDocument.create()
   for (const part of parts) {
