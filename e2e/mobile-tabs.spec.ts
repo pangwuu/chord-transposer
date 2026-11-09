@@ -21,13 +21,15 @@ test.describe('phone bottom tabs', () => {
     const tabs = page.locator('.phone-tabs')
     await expect(tabs).toBeVisible()
 
-    await page.getByRole('button', { name: 'Projector' }).click()
+    await page.getByRole('button', { name: 'More actions' }).click()
+    await page.getByRole('menuitem', { name: 'Projector' }).click()
     await expect(page.locator('.projector')).toBeVisible()
     await expect(tabs).toBeHidden()
     await page.getByRole('button', { name: 'Exit' }).click()
     await expect(tabs).toBeVisible()
 
-    await page.getByRole('button', { name: 'Stage' }).click()
+    await page.getByRole('button', { name: 'More actions' }).click()
+    await page.getByRole('menuitem', { name: 'Stage' }).click()
     await expect(page.locator('.stage')).toBeVisible()
     await expect(tabs).toBeHidden()
     await page.getByRole('button', { name: 'Exit' }).click()
