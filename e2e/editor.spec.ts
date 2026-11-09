@@ -32,7 +32,7 @@ test('shows ChordPro beside the chart and opens import review', async ({ page },
   await page.getByRole('button', { name: 'ChordPro' }).click()
   await expect(page.getByLabel('ChordPro source')).toBeVisible()
   await expect(page.getByRole('button', { name: /^Chord / }).first()).toBeVisible()
-  if (testInfo.project.name === 'mobile') await page.getByRole('button', { name: 'Songs' }).click()
+  if (testInfo.project.name === 'mobile') await page.locator('.phone-tabs').getByRole('button', { name: 'Songs' }).click()
   await page.getByRole('button', { name: 'Import' }).click()
   await page.getByLabel('Source text').fill('{title: Kitchen}\n{key: G}\n[G]Morning [D]light\n')
   await expect(page.getByText('2 chords')).toBeVisible()
@@ -42,7 +42,6 @@ test('shows ChordPro beside the chart and opens import review', async ({ page },
 
 test('walks a setlist on stage', async ({ page }, testInfo) => {
   await page.goto('/')
-  if (testInfo.project.name === 'mobile') await page.getByRole('button', { name: 'Songs' }).click()
   const setlists = testInfo.project.name === 'mobile' ? page.locator('.phone-tabs').getByRole('button', { name: 'Setlists' }) : page.locator('.side-nav').getByRole('button', { name: 'Setlists' })
   await setlists.click()
   await page.getByRole('button', { name: '+ New setlist' }).click()

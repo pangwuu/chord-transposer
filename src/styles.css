@@ -139,10 +139,10 @@ button { cursor: pointer; }
   .app.phone-songs .library, .app.phone-editor .editor, .app.phone-sets .editor, .app.phone-settings .editor, .app.phone-import .editor, .app.phone-sets .setlists, .app.phone-settings .settings, .app.phone-import .import-screen { display: flex; flex-direction: column; }
   .app.phone-editor .inspector { display: block; position: fixed; left: 0; right: 0; bottom: 0; max-height: 46vh; border-top-left-radius: 16px; border-top-right-radius: 16px; box-shadow: var(--shadow-lg); z-index: 5; }
   .app.phone-editor .inspector:not(:has(.big-chord)) { display: none; }
-  .phone-tabs { display: grid; grid-template-columns: repeat(3, 1fr); position: fixed; bottom: 0; left: 0; right: 0; background: var(--bg); border-top: 1px solid var(--border); }
+  .phone-tabs { display: grid; grid-template-columns: repeat(3, 1fr); position: fixed; bottom: 0; left: 0; right: 0; z-index: 4; background: var(--bg); border-top: 1px solid var(--border); }
   .phone-tabs button { padding: 10px; border: 0; background: transparent; }
   .phone-tabs button[aria-pressed='true'] { color: var(--accent); font-weight: 600; }
-  .app.phone-editor .phone-tabs, .app.phone-stage .phone-tabs { display: none; }
+  .app.phone-stage .phone-tabs, .app.phone-projector .phone-tabs { display: none; }
   .title-input { font-size: 24px; }
   .editor-bar { flex-wrap: wrap; height: auto; row-gap: 4px; padding: 8px 12px; position: relative; z-index: 3; }
   .editor-bar .grow { display: none; }
