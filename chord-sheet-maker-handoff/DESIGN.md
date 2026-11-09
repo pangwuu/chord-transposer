@@ -368,7 +368,7 @@ Pasted text · chords-over-lyrics detected. Check it before it's saved.
 └────────────────────────────────────────────────────────────────┘
 ```
 
-Options update the preview pane live behind the dialog. On phone the dialog becomes a full-height sheet. "Share" (in a ⋯ menu) offers the read-only link from SPEC §7.
+Options update the preview pane live behind the dialog. On phone the dialog becomes a full-height sheet. "Share" (in a ⋯ menu) offers the share link from SPEC §7 (editable local copy on open; use PDF for view-only).
 
 ### 4.11 Setlists
 
