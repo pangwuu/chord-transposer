@@ -1,20 +1,27 @@
 import { useState } from 'react'
-import { chordTextFromPdfItems, importText, type ImportResult } from '../domain/import-text'
+import { importChartPaste, type ChartPasteResult } from '../domain/chart-paste'
+import { chordTextFromPdfItems } from '../domain/import-text'
 import { addBarChord, issuesIn, type Song } from '../domain/song'
 import { Chart } from './chart'
+
+const SOURCE_LABEL = {
+  'ultimate-guitar': 'Ultimate Guitar',
+  chordie: 'Chordie',
+  'e-chords': 'E-Chords',
+} as const
 
 export function ImportScreen({ onCancel, onSave }: { onCancel: () => void; onSave: (song: Song) => void }) {
   const [source, setSource] = useState('')
   const [notice, setNotice] = useState('')
-  const [result, setResult] = useState<ImportResult | null>(null)
+  const [result, setResult] = useState<ChartPasteResult | null>(null)
   const replaceSource = (text: string) => {
     setSource(text)
-    setResult(text.trim() ? importText(text) : null)
+    setResult(text.trim() ? importChartPaste(text) : null)
   }
   return (
     <div className="import-screen">
       <h2>Review import</h2>
-      <p className="hint">Paste ChordPro or chords-over-lyrics. Copyrighted charts stay in a file on your computer.</p>
+      <p className="hint">Paste ChordPro, chords-over-lyrics, or a whole page from Ultimate Guitar, Chordie, or E-Chords. Copyrighted charts stay in a file on your computer.</p>
       <div className="row-meta">
         <input aria-label="Import file" type="file" accept=".cho,.chordpro,.chopro,.crd,.txt,.pro,.pdf" onChange={(event) => { const file = event.target.files?.[0]; if (file) void readFile(file, replaceSource, setNotice) }} />
         <span className="grow" />
@@ -29,8 +36,10 @@ export function ImportScreen({ onCancel, onSave }: { onCancel: () => void; onSav
           <span className="chip">{result.sectionCount} sections</span>
           <span className="chip">Key {result.detectedKey}</span>
           <span className="chip">{result.format}</span>
+          {result.source && <span className="chip ok">{SOURCE_LABEL[result.source]}</span>}
         </div>
       )}
+      {result?.notices?.map((item) => <p className="check-line" key={item}>{item}</p>)}
       {result?.issues.map((issue) => <p className="check-line" key={`${issue.line}-${issue.raw}`}>Line {issue.line}: {issue.raw} is kept as written.</p>)}
       <div className="split">
         <textarea className="source" aria-label="Source text" value={source} onChange={(event) => replaceSource(event.target.value)} />
