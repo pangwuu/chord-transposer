@@ -486,6 +486,28 @@ describe('pdf', () => {
     expect(height(section)).toBe(blockHeight(section, 12, 1))
   })
 
+  it('draws section headings at the chosen size and reserves the extra room', async () => {
+    const section = { kind: 'section' as const, label: 'VERSE', continued: false }
+    const lyric = { kind: 'lyric' as const, text: 'Hello', chords: [] }
+    expect(blockHeight(section, 12, 1, { headingSize: 11 })).toBe(42)
+    expect(blockHeight(section, 12, 1)).toBe(42)
+    expect(blockHeight(section, 12, 1, { headingSize: 18 })).toBe(49)
+    expect(blockHeight(lyric, 12, 1, { headingSize: 18 })).toBe(blockHeight(lyric, 12, 1))
+
+    const layout = layoutPdf(firstLight, { ...pdfOptions(firstLight.originalKey), headingSize: 18 })
+    expect(layout.headingSize).toBe(18)
+    const bytes = await renderPdf(layout, pdfFonts())
+    const pdfjs = await import('pdfjs-dist/legacy/build/pdf.mjs')
+    const doc = await pdfjs.getDocument({ data: new Uint8Array(bytes) }).promise
+    const content = await (await doc.getPage(1)).getTextContent()
+    const heading = content.items.find((entry) => 'str' in entry && entry.str === 'VERSE 1')
+    if (!heading || !('transform' in heading)) throw new Error('missing VERSE 1')
+    expect(Math.round(heading.transform[0])).toBe(18)
+
+    const shown = layoutPdf(firstLight, pdfOptions(firstLight.originalKey))
+    expect(shown.headingSize).toBe(11)
+  })
+
   it('copies divider choices onto the laid-out document', () => {
     const layout = layoutPdf(firstLight, { ...pdfOptions(firstLight.originalKey), showColumnDivider: false, showSectionDivider: false })
     expect(layout.showColumnDivider).toBe(false)
