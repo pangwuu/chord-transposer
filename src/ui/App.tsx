@@ -348,6 +348,24 @@ export function App() {
     })
   }
 
+  const menuRef = useRef<HTMLDivElement>(null)
+
+  useEffect(() => {
+    if (!menuOpen) return
+    const onPointerDown = (event: PointerEvent) => {
+      if (!menuRef.current?.contains(event.target as Node)) setMenuOpen(false)
+    }
+    const onEscape = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') setMenuOpen(false)
+    }
+    document.addEventListener('pointerdown', onPointerDown)
+    document.addEventListener('keydown', onEscape)
+    return () => {
+      document.removeEventListener('pointerdown', onPointerDown)
+      document.removeEventListener('keydown', onEscape)
+    }
+  }, [menuOpen])
+
   const visible = songs.filter((song) => song.title.toLowerCase().includes(query.trim().toLowerCase()))
   const issues = view ? issuesIn(view) : []
   const transposed = editor ? formatKey(editor.concert) !== formatKey(editor.song.originalKey) : false
@@ -359,6 +377,7 @@ export function App() {
   const phoneScreen = place === 'songs' ? 'songs' : place
   const phonePerformance = performance ? `phone-${performance.mode}` : ''
   const songsTabActive = place === 'songs' || place === 'editor' || place === 'import'
+
 
   return (
     <div className={['app', phone ? `phone-${phoneScreen}` : '', phonePerformance, showPreview ? 'show-preview' : ''].filter(Boolean).join(' ')}>
@@ -388,35 +407,23 @@ export function App() {
             <strong>{editor.song.title}</strong>
             <span className="meta">{status === 'Not saved' ? '· Not saved' : status === 'Saving…' ? '· Saving…' : '· Saved'}</span>
             <span className="grow" />
-            {!phone && (
-              <>
-                <button className="text-button" type="button" onClick={() => { setEditor(undo(editor)); announce('Undid') }}>Undo</button>
-                <button className="text-button" type="button" onClick={() => { setEditor(redo(editor)); announce('Redid') }}>Redo</button>
-                <button className="text-button" type="button" aria-pressed={mode === 'chordpro'} onClick={() => setMode((value) => value === 'visual' ? 'chordpro' : 'visual')}>{mode === 'visual' ? 'ChordPro' : 'Visual'}</button>
-                <button className="text-button" type="button" onClick={() => downloadCho(editor.song)}>.cho</button>
-                <button className="text-button" type="button" onClick={() => copyShare(editor.song, announce)}>Share</button>
-                <button className="text-button" type="button" onClick={() => editor && setPerformance({ mode: 'stage', entries: [{ song: editor.song, concert: editor.concert, capo: editor.capo }], nashville: editor.nashville })}>Stage</button>
-                <button className="text-button" type="button" onClick={() => view && setPerformance({ mode: 'projector', songs: [view] })}>Projector</button>
-                <button className="text-button" type="button" aria-pressed={showPreview} onClick={() => setShowPreview((value) => !value)}>Preview</button>
-              </>
-            )}
-            {phone && (
-              <div className="editor-bar-phone">
+            
+              <div className="editor-bar-phone" ref={menuRef}>
                 <button className="text-button" type="button" aria-pressed={showPreview} onClick={() => setShowPreview((value) => !value)}>Preview</button>
                 <button className="text-button" type="button" aria-label="More actions" aria-expanded={menuOpen} aria-haspopup="menu" onClick={() => setMenuOpen((open) => !open)}>Menu</button>
                 {menuOpen && (
                   <div className="menu editor-menu" role="menu">
                     <button type="button" role="menuitem" onClick={() => { setEditor(undo(editor)); announce('Undid'); setMenuOpen(false) }}>Undo</button>
                     <button type="button" role="menuitem" onClick={() => { setEditor(redo(editor)); announce('Redid'); setMenuOpen(false) }}>Redo</button>
-                    <button type="button" role="menuitem" onClick={() => { setMode((value) => value === 'visual' ? 'chordpro' : 'visual'); setMenuOpen(false) }}>{mode === 'visual' ? 'ChordPro' : 'Visual'}</button>
-                    <button type="button" role="menuitem" onClick={() => { downloadCho(editor.song); setMenuOpen(false) }}>.cho</button>
-                    <button type="button" role="menuitem" onClick={() => { copyShare(editor.song, announce); setMenuOpen(false) }}>Share</button>
-                    <button type="button" role="menuitem" onClick={() => { if (editor) setPerformance({ mode: 'stage', entries: [{ song: editor.song, concert: editor.concert, capo: editor.capo }], nashville: editor.nashville }); setMenuOpen(false) }}>Stage</button>
-                    <button type="button" role="menuitem" onClick={() => { if (view) setPerformance({ mode: 'projector', songs: [view] }); setMenuOpen(false) }}>Projector</button>
+                    <button type="button" role="menuitem" onClick={() => { setMode((value) => value === 'visual' ? 'chordpro' : 'visual'); setMenuOpen(false) }}>{mode === 'visual' ? 'Use ChordPro Editor' : 'Use Visual Editor'}</button>
+                    <button type="button" role="menuitem" onClick={() => { downloadCho(editor.song); setMenuOpen(false) }}>Download as ChordPro</button>
+                    <button type="button" role="menuitem" onClick={() => { copyShare(editor.song, announce); setMenuOpen(false) }}>Copy Share Link</button>
+                    <button type="button" role="menuitem" onClick={() => { if (editor) setPerformance({ mode: 'stage', entries: [{ song: editor.song, concert: editor.concert, capo: editor.capo }], nashville: editor.nashville }); setMenuOpen(false) }}>Performance View</button>
+                    <button type="button" role="menuitem" onClick={() => { if (view) setPerformance({ mode: 'projector', songs: [view] }); setMenuOpen(false) }}>Projector View</button>
                   </div>
                 )}
               </div>
-            )}
+            
           </header>
           <div className={mode === 'chordpro' ? 'editor-body chordpro-mode' : 'editor-body'}>
             {mode === 'chordpro' && <ChordProPane song={editor.song} onApply={(text) => setEditor((state) => state ? applyChordProOf(state, text) : state)} />}
