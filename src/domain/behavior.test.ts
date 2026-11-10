@@ -9,7 +9,7 @@ import { chordTextFromPdfItems, importText } from './import-text'
 import { padCollisions } from './line-layout'
 import { memoryLibrary } from './memory-library'
 import { formatLyric, fromChordPro, toChordPro } from './chordpro'
-import { charsPerLine, layoutPdf, pageSize, SECTION_LEAD_IN } from './pdf-layout'
+import { blockHeight, charsPerLine, layoutPdf, layoutSetlist, pageSize, SECTION_LEAD_IN } from './pdf-layout'
 import { renderPdf, rightHandParts, mergePdfs } from './pdf-render'
 import { decodeShare, encodeShare } from './share'
 import { addBarChord, emptySong, idSequence, performance, type Song } from './song'
@@ -436,6 +436,95 @@ describe('pdf', () => {
     const pages = (await PDFDocument.load(bytes)).getPageCount()
     const merged = await PDFDocument.load(await mergePdfs(await rightHandParts([bytes, bytes])))
     expect(merged.getPageCount()).toBe(pages + (pages % 2) + pages)
+  })
+
+  it('keeps artist, key, and time signature unless each one is hidden', () => {
+    const shown = layoutPdf(firstLight, pdfOptions(firstLight.originalKey))
+    expect(shown.pages[0].artist).toBe('Original demo')
+    expect(shown.pages[0].meta).toContain('Key G')
+    expect(shown.pages[0].meta).toContain('4/4')
+    expect(shown.pages[0].meta).toContain('96 bpm')
+    expect(shown.pages[0].footerTitle).toBe('First Light · Key G')
+
+    const noArtist = layoutPdf(firstLight, { ...pdfOptions(firstLight.originalKey), showArtist: false })
+    expect(noArtist.pages[0].artist).toBeNull()
+    expect(noArtist.pages[0].title).toBe('First Light')
+    expect(noArtist.pages[0].meta).toContain('Key G')
+
+    const noKey = layoutPdf(firstLight, { ...pdfOptions(firstLight.originalKey), showKey: false, numbers: true, capo: 4, concert: parseKey('B') })
+    expect(noKey.pages[0].meta).not.toContain('Key')
+    expect(noKey.pages[0].meta).not.toContain('bpm')
+    expect(noKey.pages[0].meta).not.toContain('Numbers')
+    expect(noKey.pages[0].meta).toContain('4/4')
+    expect(noKey.pages[0].capoLabel).toBe('CAPO 4 · PLAY G SHAPES')
+    expect(noKey.pages[0].footerTitle).toBe('First Light')
+
+    const noTime = layoutPdf(firstLight, { ...pdfOptions(firstLight.originalKey), showTime: false })
+    expect(noTime.pages[0].meta).toContain('Key G')
+    expect(noTime.pages[0].meta).toContain('96 bpm')
+    expect(noTime.pages[0].meta).not.toContain('4/4')
+
+    const continued = longSong(36)
+    const open = layoutPdf(continued, pdfOptions(continued.originalKey))
+    const closed = layoutPdf(continued, { ...pdfOptions(continued.originalKey), showKey: false })
+    expect(open.pages[1].meta).toContain('Key C')
+    expect(closed.pages[1].meta).toBe('')
+    expect(closed.pages[1].runningHeader).toContain('(cont.)')
+  })
+
+  it('scales the gap between chords and lyrics and the gap before the next section', () => {
+    const chorded = { kind: 'lyric' as const, text: 'Hello', chords: [{ label: 'G', index: 0, invalid: false }] }
+    const plain = { kind: 'lyric' as const, text: 'Hello', chords: [] }
+    const section = { kind: 'section' as const, label: 'VERSE', continued: false }
+    const height = (block: typeof chorded | typeof plain | typeof section, chordLyricSpacing = 1, sectionLeadIn = SECTION_LEAD_IN) =>
+      blockHeight(block, 12, 1, { chordLyricSpacing, sectionLeadIn })
+    expect(height(chorded, 2)).toBeGreaterThan(height(chorded, 1))
+    expect(height(plain, 2)).toBe(height(plain, 1))
+    expect(height(section, 1, 24)).toBeGreaterThan(height(section, 1, 12))
+    expect(height(chorded, 1, 24)).toBe(height(chorded, 1, 12))
+    expect(height(chorded)).toBe(blockHeight(chorded, 12, 1))
+    expect(height(section)).toBe(blockHeight(section, 12, 1))
+  })
+
+  it('copies divider choices onto the laid-out document', () => {
+    const layout = layoutPdf(firstLight, { ...pdfOptions(firstLight.originalKey), showColumnDivider: false, showSectionDivider: false })
+    expect(layout.showColumnDivider).toBe(false)
+    expect(layout.showSectionDivider).toBe(false)
+    const shown = layoutPdf(firstLight, pdfOptions(firstLight.originalKey))
+    expect(shown.showColumnDivider).toBe(true)
+    expect(shown.showSectionDivider).toBe(true)
+  })
+
+  it('lays a setlist out in order and leaves a blank page for the right hand', () => {
+    const first = verseOf(4)
+    first.title = 'One'
+    const second = verseOf(4)
+    second.title = 'Two'
+    const entries = [
+      { song: first, capo: 0, concert: first.originalKey },
+      { song: second, capo: 0, concert: second.originalKey },
+    ]
+    const plain = layoutSetlist(entries, pdfOptions(parseKey('C')), false)
+    expect(plain.sheets.map((sheet) => sheet.kind)).toEqual(['song', 'song'])
+    const [one, two] = plain.sheets
+    expect(one.kind === 'song' && one.layout.pages[0].title).toBe('One')
+    expect(one.kind === 'song' && one.layout.pages[0].pageLabel).toBe('Song 1 of 2 · Page 1 of 1')
+    expect(two.kind === 'song' && two.layout.pages[0].title).toBe('Two')
+    expect(two.kind === 'song' && two.layout.pages[0].pageLabel).toBe('Song 2 of 2 · Page 1 of 1')
+    const handed = layoutSetlist(entries, pdfOptions(parseKey('C')), true)
+    expect(handed.sheets.map((sheet) => sheet.kind)).toEqual(['song', 'blank', 'song'])
+    expect(handed.pageCount).toBe(3)
+  })
+
+  it('still renders a pdf when the header details are hidden', async () => {
+    const layout = layoutPdf(firstLight, {
+      ...pdfOptions(firstLight.originalKey),
+      showArtist: false,
+      showKey: false,
+      showTime: false,
+    })
+    const bytes = await renderPdf(layout, pdfFonts())
+    expect(String.fromCharCode(...bytes.subarray(0, 4))).toBe('%PDF')
   })
 })
 

@@ -37,14 +37,14 @@ import { applyRestore, planRestore, type BackupFile } from '../domain/backup'
 import { toChordPro } from '../domain/chordpro'
 import { idbLibrary } from '../domain/idb-library'
 import { defaultSettings, type Setlist, type Settings } from '../domain/library-types'
-import { layoutPdf } from '../domain/pdf-layout'
+import { layoutPdf, layoutSetlist } from '../domain/pdf-layout'
 import { encodeShare, decodeShare } from '../domain/share'
 import { findPlacement, issuesIn, mapSymbols, type Song } from '../domain/song'
 import { amazingGrace, firstLight } from '../fixtures/charts'
 import { emptySong } from '../domain/song'
 import { Chart, type NudgeHow } from './chart'
 import { ChordProPane } from './chordpro-pane'
-import { ExportDialog, type PdfChoices } from './export-dialog'
+import { defaultPdfChoices, ExportDialog, SetlistExportDialog, type PdfChoices } from './export-dialog'
 import { ImportScreen } from './import-screen'
 import { Inspector } from './inspector'
 import { PreviewPane } from './preview-pane'
@@ -77,10 +77,12 @@ export function App() {
     | null
   >(null)
   const [exportOpen, setExportOpen] = useState(false)
+  const [setlistExport, setSetlistExport] = useState<Setlist | null>(null)
+  const [rightHand, setRightHand] = useState(false)
   const [songs, setSongs] = useState<Song[]>([])
   const [setlists, setSetlists] = useState<Setlist[]>([])
   const [settings, setSettings] = useState<Settings>(defaultSettings())
-  const [pdfChoices, setPdfChoices] = useState<PdfChoices>({ paper: 'a4', fontSize: 12, columns: 1, fit: 'auto', content: 'full', repeats: 'full' })
+  const [pdfChoices, setPdfChoices] = useState<PdfChoices>(defaultPdfChoices)
   const [editor, setEditor] = useState<EditorState | null>(null)
   const [query, setQuery] = useState('')
   const [status, setStatus] = useState('Saved')
@@ -219,19 +221,29 @@ export function App() {
   const layout = useMemo(() => {
     if (!editor) return null
     return layoutPdf(editor.song, {
-      paper: pdfChoices.paper,
-      fontSize: pdfChoices.fontSize,
-      columns: pdfChoices.columns,
-      fit: pdfChoices.fit,
-      content: pdfChoices.content,
+      ...pdfChoices,
       numbers: editor.nashville,
       capo: editor.capo,
       concert: editor.concert,
       prefs: editor.prefs,
-      repeats: pdfChoices.repeats,
       allowTwoColumns: settings.allowTwoColumns,
     })
   }, [editor, pdfChoices, settings.allowTwoColumns])
+
+  const setlistLayout = useMemo(() => {
+    if (!setlistExport) return null
+    const entries = setlistExport.entries.flatMap((entry) => {
+      const song = songs.find((item) => item.id === entry.songId)
+      if (!song) return []
+      return [{ song, capo: entry.capo ?? 0, concert: entry.key ?? song.originalKey }]
+    })
+    return layoutSetlist(entries, {
+      ...pdfChoices,
+      numbers: settings.numbers,
+      prefs: settings.prefs,
+      allowTwoColumns: settings.allowTwoColumns,
+    }, rightHand)
+  }, [setlistExport, songs, pdfChoices, settings.numbers, settings.prefs, settings.allowTwoColumns, rightHand])
 
   function announce(text: string) {
     setLive(text)
@@ -278,19 +290,18 @@ export function App() {
     setExportOpen(false)
   }
 
-  async function exportSetlist(setlist: Setlist, rightHand = false) {
+  async function exportSetlist() {
+    if (!setlistExport || !setlistLayout || setlistLayout.pageCount === 0) return
     const [{ renderPdf, mergePdfs, rightHandParts }, { loadPdfFonts }] = await Promise.all([import('../domain/pdf-render'), import('./fonts')])
     const fonts = await loadPdfFonts()
     const parts: Uint8Array[] = []
-    for (const [index, entry] of setlist.entries.entries()) {
-      const song = songs.find((item) => item.id === entry.songId)
-      if (!song) continue
-      const laid = layoutPdf(song, { ...pdfChoices, numbers: settings.numbers, capo: entry.capo ?? 0, concert: entry.key ?? song.originalKey, prefs: settings.prefs, allowTwoColumns: settings.allowTwoColumns, songPosition: { index: index + 1, total: setlist.entries.length } })
-      parts.push(await renderPdf(laid, fonts))
+    for (const sheet of setlistLayout.sheets) {
+      if (sheet.kind === 'song') parts.push(await renderPdf(sheet.layout, fonts))
     }
     if (parts.length === 0) return
     const pages = rightHand ? await rightHandParts(parts) : parts
-    await downloadBytes(await mergePdfs(pages), `${setlist.name} - ${setlist.date}.pdf`)
+    await downloadBytes(await mergePdfs(pages), `${setlistExport.name} - ${setlistExport.date}.pdf`)
+    setSetlistExport(null)
   }
 
   async function openSong(song: Song) {
@@ -551,10 +562,11 @@ export function App() {
         </main>
       )}
       {place === 'import' && <main className="editor"><ImportScreen onCancel={() => setPlace('editor')} onSave={(song) => { void library.current.saveSong(song); setSongs((current) => [song, ...current.filter((item) => item.id !== song.id)]); const opened = openEditor(song); setEditor({ ...opened, prefs: settings.prefs }); setPlace('editor') }} /></main>}
-      {place === 'sets' && <main className="editor"><SetlistScreen songs={songs} setlists={setlists} onCreate={() => { const setlist: Setlist = { id: crypto.randomUUID(), name: 'Sunday', date: new Date().toISOString().slice(0, 10), entries: [] }; setSetlists((current) => [...current, setlist]); void library.current.saveSetlist(setlist) }} onChange={(setlist) => { setSetlists((current) => current.map((item) => item.id === setlist.id ? setlist : item)); void library.current.saveSetlist(setlist) }} onDelete={(id) => { setSetlists((current) => current.filter((item) => item.id !== id)); void library.current.deleteSetlist(id) }} onExport={(setlist, rightHand) => void exportSetlist(setlist, rightHand)} onStage={(setlist) => { const ordered = setlist.entries.flatMap((entry) => { const song = songs.find((item) => item.id === entry.songId); return song ? [{ song, concert: entry.key ?? song.originalKey, capo: entry.capo ?? 0 }] : [] }); if (ordered.length > 0) setPerformance({ mode: 'stage', entries: ordered, nashville: false }) }} /></main>}
+      {place === 'sets' && <main className="editor"><SetlistScreen songs={songs} setlists={setlists} onCreate={() => { const setlist: Setlist = { id: crypto.randomUUID(), name: 'Sunday', date: new Date().toISOString().slice(0, 10), entries: [] }; setSetlists((current) => [...current, setlist]); void library.current.saveSetlist(setlist) }} onChange={(setlist) => { setSetlists((current) => current.map((item) => item.id === setlist.id ? setlist : item)); void library.current.saveSetlist(setlist) }} onDelete={(id) => { setSetlists((current) => current.filter((item) => item.id !== id)); void library.current.deleteSetlist(id) }} onExport={(setlist) => setSetlistExport(setlist)} onStage={(setlist) => { const ordered = setlist.entries.flatMap((entry) => { const song = songs.find((item) => item.id === entry.songId); return song ? [{ song, concert: entry.key ?? song.originalKey, capo: entry.capo ?? 0 }] : [] }); if (ordered.length > 0) setPerformance({ mode: 'stage', entries: ordered, nashville: false }) }} /></main>}
       {place === 'settings' && <main className="editor"><SettingsScreen settings={settings} onChange={(next) => { setSettings(next); void library.current.saveSettings(next); document.documentElement.dataset.theme = next.theme === 'system' ? '' : next.theme; document.documentElement.dataset.size = next.textSize; try { localStorage.setItem('csm-theme', next.theme) } catch { /* ignore */ } setEditor((state) => state && { ...state, prefs: next.prefs, concert: keyFromPitch(notePitch(state.concert.tonic), state.concert.mode, next.prefs) }) }} onBackup={() => { const backup: BackupFile = { version: 1, songs, setlists, settings }; const blob = new Blob([JSON.stringify(backup, null, 2)], { type: 'application/json' }); const url = URL.createObjectURL(blob); const link = document.createElement('a'); link.href = url; link.download = 'chord-sheet-backup.json'; link.click(); URL.revokeObjectURL(url) }} onRestore={(file) => void restoreBackup(file)} /></main>}
       {place === 'editor' && layout && <PreviewPane layout={layout} onExport={() => setExportOpen(true)} onBack={phone ? () => setShowPreview(false) : undefined} />}
       {exportOpen && layout && <ExportDialog layout={layout} choices={pdfChoices} onChange={setPdfChoices} onClose={() => setExportOpen(false)} onDownload={() => void exportPdf()} />}
+      {setlistExport && setlistLayout && <SetlistExportDialog fileName={`${setlistExport.name} - ${setlistExport.date}.pdf`} layout={setlistLayout} choices={pdfChoices} rightHand={rightHand} onChange={setPdfChoices} onRightHand={setRightHand} onClose={() => setSetlistExport(null)} onDownload={() => void exportSetlist()} />}
       {performance?.mode === 'stage' && <StageView entries={performance.entries} nashville={performance.nashville} prefs={settings.prefs} onExit={() => setPerformance(null)} />}
       {performance?.mode === 'projector' && performance.songs[0] && <ProjectorView song={performance.songs[0]} onExit={() => setPerformance(null)} />}
       <div className="phone-tabs">

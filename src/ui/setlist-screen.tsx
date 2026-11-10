@@ -1,4 +1,3 @@
-import { useState } from 'react'
 import { formatKey, parseKey } from '../domain/chord'
 import type { Setlist } from '../domain/library-types'
 import type { Song } from '../domain/song'
@@ -19,16 +18,14 @@ export function SetlistScreen({
   onCreate: () => void
   onChange: (setlist: Setlist) => void
   onDelete: (id: string) => void
-  onExport: (setlist: Setlist, rightHand: boolean) => void
+  onExport: (setlist: Setlist) => void
   onStage: (setlist: Setlist) => void
 }) {
-  const [rightHand, setRightHand] = useState(false)
   return (
     <div className="setlists">
       <div className="row-meta">
         <h2>Setlists</h2>
         <span className="grow" />
-        <label className="hint"><input type="checkbox" checked={rightHand} onChange={(event) => setRightHand(event.target.checked)} /> Right-hand pages</label>
         <button className="primary" type="button" onClick={onCreate}>+ New setlist</button>
       </div>
       {setlists.length === 0 && <p className="empty">No setlists yet. A setlist is an ordered list of songs for one date.</p>}
@@ -38,7 +35,7 @@ export function SetlistScreen({
             <input className="field" aria-label="Setlist name" value={setlist.name} onChange={(event) => onChange({ ...setlist, name: event.target.value })} />
             <input className="field" aria-label="Setlist date" type="date" value={setlist.date} onChange={(event) => onChange({ ...setlist, date: event.target.value })} />
             <button className="outline" type="button" onClick={() => onStage(setlist)}>Stage</button>
-            <button className="outline" type="button" onClick={() => onExport(setlist, rightHand)}>Export PDF</button>
+            <button className="outline" type="button" onClick={() => onExport(setlist)}>Export PDF</button>
             <button className="text-button" type="button" onClick={() => onDelete(setlist.id)}>Delete</button>
           </div>
           {setlist.entries.map((entry, index) => {

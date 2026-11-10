@@ -1,9 +1,11 @@
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useRef, useState, type RefObject } from 'react'
 import {
   blockHeight,
   layoutStatus,
   type PdfBlock,
   type PdfDocument,
+  type PdfMeasure,
+  type PdfPage,
 } from '../domain/pdf-layout'
 
 export function PreviewPane({
@@ -16,17 +18,7 @@ export function PreviewPane({
   onBack?: () => void
 }) {
   const scrollRef = useRef<HTMLDivElement>(null)
-  const [paneWidth, setPaneWidth] = useState(0)
-
-  useEffect(() => {
-    const node = scrollRef.current
-    if (!node) return
-    const update = () => setPaneWidth(node.clientWidth)
-    update()
-    const observer = new ResizeObserver(update)
-    observer.observe(node)
-    return () => observer.disconnect()
-  }, [])
+  const paneWidth = usePaneWidth(scrollRef)
 
   return (
     <aside className="preview">
@@ -44,63 +36,134 @@ export function PreviewPane({
       </div>
       {layout.fitWarning && <p className="fit-warning">{layout.fitWarning}</p>}
       <div className="preview-scroll" ref={scrollRef}>
-        {layout.pages.map((page, index) => {
-          const scale = paneWidth > 0 ? Math.min(1, (paneWidth - 24) / page.width) : 1
-          return (
-            <div key={page.pageLabel}>
-              <p className="meta" style={{ textAlign: 'center' }}>
-                Page {index + 1}
-              </p>
-              <article
-                className="paper"
-                style={{
-                  width: page.width * scale,
-                  height: page.height * scale,
-                }}
-              >
-                <div
-                  className="paper-inner"
-                  style={{
-                    width: page.width,
-                    height: page.height,
-                    transform: `scale(${scale})`,
-                    transformOrigin: 'top left',
-                  }}
-                >
-                  {page.runningHeader ? (
-                    <p className="run">
-                      <strong>{page.runningHeader}</strong> {page.meta}
-                    </p>
-                  ) : (
-                    <>
-                      <h2>{page.title}</h2>
-                      {page.artist && <p>{page.artist}</p>}
-                      <p>
-                        {page.meta} {page.capoLabel ? ` ${page.capoLabel}` : ''}
-                      </p>
-                      {page.order && <p>{page.order}</p>}
-                    </>
-                  )}
-                  <div className="rule" />
-                  <PreviewBody
-                    blocks={page.blocks}
-                    columnCount={page.columnCount}
-                    fontSize={layout.fontSize}
-                    spacing={layout.spacing}
-                  />
-                  <div className="paper-foot">
-                    <p>{page.cue}</p>
-                    <p>
-                      <strong>{page.pageLabel}</strong>
-                    </p>
-                  </div>
-                </div>
-              </article>
-            </div>
-          )
-        })}
+        {layout.pages.map((page, index) => (
+          <PaperPage
+            key={page.pageLabel}
+            page={page}
+            layout={layout}
+            scale={pageScale(paneWidth, page.width)}
+            label={`Page ${index + 1}`}
+          />
+        ))}
       </div>
     </aside>
+  )
+}
+
+export function usePaneWidth(ref: RefObject<HTMLElement | null>) {
+  const [paneWidth, setPaneWidth] = useState(0)
+  useEffect(() => {
+    const node = ref.current
+    if (!node) return
+    const update = () => setPaneWidth(node.clientWidth)
+    update()
+    const observer = new ResizeObserver(update)
+    observer.observe(node)
+    return () => observer.disconnect()
+  }, [ref])
+  return paneWidth
+}
+
+export function pageScale(paneWidth: number, pageWidth: number) {
+  return paneWidth > 0 ? Math.min(1, (paneWidth - 24) / pageWidth) : 1
+}
+
+export function PaperPage({
+  page,
+  layout,
+  scale,
+  label,
+}: {
+  page: PdfPage
+  layout: PdfDocument
+  scale: number
+  label: string
+}) {
+  return (
+    <div>
+      <p className="meta" style={{ textAlign: 'center' }}>
+        {label}
+      </p>
+      <article
+        className="paper"
+        style={{
+          width: page.width * scale,
+          height: page.height * scale,
+        }}
+      >
+        <div
+          className="paper-inner"
+          style={{
+            width: page.width,
+            height: page.height,
+            transform: `scale(${scale})`,
+            transformOrigin: 'top left',
+          }}
+        >
+          {page.runningHeader ? (
+            <p className="run">
+              <strong>{page.runningHeader}</strong>
+              {page.meta ? ` ${page.meta}` : ''}
+            </p>
+          ) : (
+            <>
+              <h2>{page.title}</h2>
+              {page.artist && <p>{page.artist}</p>}
+              {(page.meta || page.capoLabel) && (
+                <p>
+                  {page.meta}
+                  {page.capoLabel ? ` ${page.capoLabel}` : ''}
+                </p>
+              )}
+              {page.order && <p>{page.order}</p>}
+            </>
+          )}
+          <div className="rule" />
+          <PreviewBody
+            blocks={page.blocks}
+            columnCount={page.columnCount}
+            fontSize={layout.fontSize}
+            spacing={layout.spacing}
+            measure={{
+              chordLyricSpacing: layout.chordLyricSpacing,
+              sectionLeadIn: layout.sectionLeadIn,
+            }}
+            showColumnDivider={layout.showColumnDivider}
+            showSectionDivider={layout.showSectionDivider}
+          />
+          <div className="paper-foot">
+            <p>{page.cue}</p>
+            <p>
+              <strong>{page.pageLabel}</strong>
+            </p>
+          </div>
+        </div>
+      </article>
+    </div>
+  )
+}
+
+export function BlankPaper({
+  width,
+  height,
+  scale,
+  label,
+}: {
+  width: number
+  height: number
+  scale: number
+  label: string
+}) {
+  return (
+    <div>
+      <p className="meta" style={{ textAlign: 'center' }}>
+        {label}
+      </p>
+      <article
+        className="paper"
+        style={{ width: width * scale, height: height * scale }}
+      />
+    </div>
   )
 }
 
@@ -109,11 +172,17 @@ function PreviewBody({
   columnCount,
   fontSize,
   spacing,
+  measure,
+  showColumnDivider,
+  showSectionDivider,
 }: {
   blocks: PdfBlock[]
   columnCount: 1 | 2
   fontSize: number
   spacing: number
+  measure: PdfMeasure
+  showColumnDivider: boolean
+  showSectionDivider: boolean
 }) {
   if (columnCount === 1)
     return (
@@ -124,6 +193,8 @@ function PreviewBody({
             block={block}
             fontSize={fontSize}
             spacing={spacing}
+            measure={measure}
+            showSectionDivider={showSectionDivider}
           />
         ))}
       </div>
@@ -131,7 +202,7 @@ function PreviewBody({
   const left = blocks.filter((block) => block.column !== 2)
   const right = blocks.filter((block) => block.column === 2)
   return (
-    <div className="columns">
+    <div className={showColumnDivider ? 'columns' : 'columns no-divider'}>
       <div>
         {left.map((block, index) => (
           <PreviewBlock
@@ -139,6 +210,8 @@ function PreviewBody({
             block={block}
             fontSize={fontSize}
             spacing={spacing}
+            measure={measure}
+            showSectionDivider={showSectionDivider}
           />
         ))}
       </div>
@@ -149,6 +222,8 @@ function PreviewBody({
             block={block}
             fontSize={fontSize}
             spacing={spacing}
+            measure={measure}
+            showSectionDivider={showSectionDivider}
           />
         ))}
       </div>
@@ -160,15 +235,22 @@ function PreviewBlock({
   block,
   fontSize,
   spacing,
+  measure,
+  showSectionDivider,
 }: {
   block: PdfBlock
   fontSize: number
   spacing: number
+  measure: PdfMeasure
+  showSectionDivider: boolean
 }) {
-  const height = blockHeight(block, fontSize, spacing)
+  const height = blockHeight(block, fontSize, spacing, measure)
   if (block.kind === 'section')
     return (
-      <div className="section-rule" style={{ height }}>
+      <div
+        className={showSectionDivider ? 'section-rule' : 'section-rule plain'}
+        style={{ height }}
+      >
         {block.label}
       </div>
     )
@@ -193,13 +275,14 @@ function PreviewBlock({
         {block.text}
       </p>
     )
+  const chordGap = block.chords.length ? Math.max(0, height - fontSize * 2) : 0
   return (
     <div
       style={{
         height,
         fontSize,
         fontFamily: 'JetBrains Mono, monospace',
-        lineHeight: 1.05,
+        lineHeight: 1,
       }}
     >
       <div
@@ -219,6 +302,7 @@ function PreviewBlock({
           </span>
         ))}
       </div>
+      {chordGap > 0 && <div style={{ height: chordGap }} />}
       <div style={{ whiteSpace: 'pre' }}>{block.text}</div>
     </div>
   )

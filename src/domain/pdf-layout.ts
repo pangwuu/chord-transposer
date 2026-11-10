@@ -27,6 +27,13 @@ export type PdfOptions = {
   repeats: 'full' | 'pointer'
   allowTwoColumns: boolean
   songPosition?: { index: number; total: number }
+  showArtist?: boolean
+  showKey?: boolean
+  showTime?: boolean
+  chordLyricSpacing?: number
+  sectionLeadIn?: number
+  showColumnDivider?: boolean
+  showSectionDivider?: boolean
 }
 
 export type PdfChord = { label: string; index: number; invalid: boolean }
@@ -64,7 +71,31 @@ export type PdfDocument = {
   fontSize: number
   columns: 1 | 2
   spacing: number
+  chordLyricSpacing: number
+  sectionLeadIn: number
+  showColumnDivider: boolean
+  showSectionDivider: boolean
   fitWarning: string | null
+}
+
+export type PdfMeasure = {
+  chordLyricSpacing?: number
+  sectionLeadIn?: number
+}
+
+export type SetlistChart = {
+  song: Song
+  capo: number
+  concert: Key
+}
+
+export type SetlistSheet =
+  | { kind: 'song'; layout: PdfDocument }
+  | { kind: 'blank'; width: number; height: number }
+
+export type SetlistLayout = {
+  sheets: SetlistSheet[]
+  pageCount: number
 }
 
 const MARGIN = 42
@@ -110,21 +141,28 @@ export function layoutStatus(layout: PdfDocument): string {
   return `${pages} · ${layout.fontSize} pt · spacing ${layout.spacing} · ${columns}`
 }
 
-export function sectionBlockHeight(): number {
-  return SECTION_LEAD_IN + SECTION_HEADING
+export function sectionBlockHeight(sectionLeadIn = SECTION_LEAD_IN): number {
+  return sectionLeadIn + SECTION_HEADING
 }
 
 export function blockHeight(
   block: UntaggedBlock,
   fontSize: number,
   spacing = 1,
+  measure: PdfMeasure = {},
 ): number {
+  const chordLyricSpacing = measure.chordLyricSpacing ?? 1
+  const sectionLeadIn = measure.sectionLeadIn ?? SECTION_LEAD_IN
   let raw: number
-  if (block.kind === 'section') raw = sectionBlockHeight()
+  if (block.kind === 'section') raw = sectionBlockHeight(sectionLeadIn)
   else if (block.kind === 'comment' || block.kind === 'pointer') raw = 16
   else if (block.kind === 'bars') raw = Math.ceil(fontSize * 1.7)
   else if (block.chords.length === 0) raw = Math.ceil(fontSize * 1.35)
-  else raw = Math.ceil(fontSize * 2.2)
+  else {
+    const line = fontSize * 2
+    const base = Math.max(line, Math.ceil(fontSize * 2.2))
+    raw = line + (base - line) * chordLyricSpacing
+  }
   const floor =
     block.kind === 'lyric' && block.chords.length > 0
       ? fontSize * 2
@@ -134,6 +172,44 @@ export function blockHeight(
           ? 22
           : 10
   return Math.max(floor, raw * spacing)
+}
+
+function readDisplay(options: PdfOptions) {
+  return {
+    showArtist: options.showArtist !== false,
+    showKey: options.showKey !== false,
+    showTime: options.showTime !== false,
+    chordLyricSpacing: options.chordLyricSpacing ?? 1,
+    sectionLeadIn: options.sectionLeadIn ?? SECTION_LEAD_IN,
+    showColumnDivider: options.showColumnDivider !== false,
+    showSectionDivider: options.showSectionDivider !== false,
+  }
+}
+
+function headerMeta(song: Song, options: PdfOptions): string {
+  const display = readDisplay(options)
+  const prefs = options.prefs ?? DEFAULT_PREFS
+  const keyName = formatKey(options.concert)
+  const shape = formatKey(shiftKey(options.concert, -options.capo, prefs))
+  return [
+    display.showKey ? `Key ${keyName}` : null,
+    display.showTime ? song.timeSignature : null,
+    display.showKey && song.tempo ? `${song.tempo} bpm` : null,
+    display.showKey && options.numbers
+      ? `Numbers in ${options.capo > 0 ? shape : keyName}`
+      : null,
+  ]
+    .filter(Boolean)
+    .join('    ')
+}
+
+function headerReserve(song: Song, options: PdfOptions, first: boolean): number {
+  if (!first) return 28
+  const display = readDisplay(options)
+  let reserve = 86
+  if (!display.showArtist && song.artist) reserve -= 16
+  if (!headerMeta(song, options) && options.capo <= 0) reserve -= 18
+  return reserve
 }
 
 function tag(blocks: UntaggedBlock[], column: PdfColumn): PdfBlock[] {
@@ -276,8 +352,8 @@ function wrapBlock(block: UntaggedBlock, capacity: number): UntaggedBlock[] {
   return lines
 }
 
-function innerHeight(height: number, first: boolean): number {
-  return height - MARGIN - FOOTER - (first ? 86 : 28)
+function innerHeight(height: number, reserve: number): number {
+  return height - MARGIN - FOOTER - reserve
 }
 
 function layoutOnce(
@@ -292,8 +368,14 @@ function layoutOnce(
   const pieces = piecesFor(song, options).map((piece) => ({
     blocks: piece.blocks.flatMap((block) => wrapBlock(block, capacity)),
   }))
-  const firstInner = innerHeight(size.height, true)
-  const nextInner = innerHeight(size.height, false)
+  const display = readDisplay(options)
+  const measure = (block: UntaggedBlock) =>
+    blockHeight(block, fontSize, spacing, {
+      chordLyricSpacing: display.chordLyricSpacing,
+      sectionLeadIn: display.sectionLeadIn,
+    })
+  const firstInner = innerHeight(size.height, headerReserve(song, options, true))
+  const nextInner = innerHeight(size.height, headerReserve(song, options, false))
   const maxInner = Math.max(firstInner, nextInner)
   const pages: { blocks: PdfBlock[]; columnCount: 1 | 2 }[] = [
     { blocks: [], columnCount: 1 },
@@ -308,10 +390,7 @@ function layoutOnce(
     mode = 'empty'
   }
   const pieceHeight = (blocks: UntaggedBlock[]) =>
-    blocks.reduce(
-      (sum, block) => sum + blockHeight(block, fontSize, spacing),
-      0,
-    )
+    blocks.reduce((sum, block) => sum + measure(block), 0)
 
   if (columns === 2) layoutTwoColumns(pieces)
   else {
@@ -443,7 +522,7 @@ function layoutOnce(
     const headingText =
       heading && heading.kind === 'section' ? heading.label : 'SECTION'
     for (const block of blocks) {
-      const blockSize = blockHeight(block, fontSize, spacing)
+      const blockSize = measure(block)
       if (slice.length > 0 && sliceHeight + blockSize > limit()) {
         pages[pages.length - 1].blocks.push(...tag(slice, 1))
         pushPage()
@@ -453,7 +532,7 @@ function layoutOnce(
           continued: true,
         }
         slice = [marker]
-        sliceHeight = blockHeight(marker, fontSize, spacing)
+        sliceHeight = measure(marker)
         continued = true
       }
       if (continued && block.kind === 'section') continue
@@ -536,18 +615,16 @@ function stamp(
     )
     .filter(Boolean)
     .join(' · ')
-  const meta = [
-    `Key ${keyName}`,
-    song.timeSignature,
-    song.tempo ? `${song.tempo} bpm` : null,
-    options.numbers ? `Numbers in ${options.capo > 0 ? shape : keyName}` : null,
-  ]
-    .filter(Boolean)
-    .join('    ')
+  const display = readDisplay(options)
+  const meta = headerMeta(song, options)
   return {
     fontSize,
     columns,
     spacing,
+    chordLyricSpacing: display.chordLyricSpacing,
+    sectionLeadIn: display.sectionLeadIn,
+    showColumnDivider: display.showColumnDivider,
+    showSectionDivider: display.showSectionDivider,
     fitWarning:
       options.fit === 'auto' || pages.length <= options.fit
         ? null
@@ -573,11 +650,11 @@ function stamp(
         columnCount: page.columnCount,
         runningHeader: index === 0 ? null : `${song.title} (cont.)`,
         title: song.title,
-        artist: song.artist ?? null,
+        artist: display.showArtist ? (song.artist ?? null) : null,
         meta,
         capoLabel,
         order: index === 0 ? `Order: ${order}` : null,
-        footerTitle: `${song.title} · Key ${keyName}`,
+        footerTitle: display.showKey ? `${song.title} · Key ${keyName}` : song.title,
         cue,
         pageLabel: `${position}Page ${index + 1} of ${total}`,
       }
@@ -587,4 +664,39 @@ function stamp(
 
 function titleCase(label: string): string {
   return label.toLowerCase().replace(/\b\w/g, (letter) => letter.toUpperCase())
+}
+
+export function layoutSetlist(
+  entries: SetlistChart[],
+  options: Omit<PdfOptions, 'capo' | 'concert' | 'songPosition'>,
+  rightHand: boolean,
+): SetlistLayout {
+  const layouts = entries.map((entry, index) =>
+    layoutPdf(entry.song, {
+      ...options,
+      capo: entry.capo,
+      concert: entry.concert,
+      songPosition: { index: index + 1, total: entries.length },
+    }),
+  )
+  const sheets: SetlistSheet[] = []
+  layouts.forEach((layout, index) => {
+    sheets.push({ kind: 'song', layout })
+    const last = index === layouts.length - 1
+    if (rightHand && !last && layout.pages.length % 2 === 1) {
+      const page = layout.pages[0]
+      const size = pageSize(options.paper)
+      sheets.push({
+        kind: 'blank',
+        width: page?.width ?? size.width,
+        height: page?.height ?? size.height,
+      })
+    }
+  })
+  const pageCount = sheets.reduce(
+    (sum, sheet) =>
+      sum + (sheet.kind === 'blank' ? 1 : sheet.layout.pages.length),
+    0,
+  )
+  return { sheets, pageCount }
 }
