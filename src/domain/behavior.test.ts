@@ -582,6 +582,21 @@ describe('share and library', () => {
     const both = applyRestore([firstLight], [{ ...amazingGrace, id: firstLight.id }], { [firstLight.id]: 'keep' })
     expect(both).toHaveLength(2)
   })
+
+  it('deletes a song and drops it from every setlist', async () => {
+    const library = memoryLibrary()
+    await library.saveSong(firstLight)
+    await library.saveSetlist({
+      id: 'set-1',
+      name: 'Sunday',
+      date: '2026-03-01',
+      entries: [{ songId: firstLight.id }, { songId: amazingGrace.id }],
+    })
+    await library.deleteSong(firstLight.id)
+    const snapshot = await library.load()
+    expect(snapshot.songs.map((song) => song.id)).toEqual([])
+    expect(snapshot.setlists[0]?.entries).toEqual([{ songId: amazingGrace.id }])
+  })
 })
 
 function lyric(song: Song) {

@@ -302,6 +302,39 @@ test('switches theme and finds a song from the library', async ({ page }, testIn
   await expect(page.getByLabel('Title')).toHaveValue('Untitled song')
 })
 
+test('deletes the open song from the menu after confirmation', async ({ page }, testInfo) => {
+  await page.goto('/')
+  await songs(page, testInfo.project.name)
+  await page.getByRole('button', { name: '+ New song' }).click()
+  await expect(page.getByLabel('Title')).toHaveValue('Untitled song')
+  page.once('dialog', (dialog) => {
+    expect(dialog.message()).toMatch(/Delete song “Untitled song”/)
+    void dialog.accept()
+  })
+  await editorAction(page, 'Delete song')
+  await songs(page, testInfo.project.name)
+  await expect(page.getByRole('button', { name: /Untitled song/ })).toHaveCount(0)
+  await expect(page.getByLabel('Title')).not.toHaveValue('Untitled song')
+})
+
+test('keeps the setlist when delete confirmation is cancelled', async ({ page }, testInfo) => {
+  await page.goto('/')
+  const setlists =
+    testInfo.project.name === 'mobile'
+      ? page.locator('.phone-tabs').getByRole('button', { name: 'Setlists' })
+      : page.locator('.side-nav').getByRole('button', { name: 'Setlists' })
+  await setlists.click()
+  await page.getByRole('button', { name: '+ New setlist' }).click()
+  await expect(page.getByLabel('Setlist name')).toHaveValue('Sunday')
+  page.once('dialog', (dialog) => {
+    expect(dialog.message()).toMatch(/Delete setlist “Sunday”/)
+    void dialog.dismiss()
+  })
+  await page.getByRole('button', { name: 'Setlist actions' }).click()
+  await page.getByRole('menuitem', { name: 'Delete' }).click()
+  await expect(page.getByLabel('Setlist name')).toHaveValue('Sunday')
+})
+
 test('copies a share link and downloads a ChordPro file', async ({ page }) => {
   await page.goto('/')
   await page.context().grantPermissions(['clipboard-read', 'clipboard-write'])
