@@ -36,7 +36,6 @@ export function PreviewPane({
             Back
           </button>
         )}
-        <strong>Preview</strong>
         <span className="meta">{layoutStatus(layout)}</span>
         <span className="grow" />
         <button className="primary" type="button" onClick={onExport}>
@@ -89,10 +88,12 @@ export function PreviewPane({
                     fontSize={layout.fontSize}
                     spacing={layout.spacing}
                   />
-                  <p>{page.cue}</p>
-                  <p>
-                    <strong>{page.pageLabel}</strong>
-                  </p>
+                  <div className="paper-foot">
+                    <p>{page.cue}</p>
+                    <p>
+                      <strong>{page.pageLabel}</strong>
+                    </p>
+                  </div>
                 </div>
               </article>
             </div>
@@ -185,6 +186,8 @@ function PreviewBlock({
           margin: 0,
           fontFamily: 'JetBrains Mono, monospace',
           fontSize,
+          fontWeight: 800,
+          whiteSpace: 'pre',
         }}
       >
         {block.text}

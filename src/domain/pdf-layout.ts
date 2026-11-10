@@ -232,11 +232,15 @@ function piecesFor(song: Song, options: PdfOptions): Piece[] {
 }
 
 function wrapBlock(block: UntaggedBlock, capacity: number): UntaggedBlock[] {
-  if (block.kind !== 'lyric' || capacity < 8 || block.text.length <= capacity)
+  if (
+    (block.kind !== 'lyric' && block.kind !== 'bars') ||
+    capacity < 8 ||
+    block.text.length <= capacity
+  )
     return [block]
   const lines: UntaggedBlock[] = []
   let text = block.text
-  let chords = block.chords
+  let chords = block.kind === 'lyric' ? block.chords : []
   let first = true
   while (text.length > 0) {
     const width = first ? capacity : Math.max(1, capacity - 2)
@@ -249,13 +253,16 @@ function wrapBlock(block: UntaggedBlock, capacity: number): UntaggedBlock[] {
     let next = cut
     while (text[next] === ' ') next += 1
     const indent = first ? 0 : 2
-    lines.push({
-      kind: 'lyric',
-      text: first ? head : `  ${head}`,
-      chords: chords
-        .filter((chord) => chord.index < cut)
-        .map((chord) => ({ ...chord, index: chord.index + indent })),
-    })
+    const lineText = first ? head : `  ${head}`
+    if (block.kind === 'bars') lines.push({ kind: 'bars', text: lineText })
+    else
+      lines.push({
+        kind: 'lyric',
+        text: lineText,
+        chords: chords
+          .filter((chord) => chord.index < cut)
+          .map((chord) => ({ ...chord, index: chord.index + indent })),
+      })
     chords = chords
       .filter((chord) => chord.index >= cut)
       .map((chord) => ({

@@ -289,7 +289,7 @@ function drawBlock(
       x: left,
       y: y - fontSize,
       size: fontSize,
-      font: fonts.mono,
+      font: fonts.monoBold,
       color: ink,
     })
     return y - height
