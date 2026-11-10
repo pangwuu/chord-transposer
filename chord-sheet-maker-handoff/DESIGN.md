@@ -376,7 +376,7 @@ Two columns on laptop: a list of setlists (name, date, song count, `+ New setlis
 
 ### 4.12 Stage view
 
-Full-screen, always dark (`#0E0E0E`), regardless of theme. The top bar has Exit, title, key or capo in purple, speed `− Speed 3 +`, **Autoscroll** (play/pause, Space), and **Next section ↓**. The body is mono 24 px with chords in `--p-300`, section labels in `--p-400` small caps with a hairline. Tapping the lower third of the screen jumps to the next section; tapping the upper third goes back. Screen Wake Lock is on while open. In a setlist, swiping left or right changes song, with a `Song 2 of 4` chip.
+Full-screen Quiet Chart reading mode, always dark (`#050505`), regardless of theme. Auto-hiding top chrome: **Exit**, key badge (warm amber), **Next section**, and **Next song** when staging a setlist. No tempo, autoscroll, or edit controls. Body is continuous scroll: serif title + artist, sticky section label, mono lyrics with warm chord labels above (`#f0b429`). Long lines wrap with a 2ch hanging indent (same rules as PDF). Screen Wake Lock is on while open. Escape exits. Prototype variants (Focus Column, Spotlight) live on branch `cursor/quiet-chart-stage-a1fb`.
 
 ### 4.13 Projector view
 

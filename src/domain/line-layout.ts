@@ -1,5 +1,7 @@
 export type LaidChord = { label: string; index: number }
 
+export type LyricDisplaySegment = { text: string; chords: LaidChord[] }
+
 export function padCollisions(text: string, chords: LaidChord[]): { text: string; chords: LaidChord[]; origins: number[] } {
   const ordered = [...chords].sort((a, b) => a.index - b.index || a.label.localeCompare(b.label))
   let display = text
@@ -25,4 +27,41 @@ export function padCollisions(text: string, chords: LaidChord[]): { text: string
     }
   }
   return { text: display, chords: placed, origins }
+}
+
+/** Wrap a display lyric (after padCollisions) to a character capacity. Matches PDF wrapBlock rules. */
+export function wrapLyricDisplay(text: string, chords: LaidChord[], capacity: number): LyricDisplaySegment[] {
+  if (capacity < 8 || text.length <= capacity) return [{ text, chords }]
+  const lines: LyricDisplaySegment[] = []
+  let remaining = text
+  let placed = chords
+  let first = true
+  while (remaining.length > 0) {
+    const width = first ? capacity : Math.max(1, capacity - 2)
+    let cut = remaining.length
+    if (remaining.length > width) {
+      const space = remaining.lastIndexOf(' ', width)
+      cut = space > 0 ? space : width
+    }
+    const head = remaining.slice(0, cut)
+    let next = cut
+    while (remaining[next] === ' ') next += 1
+    const indent = first ? 0 : 2
+    lines.push({
+      text: first ? head : `  ${head}`,
+      chords: placed
+        .filter((chord) => chord.index < cut)
+        .map((chord) => ({ ...chord, index: chord.index + indent })),
+    })
+    placed = placed
+      .filter((chord) => chord.index >= cut)
+      .map((chord) => ({
+        ...chord,
+        index: Math.max(0, chord.index - next),
+      }))
+    if (next >= remaining.length) break
+    remaining = remaining.slice(next)
+    first = false
+  }
+  return lines
 }
