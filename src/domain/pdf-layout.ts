@@ -34,6 +34,7 @@ export type PdfOptions = {
   sectionLeadIn?: number
   showColumnDivider?: boolean
   showSectionDivider?: boolean
+  headingSize?: number
 }
 
 export type PdfChord = { label: string; index: number; invalid: boolean }
@@ -75,12 +76,14 @@ export type PdfDocument = {
   sectionLeadIn: number
   showColumnDivider: boolean
   showSectionDivider: boolean
+  headingSize: number
   fitWarning: string | null
 }
 
 export type PdfMeasure = {
   chordLyricSpacing?: number
   sectionLeadIn?: number
+  headingSize?: number
 }
 
 export type SetlistChart = {
@@ -105,6 +108,8 @@ const MONO = 0.6
 export const SECTION_LEAD_IN = 12
 /** Heading label + rule + gap before the first line of the section. */
 export const SECTION_HEADING = 30
+/** Section labels such as VERSE 1, in points. */
+export const HEADING_SIZE = 11
 
 export function pageSize(paper: Paper): { width: number; height: number } {
   return paper === 'letter'
@@ -141,8 +146,11 @@ export function layoutStatus(layout: PdfDocument): string {
   return `${pages} · ${layout.fontSize} pt · spacing ${layout.spacing} · ${columns}`
 }
 
-export function sectionBlockHeight(sectionLeadIn = SECTION_LEAD_IN): number {
-  return sectionLeadIn + SECTION_HEADING
+export function sectionBlockHeight(
+  sectionLeadIn = SECTION_LEAD_IN,
+  headingSize = HEADING_SIZE,
+): number {
+  return sectionLeadIn + SECTION_HEADING + (headingSize - HEADING_SIZE)
 }
 
 export function blockHeight(
@@ -153,8 +161,10 @@ export function blockHeight(
 ): number {
   const chordLyricSpacing = measure.chordLyricSpacing ?? 1
   const sectionLeadIn = measure.sectionLeadIn ?? SECTION_LEAD_IN
+  const headingSize = measure.headingSize ?? HEADING_SIZE
   let raw: number
-  if (block.kind === 'section') raw = sectionBlockHeight(sectionLeadIn)
+  if (block.kind === 'section')
+    raw = sectionBlockHeight(sectionLeadIn, headingSize)
   else if (block.kind === 'comment' || block.kind === 'pointer') raw = 16
   else if (block.kind === 'bars') raw = Math.ceil(fontSize * 1.7)
   else if (block.chords.length === 0) raw = Math.ceil(fontSize * 1.35)
@@ -183,6 +193,7 @@ function readDisplay(options: PdfOptions) {
     sectionLeadIn: options.sectionLeadIn ?? SECTION_LEAD_IN,
     showColumnDivider: options.showColumnDivider !== false,
     showSectionDivider: options.showSectionDivider !== false,
+    headingSize: options.headingSize ?? HEADING_SIZE,
   }
 }
 
@@ -373,6 +384,7 @@ function layoutOnce(
     blockHeight(block, fontSize, spacing, {
       chordLyricSpacing: display.chordLyricSpacing,
       sectionLeadIn: display.sectionLeadIn,
+      headingSize: display.headingSize,
     })
   const firstInner = innerHeight(size.height, headerReserve(song, options, true))
   const nextInner = innerHeight(size.height, headerReserve(song, options, false))
@@ -625,6 +637,7 @@ function stamp(
     sectionLeadIn: display.sectionLeadIn,
     showColumnDivider: display.showColumnDivider,
     showSectionDivider: display.showSectionDivider,
+    headingSize: display.headingSize,
     fitWarning:
       options.fit === 'auto' || pages.length <= options.fit
         ? null

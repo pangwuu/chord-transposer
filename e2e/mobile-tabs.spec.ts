@@ -19,7 +19,7 @@ test.describe('phone bottom tabs', () => {
   test('more-actions menu is hittable and not clipped', async ({ page }) => {
     await page.getByRole('button', { name: 'More actions' }).click()
     await expect(page.getByRole('button', { name: 'More actions' })).toHaveAttribute('aria-expanded', 'true')
-    const stageItem = page.getByRole('menuitem', { name: 'Stage' })
+    const stageItem = page.getByRole('menuitem', { name: 'Performance View' })
     await expect(stageItem).toBeVisible()
     const hit = await stageItem.evaluate((node) => {
       const box = node.getBoundingClientRect()
@@ -34,14 +34,14 @@ test.describe('phone bottom tabs', () => {
     await expect(tabs).toBeVisible()
 
     await page.getByRole('button', { name: 'More actions' }).click()
-    await page.getByRole('menuitem', { name: 'Projector' }).click()
+    await page.getByRole('menuitem', { name: 'Projector View' }).click()
     await expect(page.locator('.projector')).toBeVisible()
     await expect(tabs).toBeHidden()
     await page.getByRole('button', { name: 'Exit' }).click()
     await expect(tabs).toBeVisible()
 
     await page.getByRole('button', { name: 'More actions' }).click()
-    await page.getByRole('menuitem', { name: 'Stage' }).click()
+    await page.getByRole('menuitem', { name: 'Performance View' }).click()
     await expect(page.locator('.stage')).toBeVisible()
     await expect(tabs).toBeHidden()
     await page.getByRole('button', { name: 'Exit' }).click()

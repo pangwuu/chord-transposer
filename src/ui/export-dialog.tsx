@@ -1,5 +1,6 @@
 import { useRef } from 'react'
 import {
+  HEADING_SIZE,
   SECTION_LEAD_IN,
   layoutStatus,
   type PdfContent,
@@ -24,6 +25,7 @@ export type PdfChoices = {
   sectionLeadIn: number
   showColumnDivider: boolean
   showSectionDivider: boolean
+  headingSize: number
 }
 
 export const defaultPdfChoices = (): PdfChoices => ({
@@ -40,6 +42,7 @@ export const defaultPdfChoices = (): PdfChoices => ({
   sectionLeadIn: SECTION_LEAD_IN,
   showColumnDivider: true,
   showSectionDivider: true,
+  headingSize: HEADING_SIZE,
 })
 
 export function ExportDialog({
@@ -55,16 +58,31 @@ export function ExportDialog({
   onClose: () => void
   onDownload: () => void
 }) {
+  const scrollRef = useRef<HTMLDivElement>(null)
+  const paneWidth = usePaneWidth(scrollRef)
   return (
     <div className="dialog-backdrop" onClick={onClose}>
       <div
-        className="dialog"
+        className="dialog pdf-export"
         role="dialog"
         aria-labelledby="export-title"
         onClick={(event) => event.stopPropagation()}
       >
         <h2 id="export-title">Export PDF</h2>
-        <PdfChoiceFields choices={choices} onChange={onChange} />
+        <div className="pdf-export-grid">
+          <PdfChoiceFields choices={choices} onChange={onChange} />
+          <div className="pdf-export-preview" ref={scrollRef}>
+            {layout.pages.map((page, index) => (
+              <PaperPage
+                key={`${page.pageLabel}-${index}`}
+                page={page}
+                layout={layout}
+                scale={pageScale(paneWidth, page.width)}
+                label={`Page ${index + 1}`}
+              />
+            ))}
+          </div>
+        </div>
         <p className="meta">
           {layoutStatus(layout)} · {layout.fileName}
         </p>
@@ -114,13 +132,13 @@ export function SetlistExportDialog({
   return (
     <div className="dialog-backdrop" onClick={onClose}>
       <div
-        className="dialog setlist-export"
+        className="dialog pdf-export"
         role="dialog"
         aria-labelledby="setlist-export-title"
         onClick={(event) => event.stopPropagation()}
       >
         <h2 id="setlist-export-title">Export setlist PDF</h2>
-        <div className="setlist-export-body">
+        <div className="pdf-export-grid">
           <div>
             <PdfChoiceFields choices={choices} onChange={onChange} />
             <label className="hint setlist-right-hand">
@@ -133,7 +151,7 @@ export function SetlistExportDialog({
               Right-hand pages
             </label>
           </div>
-          <div className="setlist-preview" ref={scrollRef}>
+          <div className="pdf-export-preview" ref={scrollRef}>
             {pages.length === 0 && (
               <p className="meta">Add a song before exporting.</p>
             )}
@@ -267,6 +285,21 @@ function PdfChoiceFields({
           onChange({ ...choices, fontSize: Number(event.target.value) })
         }
       />
+      <span>Heading size</span>
+      <label className="choice-slider">
+        <input
+          aria-label="Heading size"
+          type="range"
+          min={8}
+          max={20}
+          step={1}
+          value={choices.headingSize}
+          onChange={(event) =>
+            onChange({ ...choices, headingSize: Number(event.target.value) })
+          }
+        />
+        <span>{choices.headingSize} pt</span>
+      </label>
       <span>Repeats</span>
       <select
         className="select"

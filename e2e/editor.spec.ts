@@ -29,12 +29,8 @@ test('nudges, adds, edits, deletes, and replaces chords', async ({ page }) => {
 
 test('shows ChordPro beside the chart and opens import review', async ({ page }, testInfo) => {
   await page.goto('/')
-  if (testInfo.project.name === 'mobile') {
-    await page.getByRole('button', { name: 'More actions' }).click()
-    await page.getByRole('menuitem', { name: 'ChordPro' }).click()
-  } else {
-    await page.getByRole('button', { name: 'ChordPro' }).click()
-  }
+  await page.getByRole('button', { name: 'More actions' }).click()
+  await page.getByRole('menuitem', { name: 'Use ChordPro Editor', exact: true }).click()
   await expect(page.getByLabel('ChordPro source')).toBeVisible()
   await expect(page.getByRole('button', { name: /^Chord / }).first()).toBeVisible()
   if (testInfo.project.name === 'mobile') await page.locator('.phone-tabs').getByRole('button', { name: 'Songs' }).click()
@@ -52,7 +48,8 @@ test('walks a setlist on stage', async ({ page }, testInfo) => {
   await page.getByRole('button', { name: '+ New setlist' }).click()
   await page.getByLabel('Add a song to Sunday').selectOption({ label: 'Amazing Grace' })
   await page.getByLabel('Add a song to Sunday').selectOption({ label: 'First Light' })
-  await page.getByRole('button', { name: 'Stage' }).click()
+  await page.getByRole('button', { name: 'Setlist actions' }).click()
+  await page.getByRole('menuitem', { name: 'Stage' }).click()
   await page.getByRole('button', { name: 'Next song' }).click()
   await expect(page.locator('.stage strong')).toHaveText('First Light')
   await page.getByRole('button', { name: 'Exit' }).click()
