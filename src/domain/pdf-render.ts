@@ -3,7 +3,6 @@ import { PDFDocument, rgb, type PDFFont, type PDFPage } from 'pdf-lib'
 import {
   blockHeight,
   columnBounds,
-  SECTION_LEAD_IN,
   type PdfBlock,
   type PdfDocument,
   type PdfPage,
@@ -30,13 +29,25 @@ export async function renderPdf(
   const monoBold = await document.embedFont(fonts.monoBold)
   for (const layoutPage of layout.pages) {
     const page = document.addPage([layoutPage.width, layoutPage.height])
-    drawPage(page, layoutPage, layout.fontSize, layout.spacing, {
-      sans,
-      sansBold,
-      sansItalic,
-      mono,
-      monoBold,
-    })
+    drawPage(
+      page,
+      layoutPage,
+      {
+        fontSize: layout.fontSize,
+        spacing: layout.spacing,
+        chordLyricSpacing: layout.chordLyricSpacing,
+        sectionLeadIn: layout.sectionLeadIn,
+        showColumnDivider: layout.showColumnDivider,
+        showSectionDivider: layout.showSectionDivider,
+      },
+      {
+        sans,
+        sansBold,
+        sansItalic,
+        mono,
+        monoBold,
+      },
+    )
   }
   return document.save()
 }
@@ -66,18 +77,28 @@ export async function mergePdfs(parts: Uint8Array[]): Promise<Uint8Array> {
   return out.save()
 }
 
+type DrawStyle = {
+  fontSize: number
+  spacing: number
+  chordLyricSpacing: number
+  sectionLeadIn: number
+  showColumnDivider: boolean
+  showSectionDivider: boolean
+}
+
+type DrawFonts = {
+  sans: PDFFont
+  sansBold: PDFFont
+  sansItalic: PDFFont
+  mono: PDFFont
+  monoBold: PDFFont
+}
+
 function drawPage(
   page: PDFPage,
   layout: PdfPage,
-  fontSize: number,
-  spacing: number,
-  fonts: {
-    sans: PDFFont
-    sansBold: PDFFont
-    sansItalic: PDFFont
-    mono: PDFFont
-    monoBold: PDFFont
-  },
+  style: DrawStyle,
+  fonts: DrawFonts,
 ) {
   const ink = rgb(0, 0, 0)
   const secondary = rgb(0.2, 0.2, 0.2)
@@ -104,22 +125,25 @@ function drawPage(
       })
       y -= 16
     }
-    page.drawText(layout.meta, {
-      x: left,
-      y: y - 10,
-      size: 10,
-      font: fonts.sans,
-      color: ink,
-    })
-    if (layout.capoLabel)
-      page.drawText(layout.capoLabel, {
-        x: left + 220,
-        y: y - 10,
-        size: 9,
-        font: fonts.sansBold,
-        color: ink,
-      })
-    y -= 18
+    if (layout.meta || layout.capoLabel) {
+      if (layout.meta)
+        page.drawText(layout.meta, {
+          x: left,
+          y: y - 10,
+          size: 10,
+          font: fonts.sans,
+          color: ink,
+        })
+      if (layout.capoLabel)
+        page.drawText(layout.capoLabel, {
+          x: left + 220,
+          y: y - 10,
+          size: 9,
+          font: fonts.sansBold,
+          color: ink,
+        })
+      y -= 18
+    }
     if (layout.order) {
       page.drawText(layout.order, {
         x: left,
@@ -138,13 +162,14 @@ function drawPage(
       font: fonts.sansBold,
       color: ink,
     })
-    page.drawText(layout.meta, {
-      x: right - fonts.sans.widthOfTextAtSize(layout.meta, 9.5),
-      y: y - 10,
-      size: 9.5,
-      font: fonts.sans,
-      color: ink,
-    })
+    if (layout.meta)
+      page.drawText(layout.meta, {
+        x: right - fonts.sans.widthOfTextAtSize(layout.meta, 9.5),
+        y: y - 10,
+        size: 9.5,
+        font: fonts.sans,
+        color: ink,
+      })
     y -= 16
   }
   page.drawLine({
@@ -157,19 +182,7 @@ function drawPage(
   const twoColumn = layout.columnCount === 2
   if (!twoColumn) {
     for (const block of layout.blocks)
-      y = drawBlock(
-        page,
-        block,
-        y,
-        left,
-        right,
-        fontSize,
-        spacing,
-        fonts,
-        ink,
-        secondary,
-        hair,
-      )
+      y = drawBlock(page, block, y, left, right, style, fonts, ink, secondary, hair)
   } else {
     const [first, second] = columnBounds(layout.width, 2)
     let leftY = y
@@ -182,8 +195,7 @@ function drawPage(
           rightY,
           second.left,
           second.right,
-          fontSize,
-          spacing,
+          style,
           fonts,
           ink,
           secondary,
@@ -196,21 +208,22 @@ function drawPage(
           leftY,
           first.left,
           first.right,
-          fontSize,
-          spacing,
+          style,
           fonts,
           ink,
           secondary,
           hair,
         )
     }
-    const ruleX = (first.right + second.left) / 2
-    page.drawLine({
-      start: { x: ruleX, y },
-      end: { x: ruleX, y: Math.min(leftY, rightY) },
-      thickness: 0.5,
-      color: hair,
-    })
+    if (style.showColumnDivider) {
+      const ruleX = (first.right + second.left) / 2
+      page.drawLine({
+        start: { x: ruleX, y },
+        end: { x: ruleX, y: Math.min(leftY, rightY) },
+        thickness: 0.5,
+        color: hair,
+      })
+    }
   }
   page.drawText(layout.footerTitle, {
     x: left,
@@ -242,22 +255,19 @@ function drawBlock(
   y: number,
   left: number,
   right: number,
-  fontSize: number,
-  spacing: number,
-  fonts: {
-    sans: PDFFont
-    sansBold: PDFFont
-    sansItalic: PDFFont
-    mono: PDFFont
-    monoBold: PDFFont
-  },
+  style: DrawStyle,
+  fonts: DrawFonts,
   ink: ReturnType<typeof rgb>,
   secondary: ReturnType<typeof rgb>,
   hair: ReturnType<typeof rgb>,
 ): number {
-  const height = blockHeight(block, fontSize, spacing)
+  const { fontSize, spacing } = style
+  const height = blockHeight(block, fontSize, spacing, {
+    chordLyricSpacing: style.chordLyricSpacing,
+    sectionLeadIn: style.sectionLeadIn,
+  })
   if (block.kind === 'section') {
-    const lead = SECTION_LEAD_IN * spacing
+    const lead = style.sectionLeadIn * spacing
     page.drawText(block.label, {
       x: left,
       y: y - lead - 11,
@@ -265,13 +275,15 @@ function drawBlock(
       font: fonts.sansBold,
       color: ink,
     })
-    const textWidth = fonts.sansBold.widthOfTextAtSize(block.label, 11)
-    page.drawLine({
-      start: { x: left + textWidth + 8, y: y - lead - 8 },
-      end: { x: right, y: y - lead - 8 },
-      thickness: 0.6,
-      color: hair,
-    })
+    if (style.showSectionDivider) {
+      const textWidth = fonts.sansBold.widthOfTextAtSize(block.label, 11)
+      page.drawLine({
+        start: { x: left + textWidth + 8, y: y - lead - 8 },
+        end: { x: right, y: y - lead - 8 },
+        thickness: 0.6,
+        color: hair,
+      })
+    }
     return y - height
   }
   if (block.kind === 'comment' || block.kind === 'pointer') {
