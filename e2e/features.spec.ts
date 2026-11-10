@@ -121,6 +121,42 @@ test('reviews an import and saves it into the library', async ({ page }, testInf
   await expect(page.getByLabel('Title')).not.toHaveValue('')
 })
 
+test('reviews a song beside its source with save kept in reach', async ({ page }, testInfo) => {
+  await page.setViewportSize({ width: mobile(testInfo.project.name) ? 390 : 1280, height: 800 })
+  await page.goto('/')
+  await songs(page, testInfo.project.name)
+  await page.getByRole('button', { name: 'Import' }).click()
+  await page.getByLabel('Source text').fill('{title: Kitchen}\n{key: G}\n[G]Morning [D]light\n')
+  await expect(page.getByText('All chords read')).toBeVisible()
+  await expect(page.getByText(/is kept as written/)).toHaveCount(0)
+
+  const source = page.getByLabel('Source text')
+  const chord = page.getByRole('button', { name: /Chord G / })
+  const save = page.getByRole('button', { name: 'Save song' })
+  const sourceBox = await source.boundingBox()
+  const chordBox = await chord.boundingBox()
+  const saveBox = await save.boundingBox()
+  expect(sourceBox).not.toBeNull()
+  expect(chordBox).not.toBeNull()
+  expect(saveBox).not.toBeNull()
+  if (mobile(testInfo.project.name)) {
+    expect(chordBox!.y).toBeGreaterThan(sourceBox!.y)
+    const tabs = await page.locator('.phone-tabs').boundingBox()
+    expect(tabs).not.toBeNull()
+    expect(saveBox!.y + saveBox!.height).toBeLessThanOrEqual(tabs!.y + 1)
+  } else {
+    expect(chordBox!.x).toBeGreaterThan(sourceBox!.x + sourceBox!.width - 8)
+    const screen = await page.locator('.import-screen').boundingBox()
+    const library = await page.locator('.library').boundingBox()
+    expect(screen).not.toBeNull()
+    expect(library).not.toBeNull()
+    expect(screen!.width).toBeGreaterThan(900)
+    expect(screen!.x).toBeGreaterThanOrEqual(library!.x + library!.width - 2)
+  }
+  const overflow = await page.locator('.import-screen').evaluate((el) => el.scrollWidth <= el.clientWidth + 1)
+  expect(overflow).toBe(true)
+})
+
 test('scrolls a setlist export when the pages run past the window', async ({ page }, testInfo) => {
   await page.setViewportSize({ width: testInfo.project.name === 'mobile' ? 390 : 1280, height: 640 })
   await page.goto('/')

@@ -85,11 +85,22 @@ describe('plain import', () => {
 
   it('keeps an unrecognised token and reports it', () => {
     const result = importText('{title: Demo}\n{key: C}\n[C]Hello [H7]there\n', idSequence('bad'))
-    expect(result.issues.map((issue) => issue.raw)).toContain('H7')
+    expect(result.issues.map((issue) => issue.raw)).toEqual(['H7'])
+    expect(result.issues[0].line).toBe(3)
     const line = result.song.sections[0].lines[0]
     expect(line.type).toBe('lyric')
     if (line.type !== 'lyric') return
     expect(line.chords[1].symbol).toEqual({ kind: 'invalid', raw: 'H7' })
+  })
+
+  it('does not flag the words around a chord that was read', () => {
+    const chordpro = importText('{title: Kitchen}\n{key: G}\n[G]Morning [D]light falls\n', idSequence('clean-cho'))
+    expect(chordpro.issues).toEqual([])
+    expect(chordpro.chordCount).toBe(2)
+
+    const plain = importText('Verse 1\nG            D\nAmazing grace, how sweet the sound\n', idSequence('plain-words'))
+    expect(plain.issues).toEqual([])
+    expect(plain.chordCount).toBe(2)
   })
 
   it('keeps a chord line with no lyric as one bar per chord', () => {
