@@ -102,7 +102,8 @@ export type SetlistLayout = {
 }
 
 const MARGIN = 42
-const FOOTER = 40
+/** Bottom band reserved for the footer; matches the page margin so body and footer never share a line. */
+const FOOTER = 42
 const MONO = 0.6
 /** Space above a section heading after the previous section's last line. */
 export const SECTION_LEAD_IN = 12
@@ -215,10 +216,11 @@ function headerMeta(song: Song, options: PdfOptions): string {
 }
 
 function headerReserve(song: Song, options: PdfOptions, first: boolean): number {
-  if (!first) return 28
+  // Must match drawPage() in pdf-render: title 24 + artist 16 + meta 18 + order 14 + rule gap 16.
+  if (!first) return 32
   const display = readDisplay(options)
-  let reserve = 86
-  if (!display.showArtist && song.artist) reserve -= 16
+  let reserve = 88
+  if (!display.showArtist || !song.artist) reserve -= 16
   if (!headerMeta(song, options) && options.capo <= 0) reserve -= 18
   return reserve
 }
