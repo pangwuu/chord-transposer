@@ -22,7 +22,7 @@ test('transposes, shows capo shapes, and numbers the chords', async ({ page }) =
   await page.getByRole('button', { name: '1-4-5' }).click()
   await expect(page.getByRole('button', { name: 'Chord Ab over "Amazing"' })).toHaveText('1')
   await page.getByRole('button', { name: '1-4-5' }).click()
-  await page.getByLabel('Capo').selectOption({ label: 'Capo 4' })
+  await page.getByLabel('Capo', { exact: true }).selectOption('4')
   await expect(page.getByText('Capo 4 · showing E shapes · sounds in Ab')).toBeVisible()
   await expect(page.getByRole('button', { name: 'Chord E over "Amazing"' })).toBeVisible()
   await page.getByRole('button', { name: 'Save as song key' }).click()
