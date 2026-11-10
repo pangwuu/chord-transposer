@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState, type RefObject } from 'react'
 import {
   blockHeight,
+  HEADING_SIZE,
   layoutStatus,
   type PdfBlock,
   type PdfDocument,
@@ -96,8 +97,7 @@ export function PaperPage({
           style={{
             width: page.width,
             height: page.height,
-            transform: `scale(${scale})`,
-            transformOrigin: 'top left',
+            zoom: scale,
           }}
         >
           {page.runningHeader ? (
@@ -127,6 +127,7 @@ export function PaperPage({
             measure={{
               chordLyricSpacing: layout.chordLyricSpacing,
               sectionLeadIn: layout.sectionLeadIn,
+              headingSize: layout.headingSize,
             }}
             showColumnDivider={layout.showColumnDivider}
             showSectionDivider={layout.showSectionDivider}
@@ -249,7 +250,7 @@ function PreviewBlock({
     return (
       <div
         className={showSectionDivider ? 'section-rule' : 'section-rule plain'}
-        style={{ height }}
+        style={{ height, fontSize: measure.headingSize ?? HEADING_SIZE }}
       >
         {block.label}
       </div>

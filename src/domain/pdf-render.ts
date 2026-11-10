@@ -39,6 +39,7 @@ export async function renderPdf(
         sectionLeadIn: layout.sectionLeadIn,
         showColumnDivider: layout.showColumnDivider,
         showSectionDivider: layout.showSectionDivider,
+        headingSize: layout.headingSize,
       },
       {
         sans,
@@ -84,6 +85,7 @@ type DrawStyle = {
   sectionLeadIn: number
   showColumnDivider: boolean
   showSectionDivider: boolean
+  headingSize: number
 }
 
 type DrawFonts = {
@@ -265,21 +267,27 @@ function drawBlock(
   const height = blockHeight(block, fontSize, spacing, {
     chordLyricSpacing: style.chordLyricSpacing,
     sectionLeadIn: style.sectionLeadIn,
+    headingSize: style.headingSize,
   })
   if (block.kind === 'section') {
     const lead = style.sectionLeadIn * spacing
+    const headingSize = style.headingSize
     page.drawText(block.label, {
       x: left,
-      y: y - lead - 11,
-      size: 11,
+      y: y - lead - headingSize,
+      size: headingSize,
       font: fonts.sansBold,
       color: ink,
     })
     if (style.showSectionDivider) {
-      const textWidth = fonts.sansBold.widthOfTextAtSize(block.label, 11)
+      const textWidth = fonts.sansBold.widthOfTextAtSize(
+        block.label,
+        headingSize,
+      )
+      const rule = y - lead - headingSize + headingSize * (3 / 11)
       page.drawLine({
-        start: { x: left + textWidth + 8, y: y - lead - 8 },
-        end: { x: right, y: y - lead - 8 },
+        start: { x: left + textWidth + 8, y: rule },
+        end: { x: right, y: rule },
         thickness: 0.6,
         color: hair,
       })

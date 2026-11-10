@@ -8,9 +8,9 @@ async function songs(page: Page, project: string) {
   if (mobile(project)) await page.locator('.phone-tabs').getByRole('button', { name: 'Songs' }).click()
 }
 
-async function editorAction(page: Page, project: string, name: string | RegExp) {
-  if (mobile(project)) await page.getByRole('button', { name: 'More actions' }).click()
-  await page.getByRole(mobile(project) ? 'menuitem' : 'button', { name }).click()
+async function editorAction(page: Page, name: string) {
+  await page.getByRole('button', { name: 'More actions' }).click()
+  await page.getByRole('menuitem', { name, exact: true }).click()
 }
 
 test('transposes, shows capo shapes, and numbers the chords', async ({ page }) => {
@@ -85,16 +85,16 @@ test('adds a comment, a bar line, and an arrangement repeat', async ({ page }) =
   await expect(page.getByRole('button', { name: 'Verse 1 ×2' })).toBeVisible()
 })
 
-test('keeps a ChordPro edit and the chart in sync', async ({ page }, testInfo) => {
+test('keeps a ChordPro edit and the chart in sync', async ({ page }) => {
   await page.goto('/')
-  await editorAction(page, testInfo.project.name, 'ChordPro')
+  await editorAction(page, 'Use ChordPro Editor')
   const source = page.getByLabel('ChordPro source')
   await expect(source).toBeVisible()
   await expect(page.getByRole('button', { name: /^Chord / }).first()).toBeVisible()
   await source.fill('{title: Kitchen}\n{key: C}\n[C]Hello there\n')
   await expect(page.getByLabel('Title')).toHaveValue('Kitchen')
   await expect(page.getByRole('button', { name: /Chord C / }).first()).toBeVisible()
-  await editorAction(page, testInfo.project.name, 'Visual')
+  await editorAction(page, 'Use Visual Editor')
   await expect(source).toHaveCount(0)
 })
 
@@ -157,6 +157,55 @@ test('reviews a song beside its source with save kept in reach', async ({ page }
   expect(overflow).toBe(true)
 })
 
+test('scrolls a setlist export when the pages run past the window', async ({ page }, testInfo) => {
+  await page.setViewportSize({ width: testInfo.project.name === 'mobile' ? 390 : 1280, height: 640 })
+  await page.goto('/')
+  const setlists =
+    testInfo.project.name === 'mobile'
+      ? page.locator('.phone-tabs').getByRole('button', { name: 'Setlists' })
+      : page.locator('.side-nav').getByRole('button', { name: 'Setlists' })
+  await setlists.click()
+  await page.getByRole('button', { name: '+ New setlist' }).click()
+  await page.getByLabel('Add a song to Sunday').selectOption({ label: 'Amazing Grace' })
+  await page.getByLabel('Add a song to Sunday').selectOption({ label: 'First Light' })
+  await page.getByRole('button', { name: 'Export PDF' }).click()
+  const dialog = page.getByRole('dialog', { name: 'Export setlist PDF' })
+  await expect(dialog).toBeVisible()
+  await dialog.locator('.paper').first().hover({ position: { x: 40, y: 80 } })
+  await dialog.evaluate((el) => {
+    el.scrollTop = Math.max(0, el.scrollTop - 220)
+  })
+  const parked = await dialog.evaluate((el) => el.scrollTop)
+  await page.mouse.wheel(0, 400)
+  await expect.poll(async () => dialog.evaluate((el) => el.scrollTop), { message: `parked ${parked}` }).toBeGreaterThan(parked + 40)
+  await expect(dialog.getByRole('button', { name: 'Download' })).toBeInViewport()
+})
+
+test('previews a song PDF beside the export settings and scrolls it', async ({ page }, testInfo) => {
+  await page.setViewportSize({ width: testInfo.project.name === 'mobile' ? 390 : 1280, height: 640 })
+  await page.goto('/')
+  if (mobile(testInfo.project.name)) await page.getByRole('button', { name: 'Preview' }).click()
+  await page.getByRole('button', { name: 'Export PDF' }).click()
+  const dialog = page.getByRole('dialog', { name: 'Export PDF' })
+  const paper = dialog.locator('.paper').first()
+  const paperChoice = dialog.getByLabel('Paper')
+  await expect(paper.getByRole('heading', { name: 'Amazing Grace' })).toBeVisible()
+  await expect(paperChoice).toBeVisible()
+  const paperBox = await paper.boundingBox()
+  const choiceBox = await paperChoice.boundingBox()
+  expect(paperBox).not.toBeNull()
+  expect(choiceBox).not.toBeNull()
+  if (mobile(testInfo.project.name)) expect(paperBox!.y).toBeGreaterThan(choiceBox!.y)
+  else expect(paperBox!.x).toBeGreaterThan(choiceBox!.x + choiceBox!.width)
+  await paper.hover({ position: { x: 40, y: 80 } })
+  await dialog.evaluate((el) => {
+    el.scrollTop = Math.max(0, el.scrollTop - 220)
+  })
+  const parked = await dialog.evaluate((el) => el.scrollTop)
+  await page.mouse.wheel(0, 400)
+  await expect.poll(async () => dialog.evaluate((el) => el.scrollTop), { message: `parked ${parked}` }).toBeGreaterThan(parked + 40)
+})
+
 test('changes the PDF paper and fit from the export dialog', async ({ page }, testInfo) => {
   await page.goto('/')
   if (mobile(testInfo.project.name)) {
@@ -177,15 +226,15 @@ test('changes the PDF paper and fit from the export dialog', async ({ page }, te
   }
 })
 
-test('steps a projector slide and leaves the stage', async ({ page }, testInfo) => {
+test('steps a projector slide and leaves the stage', async ({ page }) => {
   await page.goto('/')
-  await editorAction(page, testInfo.project.name, 'Projector')
+  await editorAction(page, 'Projector View')
   await expect(page.locator('.projector')).toContainText('Amazing grace')
   await page.keyboard.press('ArrowRight')
   await expect(page.locator('.projector')).toContainText('grace that taught')
   await page.getByRole('button', { name: 'Exit' }).click()
   await expect(page.locator('.projector')).toHaveCount(0)
-  await editorAction(page, testInfo.project.name, 'Stage')
+  await editorAction(page, 'Performance View')
   await expect(page.locator('.stage')).toContainText('Amazing grace')
   await page.getByRole('button', { name: 'Next section' }).click()
   await page.getByRole('button', { name: 'Exit' }).click()
@@ -221,15 +270,15 @@ test('switches theme and finds a song from the library', async ({ page }, testIn
   await expect(page.getByLabel('Title')).toHaveValue('Untitled song')
 })
 
-test('copies a share link and downloads a ChordPro file', async ({ page }, testInfo) => {
+test('copies a share link and downloads a ChordPro file', async ({ page }) => {
   await page.goto('/')
   await page.context().grantPermissions(['clipboard-read', 'clipboard-write'])
-  await editorAction(page, testInfo.project.name, 'Share')
+  await editorAction(page, 'Copy Share Link')
   await expect(page.getByRole('status')).toContainText('Share link copied')
   const link = await page.evaluate(() => navigator.clipboard.readText())
   expect(link).toContain('#1.')
   const download = page.waitForEvent('download')
-  await editorAction(page, testInfo.project.name, '.cho')
+  await editorAction(page, 'Download as ChordPro')
   expect((await download).suggestedFilename()).toBe('Amazing Grace.cho')
 })
 
