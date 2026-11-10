@@ -143,6 +143,10 @@ export function chooseCapo(state: EditorState, capo: number): EditorState {
   return { ...state, capo: Math.max(0, Math.min(11, capo)) }
 }
 
+export function resetView(state: EditorState): EditorState {
+  return { ...state, concert: state.song.originalKey, capo: 0 }
+}
+
 export function renameSectionOf(state: EditorState, sectionId: string, label: string): EditorState {
   const next = label.trim()
   const current = state.song.sections.find((section) => section.id === sectionId)
