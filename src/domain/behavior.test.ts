@@ -393,7 +393,7 @@ describe('pdf', () => {
     const fonts = pdfFonts()
     const bytes = await renderPdf(layoutPdf(firstLight, pdfOptions(firstLight.originalKey)), fonts)
     const pdfjs = await import('pdfjs-dist/legacy/build/pdf.mjs')
-    const doc = await pdfjs.getDocument({ data: new Uint8Array(bytes), disableWorker: true }).promise
+    const doc = await pdfjs.getDocument({ data: new Uint8Array(bytes) }).promise
     const content = await (await doc.getPage(1)).getTextContent()
     const face = (text: string, exact = false) => {
       const item = content.items.find((entry) => 'str' in entry && (exact ? entry.str === text : entry.str.includes(text)))
