@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
-import { RotateCcw } from 'lucide-react'
+import { Eye, EyeOff, RotateCcw } from 'lucide-react'
 import {
   accidentalBias,
   chooseAccidentalBias,
@@ -14,7 +14,6 @@ import {
 import { displayedSong, type Song } from '../domain/song'
 import { StageBarLine, StageLyricLine } from './stage-lines'
 
-const CHROME_IDLE_MS = 2600
 const DEFAULT_SPEED = 0.8
 const MIN_SPEED = 0.1
 const MAX_SPEED = 12
@@ -57,12 +56,10 @@ export function StageView({
   const [capo, setCapo] = useState(() => entries[0]?.capo ?? 0)
   const [nashville, setNashville] = useState(initialNashville)
   const [prefs, setPrefs] = useState(initialPrefs)
-  const [chromeVisible, setChromeVisible] = useState(true)
-  const [chromePinned, setChromePinned] = useState(false)
+  const [headerOpen, setHeaderOpen] = useState(true)
   const [speed, setSpeed] = useState(DEFAULT_SPEED)
   const [playing, setPlaying] = useState(false)
   const body = useRef<HTMLDivElement>(null)
-  const hideTimer = useRef<number>()
   const entry = entries[Math.min(songIndex, Math.max(0, entries.length - 1))]
 
   useEffect(() => {
@@ -71,23 +68,6 @@ export function StageView({
     setCapo(entry.capo)
     setSection(0)
   }, [entry])
-
-  const revealChrome = () => {
-    setChromeVisible(true)
-    window.clearTimeout(hideTimer.current)
-    if (chromePinned) return
-    hideTimer.current = window.setTimeout(() => setChromeVisible(false), CHROME_IDLE_MS)
-  }
-
-  const holdChrome = () => {
-    setChromeVisible(true)
-    window.clearTimeout(hideTimer.current)
-  }
-
-  useEffect(() => {
-    revealChrome()
-    return () => window.clearTimeout(hideTimer.current)
-  }, [songIndex, chromePinned])
 
   useEffect(() => {
     if (!playing) return
@@ -115,11 +95,10 @@ export function StageView({
         event.preventDefault()
         setPlaying((value) => !value)
       }
-      revealChrome()
     }
     window.addEventListener('keydown', onKey)
     return () => window.removeEventListener('keydown', onKey)
-  }, [onExit, chromePinned])
+  }, [onExit])
 
   if (!entry) return null
 
@@ -142,48 +121,49 @@ export function StageView({
       }
       return next
     })
-    revealChrome()
   }
 
   return (
-    <div className="stage" onPointerDown={revealChrome} onMouseMove={revealChrome}>
-      <div
-        className={chromeVisible ? 'stage-chrome' : 'stage-chrome is-hidden'}
-        aria-hidden={!chromeVisible}
-        onPointerEnter={holdChrome}
-        onPointerLeave={() => { if (!chromePinned) revealChrome() }}
-        onFocus={holdChrome}
-        onBlur={(event) => {
-          if (!event.currentTarget.contains(event.relatedTarget as Node | null) && !chromePinned) revealChrome()
-        }}
-      >
+    <div className="stage">
+      <div className={headerOpen ? 'stage-chrome' : 'stage-chrome is-collapsed'}>
         <div className="stage-chrome-row">
-          <button className="text-button" type="button" onClick={onExit}>Exit</button>
-          <span className="stage-key">{formatKey(concert)}</span>
-          <span className="grow" />
-          <button className="outline" type="button" aria-pressed={chromePinned} onClick={() => setChromePinned((value) => !value)}>
-            {chromePinned ? 'Unpin' : 'Pin'}
-          </button>
-          <button className="outline" type="button" aria-label="Slower" onClick={() => setSpeed((value) => nudgeSpeed(value, -SPEED_STEP))}>−</button>
-          <span>Speed {speed.toFixed(1)}</span>
-          <button className="outline" type="button" aria-label="Faster" onClick={() => setSpeed((value) => nudgeSpeed(value, SPEED_STEP))}>+</button>
-          <button className="primary" type="button" onClick={() => setPlaying((value) => !value)}>{playing ? 'Pause' : 'Autoscroll'}</button>
-          <button className="outline" type="button" onClick={() => goSection(1)}>Next section</button>
-          {entries.length > 1 && (
-            <button
-              className="outline"
-              type="button"
-              onClick={() => {
-                setSongIndex((value) => Math.min(entries.length - 1, value + 1))
-                body.current?.scrollTo({ top: 0 })
-                revealChrome()
-              }}
-            >
-              Next song
-            </button>
+          {headerOpen && (
+            <>
+              <button className="text-button" type="button" onClick={onExit}>Exit</button>
+              <span className="stage-key">{formatKey(concert)}</span>
+              <span className="grow" />
+              <button className="outline" type="button" aria-label="Slower" onClick={() => setSpeed((value) => nudgeSpeed(value, -SPEED_STEP))}>−</button>
+              <span>Speed {speed.toFixed(1)}</span>
+              <button className="outline" type="button" aria-label="Faster" onClick={() => setSpeed((value) => nudgeSpeed(value, SPEED_STEP))}>+</button>
+              <button className="primary" type="button" onClick={() => setPlaying((value) => !value)}>{playing ? 'Pause' : 'Autoscroll'}</button>
+              <button className="outline" type="button" onClick={() => goSection(1)}>Next section</button>
+              {entries.length > 1 && (
+                <button
+                  className="outline"
+                  type="button"
+                  onClick={() => {
+                    setSongIndex((value) => Math.min(entries.length - 1, value + 1))
+                    body.current?.scrollTo({ top: 0 })
+                  }}
+                >
+                  Next song
+                </button>
+              )}
+            </>
           )}
+          <button
+            className="stage-eye"
+            type="button"
+            aria-pressed={headerOpen}
+            aria-label={headerOpen ? 'Hide header' : 'Show header'}
+            onClick={() => setHeaderOpen((open) => !open)}
+          >
+            {headerOpen
+              ? <Eye size={16} strokeWidth={1.75} aria-hidden="true" />
+              : <EyeOff size={16} strokeWidth={1.75} aria-hidden="true" />}
+          </button>
         </div>
-        <div className="stage-transport transport">
+        {headerOpen && <div className="stage-transport transport">
           <div className="transport-main">
             <div className="pill" role="group" aria-label="Transpose">
               <button className="pill-btn" type="button" aria-label="Key down a semitone" onClick={() => setConcert((value) => shiftKey(value, -1, prefs))}>−</button>
@@ -260,9 +240,9 @@ export function StageView({
               </div>
             </div>
           </div>
-        </div>
+        </div>}
       </div>
-      <div className="stage-body" ref={body} onScroll={revealChrome}>
+      <div className="stage-body" ref={body}>
         <header className="stage-head">
           <strong className="stage-title">{song.title}</strong>
           {song.artist && <p className="stage-artist">{song.artist}</p>}
