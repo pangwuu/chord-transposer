@@ -1,7 +1,11 @@
 import { useEffect, useRef, useState } from 'react'
 import { RotateCcw } from 'lucide-react'
 import {
+  accidentalBias,
+  chooseAccidentalBias,
   formatKey,
+  keyFromPitch,
+  notePitch,
   parseKey,
   shiftKey,
   type Key,
@@ -15,7 +19,15 @@ const DEFAULT_SPEED = 0.8
 const MIN_SPEED = 0.1
 const MAX_SPEED = 12
 const SPEED_STEP = 0.1
-const KEYS = ['C', 'Db', 'D', 'Eb', 'E', 'F', 'F#', 'G', 'Ab', 'A', 'Bb', 'B']
+const BASE_KEYS = ['C', 'Db', 'D', 'Eb', 'E', 'F', 'F#', 'G', 'Ab', 'A', 'Bb', 'B'] as const
+
+function keyOptions(prefs: SpellingPrefs): string[] {
+  return BASE_KEYS.map((name) => {
+    if (name === 'F#' && prefs.gb) return 'Gb'
+    if (name === 'Db' && prefs.csharp) return 'C#'
+    return name
+  })
+}
 
 function nudgeSpeed(value: number, delta: number) {
   return Math.min(MAX_SPEED, Math.max(MIN_SPEED, Math.round((value + delta) * 10) / 10))
@@ -114,6 +126,12 @@ export function StageView({
   const song = displayedSong(entry.song, concert, capo, prefs)
   const shapeKey = shiftKey(concert, -capo, prefs)
   const viewDirty = formatKey(concert) !== formatKey(entry.song.originalKey) || capo > 0
+  const bias = accidentalBias(prefs)
+
+  function applyStagePrefs(next: SpellingPrefs) {
+    setPrefs(next)
+    setConcert((key) => keyFromPitch(notePitch(key.tonic), key.mode, next))
+  }
 
   const goSection = (direction: 1 | -1) => {
     setSection((value) => {
@@ -175,8 +193,8 @@ export function StageView({
                 value={formatKey(concert)}
                 onChange={(event) => setConcert(parseKey(event.target.value))}
               >
-                <optgroup label="Major">{KEYS.map((key) => <option key={key}>{key}</option>)}</optgroup>
-                <optgroup label="Minor">{KEYS.map((key) => <option key={`${key}m`}>{key}m</option>)}</optgroup>
+                <optgroup label="Major">{keyOptions(prefs).map((key) => <option key={key}>{key}</option>)}</optgroup>
+                <optgroup label="Minor">{keyOptions(prefs).map((key) => <option key={`${key}m`}>{key}m</option>)}</optgroup>
               </select>
               <button className="pill-btn" type="button" aria-label="Key up a semitone" onClick={() => setConcert((value) => shiftKey(value, 1, prefs))}>+</button>
               <span className="pill-divider" aria-hidden="true" />
@@ -212,8 +230,8 @@ export function StageView({
                 className="pill-btn"
                 type="button"
                 aria-label="Prefer flats"
-                aria-pressed={prefs.gb}
-                onClick={() => setPrefs((current) => ({ ...current, gb: !current.gb }))}
+                aria-pressed={bias === 'flats'}
+                onClick={() => applyStagePrefs(chooseAccidentalBias(prefs, 'flats'))}
               >
                 ♭
               </button>
@@ -222,8 +240,8 @@ export function StageView({
                 className="pill-btn"
                 type="button"
                 aria-label="Prefer sharps"
-                aria-pressed={prefs.csharp}
-                onClick={() => setPrefs((current) => ({ ...current, csharp: !current.csharp }))}
+                aria-pressed={bias === 'sharps'}
+                onClick={() => applyStagePrefs(chooseAccidentalBias(prefs, 'sharps'))}
               >
                 ♯
               </button>

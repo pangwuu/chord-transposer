@@ -177,6 +177,17 @@ describe('editing', () => {
     expect(state.song.originalKey).toEqual(parseKey('E'))
   })
 
+  it('applies accidental bias to the transposed editor view without editing storage', () => {
+    const song = fromChordPro('{title: Demo}\n{key: F}\n[F/A]Hello [Dm]there\n', idSequence('bias-view'))
+    let state = { ...openEditor(song), concert: parseKey('E'), prefs: { gb: true, csharp: false } }
+    expect(formatSymbol(lyric(viewSong(state)).chords[0].symbol)).toBe('E/Ab')
+    expect(formatSymbol(lyric(viewSong(state)).chords[1].symbol)).toBe('Dbm')
+    expect(formatSymbol(lyric(state.song).chords[0].symbol)).toBe('F/A')
+    state = { ...state, prefs: { gb: false, csharp: true } }
+    expect(formatSymbol(lyric(viewSong(state)).chords[0].symbol)).toBe('E/G#')
+    expect(formatSymbol(lyric(viewSong(state)).chords[1].symbol)).toBe('C#m')
+  })
+
   it('resets concert key and capo to the stored song without editing chords', () => {
     const song = fromChordPro('{title: Demo}\n{key: F}\n[F/A]Hello\n', idSequence('reset'))
     let state = chooseCapo({ ...openEditor(song), concert: parseKey('E') }, 2)

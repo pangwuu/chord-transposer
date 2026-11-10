@@ -1,14 +1,19 @@
 import { describe, expect, it } from 'vitest'
 import {
+  accidentalBias,
+  chooseAccidentalBias,
+  DEFAULT_PREFS,
   formatChord,
   formatKey,
   formatNote,
   formatSymbol,
   friendlyCapos,
+  keyFromPitch,
   normaliseSymbol,
   nashville,
   parseChord,
   parseKey,
+  prefsForBias,
   shiftKey,
   spellPitch,
   suggestionsFor,
@@ -51,6 +56,45 @@ describe('parseChord', () => {
     expect(formatSymbol(normaliseSymbol(parseChord('CΔ7')))).toBe('Cmaj7')
     expect(formatSymbol(normaliseSymbol(parseChord('Csus')))).toBe('Csus4')
     expect(formatSymbol(parseChord('Cmin'))).toBe('Cmin')
+  })
+})
+
+describe('accidental bias prefs', () => {
+  it('defaults to F# and Db, and prefers only one of flats or sharps at a time', () => {
+    expect(accidentalBias(DEFAULT_PREFS)).toBe('default')
+    expect(formatKey(keyFromPitch(6, 'major'))).toBe('F#')
+    expect(formatKey(keyFromPitch(1, 'major'))).toBe('Db')
+
+    const flats = chooseAccidentalBias(DEFAULT_PREFS, 'flats')
+    expect(accidentalBias(flats)).toBe('flats')
+    expect(flats).toEqual(prefsForBias('flats'))
+    expect(formatKey(keyFromPitch(6, 'major', flats))).toBe('Gb')
+    expect(formatKey(keyFromPitch(1, 'major', flats))).toBe('Db')
+
+    const sharps = chooseAccidentalBias(flats, 'sharps')
+    expect(accidentalBias(sharps)).toBe('sharps')
+    expect(sharps).toEqual({ gb: false, csharp: true })
+    expect(formatKey(keyFromPitch(6, 'major', sharps))).toBe('F#')
+    expect(formatKey(keyFromPitch(1, 'major', sharps))).toBe('C#')
+
+    expect(chooseAccidentalBias(sharps, 'sharps')).toEqual(DEFAULT_PREFS)
+    expect(accidentalBias({ gb: true, csharp: true })).toBe('default')
+  })
+
+  it('rewrites transposed chord accidentals when flats or sharps are preferred', () => {
+    const flats = prefsForBias('flats')
+    const sharps = prefsForBias('sharps')
+
+    expect(formatSymbol(transposeSymbol(parseChord('F/A'), -1, E))).toBe('E/G#')
+    expect(formatSymbol(transposeSymbol(parseChord('F/A'), -1, E, flats))).toBe('E/Ab')
+    expect(formatSymbol(transposeSymbol(parseChord('F/A'), -1, E, sharps))).toBe('E/G#')
+
+    expect(formatSymbol(transposeSymbol(parseChord('Dm'), -1, E))).toBe('C#m')
+    expect(formatSymbol(transposeSymbol(parseChord('Dm'), -1, E, flats))).toBe('Dbm')
+    expect(formatSymbol(transposeSymbol(parseChord('Dm'), -1, E, sharps))).toBe('C#m')
+
+    expect(formatSymbol(transposeSymbol(parseChord('Bb'), 0, F, sharps))).toBe('A#')
+    expect(formatSymbol(transposeSymbol(parseChord('Bb'), 0, F, flats))).toBe('Bb')
   })
 })
 

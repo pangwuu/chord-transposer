@@ -1,10 +1,12 @@
 import {
+  DEFAULT_PREFS,
   formatKey,
   formatSymbol,
   nashville,
   shiftKey,
   type ChordSymbol,
   type Key,
+  type SpellingPrefs,
 } from './chord'
 import { padCollisions } from './line-layout'
 import { displayedSong, performance, type BarItem, type Song } from './song'
@@ -21,6 +23,7 @@ export type PdfOptions = {
   numbers: boolean
   capo: number
   concert: Key
+  prefs?: SpellingPrefs
   repeats: 'full' | 'pointer'
   allowTwoColumns: boolean
   songPosition?: { index: number; total: number }
@@ -160,8 +163,9 @@ function barText(items: BarItem[], numbers: boolean, key: Key): string {
 type Piece = { blocks: UntaggedBlock[] }
 
 function piecesFor(song: Song, options: PdfOptions): Piece[] {
-  const shapeKey = shiftKey(options.concert, -options.capo)
-  const played = displayedSong(song, options.concert, options.capo)
+  const prefs = options.prefs ?? DEFAULT_PREFS
+  const shapeKey = shiftKey(options.concert, -options.capo, prefs)
+  const played = displayedSong(song, options.concert, options.capo, prefs)
   return performance(song, options.repeats).map(
     ({ section, copies, pointer }) => {
       const source =
@@ -510,8 +514,9 @@ function stamp(
   spacing: number,
 ): PdfDocument {
   const total = pages.length
+  const prefs = options.prefs ?? DEFAULT_PREFS
   const keyName = formatKey(options.concert)
-  const shape = formatKey(shiftKey(options.concert, -options.capo))
+  const shape = formatKey(shiftKey(options.concert, -options.capo, prefs))
   const capoLabel =
     options.capo > 0
       ? `CAPO ${options.capo} · PLAY ${shape.replace(/m$/, '')} SHAPES`

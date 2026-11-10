@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { RotateCcw } from 'lucide-react'
-import { formatKey, formatSymbol, keyFromPitch, normaliseSymbol, notePitch, parseChord, parseKey, shiftKey, type SpellingPrefs } from '../domain/chord'
+import { accidentalBias, chooseAccidentalBias, formatKey, formatSymbol, keyFromPitch, normaliseSymbol, notePitch, parseChord, parseKey, shiftKey, type SpellingPrefs } from '../domain/chord'
 import {
   addAt,
   addSectionOf,
@@ -52,7 +52,15 @@ import { ProjectorView, StageView, type StageEntry } from './performance'
 import { SetlistScreen } from './setlist-screen'
 import { SettingsScreen } from './settings-screen'
 
-const KEYS = ['C', 'Db', 'D', 'Eb', 'E', 'F', 'F#', 'G', 'Ab', 'A', 'Bb', 'B']
+const BASE_KEYS = ['C', 'Db', 'D', 'Eb', 'E', 'F', 'F#', 'G', 'Ab', 'A', 'Bb', 'B'] as const
+
+function keyOptions(prefs: SpellingPrefs): string[] {
+  return BASE_KEYS.map((name) => {
+    if (name === 'F#' && prefs.gb) return 'Gb'
+    if (name === 'Db' && prefs.csharp) return 'C#'
+    return name
+  })
+}
 
 export function App() {
   const library = useRef(idbLibrary())
@@ -219,6 +227,7 @@ export function App() {
       numbers: editor.nashville,
       capo: editor.capo,
       concert: editor.concert,
+      prefs: editor.prefs,
       repeats: pdfChoices.repeats,
       allowTwoColumns: settings.allowTwoColumns,
     })
@@ -276,7 +285,7 @@ export function App() {
     for (const [index, entry] of setlist.entries.entries()) {
       const song = songs.find((item) => item.id === entry.songId)
       if (!song) continue
-      const laid = layoutPdf(song, { ...pdfChoices, numbers: settings.numbers, capo: entry.capo ?? 0, concert: entry.key ?? song.originalKey, allowTwoColumns: settings.allowTwoColumns, songPosition: { index: index + 1, total: setlist.entries.length } })
+      const laid = layoutPdf(song, { ...pdfChoices, numbers: settings.numbers, capo: entry.capo ?? 0, concert: entry.key ?? song.originalKey, prefs: settings.prefs, allowTwoColumns: settings.allowTwoColumns, songPosition: { index: index + 1, total: setlist.entries.length } })
       parts.push(await renderPdf(laid, fonts))
     }
     if (parts.length === 0) return
@@ -411,8 +420,8 @@ export function App() {
                   <div className="pill" role="group" aria-label="Transpose">
                     <button className="pill-btn" type="button" aria-label="Key down a semitone" onClick={() => setEditor(stepConcert(editor, -1))}>−</button>
                     <select className="pill-select pill-key" aria-label="Key" value={formatKey(editor.concert)} onChange={(event) => setEditor(chooseConcert(editor, parseKey(event.target.value)))}>
-                      <optgroup label="Major">{KEYS.map((key) => <option key={key}>{key}</option>)}</optgroup>
-                      <optgroup label="Minor">{KEYS.map((key) => <option key={`${key}m`}>{key}m</option>)}</optgroup>
+                      <optgroup label="Major">{keyOptions(settings.prefs).map((key) => <option key={key}>{key}</option>)}</optgroup>
+                      <optgroup label="Minor">{keyOptions(settings.prefs).map((key) => <option key={`${key}m`}>{key}m</option>)}</optgroup>
                     </select>
                     <button className="pill-btn" type="button" aria-label="Key up a semitone" onClick={() => setEditor(stepConcert(editor, 1))}>+</button>
                     <span className="pill-divider" aria-hidden="true" />
@@ -438,8 +447,8 @@ export function App() {
                       className="pill-btn"
                       type="button"
                       aria-label="Prefer flats"
-                      aria-pressed={settings.prefs.gb}
-                      onClick={() => applyPrefs({ ...settings.prefs, gb: !settings.prefs.gb })}
+                      aria-pressed={accidentalBias(settings.prefs) === 'flats'}
+                      onClick={() => applyPrefs(chooseAccidentalBias(settings.prefs, 'flats'))}
                     >
                       ♭
                     </button>
@@ -448,8 +457,8 @@ export function App() {
                       className="pill-btn"
                       type="button"
                       aria-label="Prefer sharps"
-                      aria-pressed={settings.prefs.csharp}
-                      onClick={() => applyPrefs({ ...settings.prefs, csharp: !settings.prefs.csharp })}
+                      aria-pressed={accidentalBias(settings.prefs) === 'sharps'}
+                      onClick={() => applyPrefs(chooseAccidentalBias(settings.prefs, 'sharps'))}
                     >
                       ♯
                     </button>

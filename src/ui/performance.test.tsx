@@ -134,4 +134,50 @@ describe('StageView quiet chart', () => {
     expect(screen.getByRole('button', { name: '1-4-5' }).getAttribute('aria-pressed')).toBe('true')
     expect(screen.getAllByText('1').length).toBeGreaterThan(0)
   })
+
+  it('rewrites transposed accidentals when preferring flats or sharps', () => {
+    const ids = idSequence('bias')
+    const song = emptySong({ title: 'Bias Demo', originalKey: parseKey('F') }, ids)
+    song.sections = [
+      {
+        id: ids(),
+        kind: 'verse',
+        label: 'Verse',
+        lines: [
+          {
+            id: ids(),
+            type: 'lyric',
+            text: 'Hello world',
+            chords: [
+              { id: ids(), index: 0, symbol: parseChord('F') },
+              { id: ids(), index: 6, symbol: parseChord('Dm') },
+            ],
+            needsCheck: false,
+          },
+        ],
+      },
+    ]
+    song.arrangement = song.sections.map((section) => ({ sectionId: section.id }))
+
+    render(
+      <StageView
+        entries={[{ song, concert: parseKey('E'), capo: 0 }]}
+        nashville={false}
+        prefs={DEFAULT_PREFS}
+        onExit={() => {}}
+      />,
+    )
+
+    expect(screen.getAllByText('C#m').length).toBeGreaterThan(0)
+    fireEvent.click(screen.getByRole('button', { name: 'Prefer flats' }))
+    expect(screen.getByRole('button', { name: 'Prefer flats' }).getAttribute('aria-pressed')).toBe('true')
+    expect(screen.getByRole('button', { name: 'Prefer sharps' }).getAttribute('aria-pressed')).toBe('false')
+    expect(screen.getAllByText('Dbm').length).toBeGreaterThan(0)
+    expect(screen.queryByText('C#m')).toBeNull()
+
+    fireEvent.click(screen.getByRole('button', { name: 'Prefer sharps' }))
+    expect(screen.getByRole('button', { name: 'Prefer sharps' }).getAttribute('aria-pressed')).toBe('true')
+    expect(screen.getByRole('button', { name: 'Prefer flats' }).getAttribute('aria-pressed')).toBe('false')
+    expect(screen.getAllByText('C#m').length).toBeGreaterThan(0)
+  })
 })

@@ -40,6 +40,7 @@ button { cursor: pointer; }
 .brand span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .search { margin: 8px 12px; padding: 8px 10px; border: 1px solid var(--border-strong); border-radius: 6px; background: var(--bg); width: calc(100% - 24px); }
 .nav-label, .meta, .hint, .comment { color: var(--text-muted); }
+.settings [role='radiogroup'] { display: flex; flex-direction: column; gap: 6px; }
 .song-row, .nav-button, .icon-button, .text-button, .primary, .outline { border: 0; background: transparent; border-radius: 6px; }
 .song-row { display: block; width: calc(100% - 12px); margin: 1px 6px; text-align: left; padding: 7px 8px; }
 .song-row strong { display: block; font-weight: 500; font-size: 13.5px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
