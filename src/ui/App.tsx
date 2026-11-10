@@ -39,7 +39,7 @@ import { idbLibrary } from '../domain/idb-library'
 import { defaultSettings, type Setlist, type Settings } from '../domain/library-types'
 import { layoutPdf } from '../domain/pdf-layout'
 import { encodeShare, decodeShare } from '../domain/share'
-import { displayedSong, findPlacement, issuesIn, mapSymbols, type Song } from '../domain/song'
+import { findPlacement, issuesIn, mapSymbols, type Song } from '../domain/song'
 import { amazingGrace, firstLight } from '../fixtures/charts'
 import { emptySong } from '../domain/song'
 import { Chart, type NudgeHow } from './chart'
@@ -48,7 +48,7 @@ import { ExportDialog, type PdfChoices } from './export-dialog'
 import { ImportScreen } from './import-screen'
 import { Inspector } from './inspector'
 import { PreviewPane } from './preview-pane'
-import { ProjectorView, StageView } from './performance'
+import { ProjectorView, StageView, type StageEntry } from './performance'
 import { SetlistScreen } from './setlist-screen'
 import { SettingsScreen } from './settings-screen'
 
@@ -63,7 +63,11 @@ export function App() {
   const [showPreview, setShowPreview] = useState(false)
   const [mode, setMode] = useState<'visual' | 'chordpro'>('visual')
   const [menuOpen, setMenuOpen] = useState(false)
-  const [performance, setPerformance] = useState<{ mode: 'stage' | 'projector'; songs: Song[] } | null>(null)
+  const [performance, setPerformance] = useState<
+    | { mode: 'stage'; entries: StageEntry[]; nashville: boolean }
+    | { mode: 'projector'; songs: Song[] }
+    | null
+  >(null)
   const [exportOpen, setExportOpen] = useState(false)
   const [songs, setSongs] = useState<Song[]>([])
   const [setlists, setSetlists] = useState<Setlist[]>([])
@@ -371,7 +375,7 @@ export function App() {
                 <button className="text-button" type="button" aria-pressed={mode === 'chordpro'} onClick={() => setMode((value) => value === 'visual' ? 'chordpro' : 'visual')}>{mode === 'visual' ? 'ChordPro' : 'Visual'}</button>
                 <button className="text-button" type="button" onClick={() => downloadCho(editor.song)}>.cho</button>
                 <button className="text-button" type="button" onClick={() => copyShare(editor.song, announce)}>Share</button>
-                <button className="text-button" type="button" onClick={() => view && setPerformance({ mode: 'stage', songs: [view] })}>Stage</button>
+                <button className="text-button" type="button" onClick={() => editor && setPerformance({ mode: 'stage', entries: [{ song: editor.song, concert: editor.concert, capo: editor.capo }], nashville: editor.nashville })}>Stage</button>
                 <button className="text-button" type="button" onClick={() => view && setPerformance({ mode: 'projector', songs: [view] })}>Projector</button>
                 <button className="text-button" type="button" aria-pressed={showPreview} onClick={() => setShowPreview((value) => !value)}>Preview</button>
               </>
@@ -387,7 +391,7 @@ export function App() {
                     <button type="button" role="menuitem" onClick={() => { setMode((value) => value === 'visual' ? 'chordpro' : 'visual'); setMenuOpen(false) }}>{mode === 'visual' ? 'ChordPro' : 'Visual'}</button>
                     <button type="button" role="menuitem" onClick={() => { downloadCho(editor.song); setMenuOpen(false) }}>.cho</button>
                     <button type="button" role="menuitem" onClick={() => { copyShare(editor.song, announce); setMenuOpen(false) }}>Share</button>
-                    <button type="button" role="menuitem" onClick={() => { if (view) setPerformance({ mode: 'stage', songs: [view] }); setMenuOpen(false) }}>Stage</button>
+                    <button type="button" role="menuitem" onClick={() => { if (editor) setPerformance({ mode: 'stage', entries: [{ song: editor.song, concert: editor.concert, capo: editor.capo }], nashville: editor.nashville }); setMenuOpen(false) }}>Stage</button>
                     <button type="button" role="menuitem" onClick={() => { if (view) setPerformance({ mode: 'projector', songs: [view] }); setMenuOpen(false) }}>Projector</button>
                   </div>
                 )}
@@ -538,11 +542,11 @@ export function App() {
         </main>
       )}
       {place === 'import' && <main className="editor"><ImportScreen onCancel={() => setPlace('editor')} onSave={(song) => { void library.current.saveSong(song); setSongs((current) => [song, ...current.filter((item) => item.id !== song.id)]); const opened = openEditor(song); setEditor({ ...opened, prefs: settings.prefs }); setPlace('editor') }} /></main>}
-      {place === 'sets' && <main className="editor"><SetlistScreen songs={songs} setlists={setlists} onCreate={() => { const setlist: Setlist = { id: crypto.randomUUID(), name: 'Sunday', date: new Date().toISOString().slice(0, 10), entries: [] }; setSetlists((current) => [...current, setlist]); void library.current.saveSetlist(setlist) }} onChange={(setlist) => { setSetlists((current) => current.map((item) => item.id === setlist.id ? setlist : item)); void library.current.saveSetlist(setlist) }} onDelete={(id) => { setSetlists((current) => current.filter((item) => item.id !== id)); void library.current.deleteSetlist(id) }} onExport={(setlist, rightHand) => void exportSetlist(setlist, rightHand)} onStage={(setlist) => { const ordered = setlist.entries.flatMap((entry) => { const song = songs.find((item) => item.id === entry.songId); return song ? [displayedSong(song, entry.key ?? song.originalKey, entry.capo ?? 0, settings.prefs)] : [] }); if (ordered.length > 0) setPerformance({ mode: 'stage', songs: ordered }) }} /></main>}
+      {place === 'sets' && <main className="editor"><SetlistScreen songs={songs} setlists={setlists} onCreate={() => { const setlist: Setlist = { id: crypto.randomUUID(), name: 'Sunday', date: new Date().toISOString().slice(0, 10), entries: [] }; setSetlists((current) => [...current, setlist]); void library.current.saveSetlist(setlist) }} onChange={(setlist) => { setSetlists((current) => current.map((item) => item.id === setlist.id ? setlist : item)); void library.current.saveSetlist(setlist) }} onDelete={(id) => { setSetlists((current) => current.filter((item) => item.id !== id)); void library.current.deleteSetlist(id) }} onExport={(setlist, rightHand) => void exportSetlist(setlist, rightHand)} onStage={(setlist) => { const ordered = setlist.entries.flatMap((entry) => { const song = songs.find((item) => item.id === entry.songId); return song ? [{ song, concert: entry.key ?? song.originalKey, capo: entry.capo ?? 0 }] : [] }); if (ordered.length > 0) setPerformance({ mode: 'stage', entries: ordered, nashville: false }) }} /></main>}
       {place === 'settings' && <main className="editor"><SettingsScreen settings={settings} onChange={(next) => { setSettings(next); void library.current.saveSettings(next); document.documentElement.dataset.theme = next.theme === 'system' ? '' : next.theme; document.documentElement.dataset.size = next.textSize; try { localStorage.setItem('csm-theme', next.theme) } catch { /* ignore */ } setEditor((state) => state && { ...state, prefs: next.prefs, concert: keyFromPitch(notePitch(state.concert.tonic), state.concert.mode, next.prefs) }) }} onBackup={() => { const backup: BackupFile = { version: 1, songs, setlists, settings }; const blob = new Blob([JSON.stringify(backup, null, 2)], { type: 'application/json' }); const url = URL.createObjectURL(blob); const link = document.createElement('a'); link.href = url; link.download = 'chord-sheet-backup.json'; link.click(); URL.revokeObjectURL(url) }} onRestore={(file) => void restoreBackup(file)} /></main>}
       {place === 'editor' && layout && <PreviewPane layout={layout} onExport={() => setExportOpen(true)} onBack={phone ? () => setShowPreview(false) : undefined} />}
       {exportOpen && layout && <ExportDialog layout={layout} choices={pdfChoices} onChange={setPdfChoices} onClose={() => setExportOpen(false)} onDownload={() => void exportPdf()} />}
-      {performance?.mode === 'stage' && <StageView songs={performance.songs} onExit={() => setPerformance(null)} />}
+      {performance?.mode === 'stage' && <StageView entries={performance.entries} nashville={performance.nashville} prefs={settings.prefs} onExit={() => setPerformance(null)} />}
       {performance?.mode === 'projector' && performance.songs[0] && <ProjectorView song={performance.songs[0]} onExit={() => setPerformance(null)} />}
       <div className="phone-tabs">
         <button type="button" aria-pressed={songsTabActive} onClick={() => setPlace('songs')}>Songs</button>

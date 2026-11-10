@@ -1,12 +1,21 @@
 import { useEffect, useRef, useState } from 'react'
-import { formatSymbol } from '../domain/chord'
+import type { Key } from '../domain/chord'
 import { padCollisions, wrapLyricDisplay } from '../domain/line-layout'
 import type { BarLine, LyricLine } from '../domain/song'
+import { symbolLabel } from './chart'
 
 /** Same advance factor PDF layout uses for mono capacity. */
 const MONO = 0.6
 
-export function StageLyricLine({ line }: { line: LyricLine }) {
+export function StageLyricLine({
+  line,
+  numbers,
+  shapeKey,
+}: {
+  line: LyricLine
+  numbers: boolean
+  shapeKey: Key
+}) {
   const ref = useRef<HTMLDivElement>(null)
   const [capacity, setCapacity] = useState(0)
 
@@ -26,7 +35,10 @@ export function StageLyricLine({ line }: { line: LyricLine }) {
 
   const laid = padCollisions(
     line.text,
-    line.chords.map((chord) => ({ label: formatSymbol(chord.symbol), index: chord.index })),
+    line.chords.map((chord) => ({
+      label: symbolLabel(chord.symbol, numbers, shapeKey),
+      index: chord.index,
+    })),
   )
   const segments = capacity > 0
     ? wrapLyricDisplay(laid.text, laid.chords, capacity)
@@ -54,10 +66,18 @@ export function StageLyricLine({ line }: { line: LyricLine }) {
   )
 }
 
-export function StageBarLine({ line }: { line: BarLine }) {
+export function StageBarLine({
+  line,
+  numbers,
+  shapeKey,
+}: {
+  line: BarLine
+  numbers: boolean
+  shapeKey: Key
+}) {
   const text = line.items
     .map((item) => {
-      if (item.kind === 'chord') return formatSymbol(item.symbol)
+      if (item.kind === 'chord') return symbolLabel(item.symbol, numbers, shapeKey)
       if (item.kind === 'rest') return item.mark
       return '|'
     })
