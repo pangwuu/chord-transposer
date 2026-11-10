@@ -370,7 +370,7 @@ describe('pdf', () => {
   })
 
   it('tightens spacing before it changes the lyric size', () => {
-    const layout = layoutPdf(verseOf(42), { ...pdfOptions(parseKey('C')), fit: 1, fontSize: 12 })
+    const layout = layoutPdf(verseOf(43), { ...pdfOptions(parseKey('C')), fit: 1, fontSize: 12 })
     expect(layout.fontSize).toBe(12)
     expect(layout.spacing).toBe(0.8)
     expect(layout.columns).toBe(1)
@@ -423,7 +423,7 @@ describe('pdf', () => {
   })
 
   it('uses a real second column before it changes the lyric size', () => {
-    const layout = layoutPdf(longSong(44), { ...pdfOptions(parseKey('C')), fit: 1, fontSize: 12, allowTwoColumns: true })
+    const layout = layoutPdf(longSong(45), { ...pdfOptions(parseKey('C')), fit: 1, fontSize: 12, allowTwoColumns: true })
     expect(layout.fontSize).toBe(12)
     expect(layout.columns).toBe(2)
     expect(layout.spacing).toBe(0.8)

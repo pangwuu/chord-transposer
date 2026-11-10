@@ -144,9 +144,14 @@ button { cursor: pointer; }
 .paper-foot { position: absolute; left: 42px; right: 42px; bottom: 16px; display: flex; justify-content: space-between; align-items: baseline; gap: 12px; }
 .paper-foot p { margin: 0; font-size: 9.5px; line-height: 1.2; }
 .preview-scroll { overflow: auto; padding: 12px; flex: 1; min-height: 0; }
-.paper h2, .paper p, .paper .run { font-family: Inter, sans-serif; color: black; }
-.paper h2 { font-size: 21px; margin: 0 0 6px; }
-.paper .rule { border-top: 1px solid black; margin: 8px 0; }
+.paper h2, .paper p, .paper .run { font-family: Inter, sans-serif; color: black; margin: 0; }
+/* Header slots match pdf-render drawPage + headerReserve (pt == px here). */
+.paper h2 { font-size: 21px; line-height: 24px; height: 24px; overflow: hidden; }
+.paper .run { font-size: 9.5px; line-height: 16px; height: 16px; overflow: hidden; }
+.paper .paper-artist { font-size: 10.5px; line-height: 16px; height: 16px; overflow: hidden; }
+.paper .paper-meta { font-size: 10px; line-height: 18px; height: 18px; overflow: hidden; }
+.paper .paper-order { font-size: 9px; line-height: 14px; height: 14px; overflow: hidden; }
+.paper .rule { border-top: 1px solid black; margin: 0 0 16px; }
 .paper .section-rule { font-family: Inter, sans-serif; font-weight: 700; font-size: 11px; letter-spacing: .06em; border-bottom: 1px solid #999; margin: 0; display: flex; align-items: flex-end; }
 .paper .section-rule.plain { border-bottom-color: transparent; }
 .paper .columns { display: flex; gap: 18px; align-items: flex-start; }
