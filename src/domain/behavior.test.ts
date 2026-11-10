@@ -9,7 +9,7 @@ import { chordTextFromPdfItems, importText } from './import-text'
 import { padCollisions } from './line-layout'
 import { memoryLibrary } from './memory-library'
 import { formatLyric, fromChordPro, toChordPro } from './chordpro'
-import { layoutPdf, SECTION_LEAD_IN } from './pdf-layout'
+import { charsPerLine, layoutPdf, pageSize, SECTION_LEAD_IN } from './pdf-layout'
 import { renderPdf, rightHandParts, mergePdfs } from './pdf-render'
 import { decodeShare, encodeShare } from './share'
 import { addBarChord, emptySong, idSequence, performance, type Song } from './song'
@@ -379,6 +379,31 @@ describe('pdf', () => {
     expect(secondColumn?.kind === 'section' && secondColumn.label).toBe('VERSE 3')
   })
 
+  it('keeps an instrumental bar inside its column', () => {
+    const layout = layoutPdf(firstLight, { ...pdfOptions(firstLight.originalKey), columns: 2 })
+    const capacity = charsPerLine(layout.fontSize, pageSize('a4').width, 2)
+    const bars = layout.pages.flatMap((page) => page.blocks).flatMap((block) => (block.kind === 'bars' ? [block.text] : []))
+    expect(bars.length).toBeGreaterThan(1)
+    expect(bars.every((text) => text.length <= capacity)).toBe(true)
+    expect(bars.join(' ').replace(/\s+/g, ' ')).toContain('D/F#')
+    expect(bars.join(' ').replace(/\s+/g, ' ')).toContain('| C - - - |')
+  })
+
+  it('prints instrumental bars in the bold chord face', async () => {
+    const fonts = pdfFonts()
+    const bytes = await renderPdf(layoutPdf(firstLight, pdfOptions(firstLight.originalKey)), fonts)
+    const pdfjs = await import('pdfjs-dist/legacy/build/pdf.mjs')
+    const doc = await pdfjs.getDocument({ data: new Uint8Array(bytes) }).promise
+    const content = await (await doc.getPage(1)).getTextContent()
+    const face = (text: string, exact = false) => {
+      const item = content.items.find((entry) => 'str' in entry && (exact ? entry.str === text : entry.str.includes(text)))
+      if (!item || !('fontName' in item)) throw new Error(`missing ${text}`)
+      return item.fontName
+    }
+    expect(face('D/F#')).toBe(face('D', true))
+    expect(face('D/F#')).not.toBe(face('Morning'))
+  })
+
   it('draws an explicit two-column choice as two columns', () => {
     const layout = layoutPdf(verseOf(4), { ...pdfOptions(parseKey('C')), columns: 2 })
     expect(layout.columns).toBe(2)
@@ -489,6 +514,16 @@ function longSong(lines: number): Song {
   })
   song.arrangement = [{ sectionId: song.sections[0].id }, { sectionId: 'chorus' }]
   return song
+}
+
+function pdfFonts() {
+  return {
+    sans: readFileSync('public/fonts/Inter-Regular.ttf'),
+    sansBold: readFileSync('public/fonts/Inter-Bold.ttf'),
+    sansItalic: readFileSync('public/fonts/Inter-Italic.ttf'),
+    mono: readFileSync('public/fonts/JetBrainsMono-Regular.ttf'),
+    monoBold: readFileSync('public/fonts/JetBrainsMono-ExtraBold.ttf'),
+  }
 }
 
 function pdfOptions(concert: Song['originalKey']) {

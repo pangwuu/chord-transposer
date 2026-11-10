@@ -58,6 +58,9 @@ button { cursor: pointer; }
 .rail { align-items: center; }
 .editor { display: flex; flex-direction: column; background: var(--bg); }
 .editor-bar, .preview-bar { display: flex; gap: 8px; align-items: center; min-height: 48px; padding: 0 16px; border-bottom: 1px solid var(--border); }
+.preview-bar { flex-wrap: nowrap; }
+.preview-bar .meta { white-space: nowrap; min-width: 0; }
+.preview-bar .primary { padding: 8px 14px; white-space: nowrap; flex-shrink: 0; }
 .editor-bar { min-width: 0; overflow-x: auto; }
 .editor-bar strong { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .transport { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; row-gap: 8px; margin: 14px 0 4px; padding: 0; border: 0; min-height: 0; }
@@ -137,7 +140,9 @@ button { cursor: pointer; }
 .tile.on, .tile[aria-pressed='true'] { background: var(--accent); color: var(--text-on-accent); border-color: transparent; }
 .preview { background: var(--bg-canvas); border-left: 1px solid var(--border); display: flex; flex-direction: column; }
 .paper { background: white; color: black; margin: 0 auto 18px; box-shadow: var(--shadow-md); transform-origin: top center; overflow: hidden; }
-.paper-inner { padding: 42px; font-family: var(--mono); }
+.paper-inner { position: relative; padding: 42px; font-family: var(--mono); }
+.paper-foot { position: absolute; left: 42px; right: 42px; bottom: 16px; display: flex; justify-content: space-between; align-items: baseline; gap: 12px; }
+.paper-foot p { margin: 0; font-size: 9.5px; line-height: 1.2; }
 .preview-scroll { overflow: auto; padding: 12px; flex: 1; min-height: 0; }
 .paper h2, .paper p, .paper .run { font-family: Inter, sans-serif; color: black; }
 .paper h2 { font-size: 21px; margin: 0 0 6px; }
@@ -243,4 +248,8 @@ button { cursor: pointer; }
   .editor-body, .editor-body:has(.inspector) { grid-template-columns: minmax(0, 1fr); grid-template-rows: minmax(0, 1fr); }
   .app.phone-editor.show-preview .preview { display: flex; }
   .app.phone-editor.show-preview .editor { display: none; }
+  .preview-bar { padding: 0 8px; gap: 6px; }
+  .preview-bar .text-button { padding: 6px 4px; }
+  .preview-bar .meta { font-size: clamp(9px, 2.7vw, 13px); }
+  .preview-bar .primary { padding: 8px 12px; }
 }
