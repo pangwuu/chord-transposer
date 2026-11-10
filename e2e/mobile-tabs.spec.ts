@@ -16,6 +16,19 @@ test.describe('phone bottom tabs', () => {
     await expect(tabs.getByRole('button', { name: 'Setlists' })).toHaveAttribute('aria-pressed', 'true')
   })
 
+  test('more-actions menu is hittable and not clipped', async ({ page }) => {
+    await page.getByRole('button', { name: 'More actions' }).click()
+    await expect(page.getByRole('button', { name: 'More actions' })).toHaveAttribute('aria-expanded', 'true')
+    const stageItem = page.getByRole('menuitem', { name: 'Stage' })
+    await expect(stageItem).toBeVisible()
+    const hit = await stageItem.evaluate((node) => {
+      const box = node.getBoundingClientRect()
+      const el = document.elementFromPoint(box.left + box.width / 2, box.top + box.height / 2)
+      return el === node || node.contains(el)
+    })
+    expect(hit).toBe(true)
+  })
+
   test('hide on projector and stage', async ({ page }) => {
     const tabs = page.locator('.phone-tabs')
     await expect(tabs).toBeVisible()

@@ -152,8 +152,9 @@ button { cursor: pointer; }
 .play-a-artist { margin: 10px 0 0; font-family: var(--sans); font-size: 15px; color: #9b9b97; }
 .play-a-section { margin: 0 0 2.4rem; max-width: 42rem; scroll-margin-top: 48px; }
 .play-a-section-label { margin: 0 0 14px; font-family: var(--sans); font-size: 13px; font-weight: 700; letter-spacing: .08em; text-transform: uppercase; color: #fff; }
+.play-lyric-wrap { max-width: 100%; }
 .play-a-chord { position: absolute; top: 0; color: #f0b429; font-weight: 800; white-space: nowrap; }
-.play-a-lyric { margin: 0; white-space: pre-wrap; color: #f2f2f0; }
+.play-a-lyric { margin: 0; white-space: pre; color: #f2f2f0; }
 .play-a-bars { margin: 0 0 1rem; color: #f0b429; font-weight: 800; white-space: pre-wrap; }
 
 /* Play-mode prototype B — Focus Column + jump rail */
@@ -171,13 +172,16 @@ button { cursor: pointer; }
 .play-b-section { max-width: 36rem; margin: 0 auto 2.8rem; scroll-margin-top: 24px; font-family: var(--mono); font-size: 23px; }
 .play-b-section h2 { margin: 0 0 16px; font-family: var(--sans); font-size: 12px; letter-spacing: .16em; text-transform: uppercase; color: var(--p-400); }
 .play-b-chord { position: absolute; top: 0; color: var(--p-300); font-weight: 800; white-space: nowrap; }
-.play-b-lyric { margin: 0; white-space: pre-wrap; }
+.play-b-lyric { margin: 0; white-space: pre; }
 .play-b-bars { margin: 0 0 1rem; color: var(--p-300); font-weight: 800; white-space: pre-wrap; }
 @media (max-width: 767px) {
+  .play-a-body { font-size: 16px; padding: 64px 16px 56px; }
+  .play-a-title { font-size: clamp(1.6rem, 7vw, 2.2rem); }
   .play-b-layout { grid-template-columns: 1fr; grid-template-rows: auto 1fr; }
   .play-b-rail { flex-direction: row; overflow-x: auto; border-right: 0; border-bottom: 1px solid #1c2230; padding: 10px; }
   .play-b-rail button { white-space: nowrap; }
   .play-b-column { padding: 20px 16px 80px; }
+  .play-b-section { font-size: 17px; }
 }
 
 /* Play-mode prototype C — Spotlight */
@@ -189,7 +193,7 @@ button { cursor: pointer; }
 .play-c-section { margin: 0 0 28px; font-family: var(--sans); font-size: clamp(1.6rem, 4vw, 2.4rem); font-weight: 600; }
 .play-c-lines { max-width: 48rem; font-family: var(--mono); font-size: clamp(1.35rem, 3.4vw, 2rem); }
 .play-c-chord { position: absolute; top: 0; color: #ffd166; font-weight: 800; white-space: nowrap; }
-.play-c-lyric { margin: 0; white-space: pre-wrap; line-height: 1.25; }
+.play-c-lyric { margin: 0; white-space: pre; line-height: 1.25; }
 .play-c-bars { margin: 0 0 1.2rem; color: #ffd166; font-weight: 800; white-space: pre-wrap; }
 
 /* Throwaway prototype switcher — not part of any variant design */
@@ -218,7 +222,8 @@ button { cursor: pointer; }
   .phone-tabs button[aria-pressed='true'] { color: var(--accent); font-weight: 600; }
   .app.phone-stage .phone-tabs, .app.phone-projector .phone-tabs { display: none; }
   .title-input { font-size: 24px; }
-  .editor-bar { flex-wrap: nowrap; height: auto; row-gap: 4px; padding: 8px 12px; position: relative; z-index: 3; }
+  /* overflow:visible so the absolute More-actions menu is not clipped by overflow-x:auto */
+  .editor-bar { flex-wrap: nowrap; height: auto; row-gap: 4px; padding: 8px 12px; position: relative; z-index: 3; overflow: visible; }
   .editor-bar .grow { flex: 1; min-width: 8px; }
   .transport { padding: 6px 12px; }
   .transport-main .outline, .transport-main .select { height: 36px; }
