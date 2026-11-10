@@ -16,6 +16,7 @@
   --shadow-md: 0 0 0 1px rgba(15, 15, 15, .05), 0 3px 6px rgba(15, 15, 15, .08), 0 9px 24px rgba(15, 15, 15, .12);
   --shadow-lg: 0 0 0 1px rgba(15, 15, 15, .05), 0 5px 10px rgba(15, 15, 15, .1), 0 15px 40px rgba(15, 15, 15, .2);
   --fs-lyric: 15px; --mono: 'JetBrains Mono', ui-monospace, monospace; --sans: Inter, ui-sans-serif, system-ui, sans-serif;
+  --serif: 'Iowan Old Style', 'Palatino Linotype', Palatino, 'Book Antiqua', Georgia, serif;
   color: var(--text); background: var(--bg); font-family: var(--sans); font-size: 14px;
 }
 @media (prefers-color-scheme: dark) {
@@ -55,20 +56,39 @@ button { cursor: pointer; }
 .rail .brand span, .rail .search, .rail .library-scroll, .rail .nav-button span { display: none; }
 .rail { align-items: center; }
 .editor { display: flex; flex-direction: column; background: var(--bg); }
-.editor-bar, .transport, .preview-bar { display: flex; gap: 8px; align-items: center; min-height: 48px; padding: 0 16px; border-bottom: 1px solid var(--border); }
+.editor-bar, .preview-bar { display: flex; gap: 8px; align-items: center; min-height: 48px; padding: 0 16px; border-bottom: 1px solid var(--border); }
 .editor-bar { min-width: 0; overflow-x: auto; }
 .editor-bar strong { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.transport { min-height: 44px; flex-wrap: wrap; row-gap: 6px; }
-.transport-main, .transport-status { display: flex; align-items: center; gap: 8px; flex-wrap: nowrap; }
-.transport-main { min-width: min(100%, 17.5rem); max-width: 100%; overflow-x: auto; }
-.transport-main > .outline, .transport-main > .select { flex-shrink: 0; }
-.transport-main > .transport-capo { flex: 1 1 6.5rem; flex-shrink: 1; min-width: 0; max-width: 9.5rem; }
-.transport-status { margin-left: auto; max-width: 100%; overflow-x: auto; }
+.transport { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; row-gap: 8px; margin: 14px 0 4px; padding: 0; border: 0; min-height: 0; }
+.transport-main, .transport-status { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+.transport-main { min-width: 0; max-width: 100%; }
+.transport-status { margin-left: auto; max-width: 100%; }
+.transport-mode { display: inline-flex; align-items: center; gap: 6px; }
+.transport-label { font-size: 11px; font-weight: 600; letter-spacing: .06em; text-transform: uppercase; color: var(--text-muted); }
+.pill { display: inline-flex; align-items: stretch; min-height: 36px; border: 1px solid var(--border-strong); border-radius: 999px; background: var(--bg-subtle); overflow: hidden; }
+.pill-btn, .pill-select { border: 0; background: transparent; color: inherit; min-height: 36px; padding: 0 12px; border-radius: 0; }
+.pill-btn { display: inline-flex; align-items: center; justify-content: center; font-weight: 600; }
+.pill-btn[aria-pressed='true'] { background: var(--bg-active); color: var(--accent-text); }
+.pill-btn:disabled { opacity: .35; cursor: default; }
+.pill-icon { padding: 0 10px; color: var(--text-muted); }
+.pill-select { appearance: none; -webkit-appearance: none; padding-right: 22px; background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%236F6E69' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpolyline points='6 9 12 15 18 9'/%3E%3C/svg%3E"); background-repeat: no-repeat; background-position: right 8px center; cursor: pointer; }
+.pill-key { font-family: var(--mono); font-weight: 700; color: var(--accent-text); min-width: 3.25rem; text-align: center; padding-left: 6px; padding-right: 18px; background-position: right 4px center; }
+.pill-capo { display: inline-flex; align-items: center; gap: 4px; padding-left: 4px; }
+.pill-capo-label { color: var(--text-muted); font-size: 13px; padding-left: 8px; }
+.pill-capo .pill-select { padding-left: 4px; min-width: 3.5rem; }
+.pill-divider { width: 1px; align-self: stretch; margin: 7px 0; background: var(--border-strong); }
+@media (hover: hover) {
+  .pill-btn:hover:not(:disabled) { background: var(--bg-hover); }
+}
 .grow { flex: 1; }
 .editor-scroll { padding: 28px 24px 80px; }
 .document { max-width: 760px; margin: 0 auto; }
-.title-input, .section-label, .lyric-edit { width: 100%; border: 0; background: transparent; }
-.title-input { font-size: 30px; font-weight: 700; line-height: 36px; }
+.song-hero { display: flex; flex-direction: column; align-items: flex-start; gap: 6px; margin-bottom: 0; }
+.title-input, .artist-input, .section-label, .lyric-edit { width: 100%; border: 0; background: transparent; }
+.title-input { font-family: var(--serif); font-size: 34px; font-weight: 700; line-height: 1.15; letter-spacing: -0.01em; }
+.artist-input { font-size: 15px; color: var(--text-muted); padding: 0; }
+.artist-input::placeholder { color: var(--text-faint); }
+.meter-pill { display: inline-flex; align-items: center; margin-top: 6px; padding: 5px 12px; border: 1px solid var(--border-strong); border-radius: 999px; background: var(--bg-subtle); color: var(--text-muted); font-size: 13px; }
 .properties { display: grid; grid-template-columns: 120px 1fr; gap: 6px 12px; margin: 16px 0; font-size: 14px; }
 .capo-banner { background: var(--accent-soft); color: var(--accent-text); border-radius: 6px; padding: 8px 10px; margin-bottom: 12px; }
 .section { margin-top: 18px; }
@@ -160,11 +180,13 @@ button { cursor: pointer; }
   .phone-tabs button { padding: 10px; border: 0; background: transparent; }
   .phone-tabs button[aria-pressed='true'] { color: var(--accent); font-weight: 600; }
   .app.phone-stage .phone-tabs, .app.phone-projector .phone-tabs { display: none; }
-  .title-input { font-size: 24px; }
+  .title-input { font-size: 26px; }
   .editor-bar { flex-wrap: nowrap; height: auto; row-gap: 4px; padding: 8px 12px; position: relative; z-index: 3; }
   .editor-bar .grow { flex: 1; min-width: 8px; }
-  .transport { padding: 6px 12px; }
-  .transport-main .outline, .transport-main .select { height: 36px; }
+  .transport { margin: 12px 0 2px; }
+  .transport-status { margin-left: 0; width: 100%; }
+  .pill, .pill-btn, .pill-select { min-height: 36px; }
+  .song-hero { gap: 4px; }
   /* Phone: stack setlist/settings rows so controls stay inside the viewport. */
   .import-screen, .setlists, .settings { max-width: 100%; overflow-x: hidden; }
   .setlists .row-meta { flex-wrap: wrap; align-items: center; }
