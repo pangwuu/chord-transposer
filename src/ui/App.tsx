@@ -380,22 +380,25 @@ export function App() {
             )}
           </header>
           <div className="transport">
-            <button className="outline" type="button" aria-label="Key down a semitone" onClick={() => setEditor(stepConcert(editor, -1))}>−</button>
-            <select className="select" aria-label="Key" value={formatKey(editor.concert)} onChange={(event) => setEditor(chooseConcert(editor, parseKey(event.target.value)))}>
-              <optgroup label="Major">{KEYS.map((key) => <option key={key}>{key}</option>)}</optgroup>
-              <optgroup label="Minor">{KEYS.map((key) => <option key={`${key}m`}>{key}m</option>)}</optgroup>
-            </select>
-            <button className="outline" type="button" aria-label="Key up a semitone" onClick={() => setEditor(stepConcert(editor, 1))}>+</button>
-            <select className="select" aria-label="Capo" value={editor.capo} onChange={(event) => setEditor(chooseCapo(editor, Number(event.target.value)))}>
-              {Array.from({ length: 12 }, (_, capo) => <option key={capo} value={capo}>{capo === 0 ? 'Capo off' : `Capo ${capo}`}</option>)}
-            </select>
-            <button className="outline" type="button" aria-pressed={editor.nashville} onClick={() => setEditor({ ...editor, nashville: !editor.nashville })}>1-4-5</button>
-            {transposed && <span className="chip">From {formatKey(editor.song.originalKey)}</span>}
-            {transposed && <button className="text-button" type="button" onClick={() => { setEditor(saveConcertAsSongKey(editor)); announce(`Saved in ${formatKey(editor.concert)}`) }}>Save as song key</button>}
-            <span className="grow" />
-            <button className={issues.length ? 'chip warn' : 'chip ok'} type="button" onClick={() => issues[0] && setEditor(selectChord(editor, issues[0].id))}>
-              {issues.length ? `${issues.length} to check` : 'All chords valid'}
-            </button>
+            <div className="transport-main">
+              <button className="outline" type="button" aria-label="Key down a semitone" onClick={() => setEditor(stepConcert(editor, -1))}>−</button>
+              <select className="select" aria-label="Key" value={formatKey(editor.concert)} onChange={(event) => setEditor(chooseConcert(editor, parseKey(event.target.value)))}>
+                <optgroup label="Major">{KEYS.map((key) => <option key={key}>{key}</option>)}</optgroup>
+                <optgroup label="Minor">{KEYS.map((key) => <option key={`${key}m`}>{key}m</option>)}</optgroup>
+              </select>
+              <button className="outline" type="button" aria-label="Key up a semitone" onClick={() => setEditor(stepConcert(editor, 1))}>+</button>
+              <select className="select transport-capo" aria-label="Capo" value={editor.capo} onChange={(event) => setEditor(chooseCapo(editor, Number(event.target.value)))}>
+                {Array.from({ length: 12 }, (_, capo) => <option key={capo} value={capo}>{capo === 0 ? 'Capo off' : `Capo ${capo}`}</option>)}
+              </select>
+              <button className="outline" type="button" aria-pressed={editor.nashville} onClick={() => setEditor({ ...editor, nashville: !editor.nashville })}>1-4-5</button>
+            </div>
+            <div className="transport-status">
+              {transposed && <span className="chip">From {formatKey(editor.song.originalKey)}</span>}
+              {transposed && <button className="text-button" type="button" onClick={() => { setEditor(saveConcertAsSongKey(editor)); announce(`Saved in ${formatKey(editor.concert)}`) }}>Save as song key</button>}
+              <button className={issues.length ? 'chip warn' : 'chip ok'} type="button" onClick={() => issues[0] && setEditor(selectChord(editor, issues[0].id))}>
+                {issues.length ? `${issues.length} to check` : 'All chords valid'}
+              </button>
+            </div>
           </div>
           <div className={mode === 'chordpro' ? 'editor-body chordpro-mode' : 'editor-body'}>
             {mode === 'chordpro' && <ChordProPane song={editor.song} onApply={(text) => setEditor((state) => state ? applyChordProOf(state, text) : state)} />}

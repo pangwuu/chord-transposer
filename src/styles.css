@@ -29,7 +29,7 @@ body { margin: 0; }
 button, input, textarea, select { font: inherit; color: inherit; }
 button { cursor: pointer; }
 :focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
-.app { display: grid; grid-template-columns: 240px minmax(0, 1fr) 420px; height: 100vh; overflow: hidden; }
+.app { display: grid; grid-template-columns: 240px minmax(620px, 1fr) minmax(400px, 1fr); height: 100vh; overflow: hidden; }
 .app.with-inspector { grid-template-columns: 56px minmax(0, 1fr) 296px 420px; }
 .app.wide.with-inspector { grid-template-columns: 240px minmax(0, 1fr) 296px 480px; }
 .library, .editor, .inspector, .preview { min-width: 0; min-height: 0; }
@@ -56,8 +56,14 @@ button { cursor: pointer; }
 .rail { align-items: center; }
 .editor { display: flex; flex-direction: column; background: var(--bg); }
 .editor-bar, .transport, .preview-bar { display: flex; gap: 8px; align-items: center; min-height: 48px; padding: 0 16px; border-bottom: 1px solid var(--border); }
+.editor-bar { min-width: 0; overflow-x: auto; }
 .editor-bar strong { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.transport { min-height: 44px; flex-wrap: wrap; }
+.transport { min-height: 44px; flex-wrap: wrap; row-gap: 6px; }
+.transport-main, .transport-status { display: flex; align-items: center; gap: 8px; flex-wrap: nowrap; }
+.transport-main { min-width: min(100%, 17.5rem); max-width: 100%; overflow-x: auto; }
+.transport-main > .outline, .transport-main > .select { flex-shrink: 0; }
+.transport-main > .transport-capo { flex: 1 1 6.5rem; flex-shrink: 1; min-width: 0; max-width: 9.5rem; }
+.transport-status { margin-left: auto; max-width: 100%; overflow-x: auto; }
 .grow { flex: 1; }
 .editor-scroll { padding: 28px 24px 80px; }
 .document { max-width: 760px; margin: 0 auto; }
@@ -84,7 +90,8 @@ button { cursor: pointer; }
 .editor-bar-phone { position: relative; display: flex; gap: 8px; align-items: center; }
 .editor-menu { right: 0; left: auto; top: 36px; }
 .section-actions { display: flex; flex-wrap: wrap; gap: 2px; }
-.editor-body { display: grid; grid-template-columns: minmax(0, 1fr) 280px; min-height: 0; flex: 1; }
+.editor-body { display: grid; grid-template-columns: minmax(0, 1fr); min-height: 0; flex: 1; }
+.editor-body:has(.inspector) { grid-template-columns: minmax(0, 1fr) 280px; }
 .editor-body.chordpro-mode { grid-template-columns: minmax(260px, 340px) minmax(0, 1fr); }
 .editor-body.chordpro-mode .source { height: 100%; min-height: 0; box-sizing: border-box; resize: none; }
 .editor-body .inspector { overflow: auto; }
@@ -156,6 +163,8 @@ button { cursor: pointer; }
   .title-input { font-size: 24px; }
   .editor-bar { flex-wrap: nowrap; height: auto; row-gap: 4px; padding: 8px 12px; position: relative; z-index: 3; }
   .editor-bar .grow { flex: 1; min-width: 8px; }
+  .transport { padding: 6px 12px; }
+  .transport-main .outline, .transport-main .select { height: 36px; }
   /* Phone: stack setlist/settings rows so controls stay inside the viewport. */
   .import-screen, .setlists, .settings { max-width: 100%; overflow-x: hidden; }
   .setlists .row-meta { flex-wrap: wrap; align-items: center; }
@@ -176,10 +185,11 @@ button { cursor: pointer; }
   .editor-body.chordpro-mode { grid-template-columns: minmax(0, 1fr); grid-template-rows: minmax(180px, 34vh) minmax(0, 1fr); }
 }
 @media (max-width: 1199px) {
-  .editor-body { grid-template-columns: minmax(0, 1fr); grid-template-rows: minmax(0, 1fr) minmax(160px, 36vh); }
+  .editor-body, .editor-body:has(.inspector) { grid-template-columns: minmax(0, 1fr); grid-template-rows: minmax(0, 1fr); }
+  .editor-body:has(.inspector) { grid-template-rows: minmax(0, 1fr) minmax(160px, 36vh); }
 }
 @media (max-width: 767px) {
-  .editor-body { grid-template-rows: minmax(0, 1fr); }
+  .editor-body, .editor-body:has(.inspector) { grid-template-columns: minmax(0, 1fr); grid-template-rows: minmax(0, 1fr); }
   .app.phone-editor.show-preview .preview { display: flex; }
   .app.phone-editor.show-preview .editor { display: none; }
 }

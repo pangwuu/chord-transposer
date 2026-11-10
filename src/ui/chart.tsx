@@ -293,9 +293,17 @@ function dropAt(clientX: number, clientY: number): { lineId: string; index: numb
   if (!row?.dataset.line) return null
   const origins = (row.dataset.origins ?? '').split(',').filter((item) => item.length > 0).map(Number)
   if (origins.length === 0) return { lineId: row.dataset.line, index: 0 }
-  const rect = row.getBoundingClientRect()
-  const width = rect.width / origins.length
-  const col = Math.min(origins.length - 1, Math.max(0, Math.floor((clientX - rect.left) / Math.max(width, 1))))
+  const letters = [...row.querySelectorAll('button.letter')]
+  const direct = hit?.closest('button.letter')
+  let col = direct ? letters.indexOf(direct) : -1
+  if (col < 0) {
+    const rowRect = row.getBoundingClientRect()
+    const first = letters[0]?.getBoundingClientRect()
+    const width = first && first.width > 0 ? first.width : rowRect.width / origins.length
+    const left = first?.left ?? rowRect.left
+    col = Math.floor((clientX - left) / Math.max(width, 1))
+  }
+  col = Math.min(origins.length - 1, Math.max(0, col))
   let index = origins[col]
   if (index < 0) index = [...origins.slice(0, col)].reverse().find((item) => item >= 0) ?? origins.find((item) => item >= 0) ?? 0
   return { lineId: row.dataset.line, index }
