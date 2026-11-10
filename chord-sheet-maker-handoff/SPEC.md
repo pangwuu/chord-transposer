@@ -190,7 +190,7 @@ The PDF must be readable at a distance on a music stand, with pages laid side by
 
 ## 7. Other views (secondary)
 
-- **Stage view:** Quiet Chart reading mode — large text, dark mode, auto-hiding chrome with Pin (Exit / key / Speed / Autoscroll / Next section / Next song + transpose/Capo/accidentals/Nashville), sticky per-section headings, chords over lyrics with wrap, screen wake lock; session-local controls (no save-back); uses the setlist order.
+- **Stage view:** Quiet Chart reading mode — large text, dark mode, auto-hiding chrome with Pin (Exit / key / Speed / Autoscroll / Next section / Next song + transpose/Capo/accidentals/Nashville), in-flow section headings, chords over lyrics with wrap, screen wake lock; autoscroll default 0.8 in 0.1 steps; session-local controls (no save-back); uses the setlist order.
 - **Projector view:** lyrics only, large, one section per screen, arrow keys to advance.
 - **Setlists:** name, date, ordered songs, key and capo per song, notes; export as one PDF; step through on stage.
 - **Sharing:** export a song or setlist as a file, and a share link that encodes the song in the URL (compressed). Opening the link imports an editable local copy into the recipient's library (no account). For view-only handoff, export a PDF instead.

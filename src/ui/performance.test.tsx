@@ -100,9 +100,10 @@ describe('StageView quiet chart', () => {
     expect(screen.queryByText(/4\/4/)).toBeNull()
     expect(screen.queryByRole('button', { name: 'Save' })).toBeNull()
     expect(document.querySelector('.stage-sticky')).toBeNull()
+    expect(screen.getByText('Speed 0.8')).toBeTruthy()
   })
 
-  it('keeps a single section heading after Next section (no sticky overlay)', () => {
+  it('keeps section headings in flow after Next section (not sticky)', () => {
     renderStage()
     fireEvent.click(screen.getByRole('button', { name: 'Next section' }))
     fireEvent.click(screen.getByRole('button', { name: 'Next section' }))
@@ -110,9 +111,21 @@ describe('StageView quiet chart', () => {
     const headings = screen.getAllByRole('heading', { level: 2 })
     expect(headings.map((node) => node.textContent)).toEqual(['Verse 1', 'Verse 2', 'Verse 3'])
     expect(document.querySelectorAll('.stage-sticky')).toHaveLength(0)
+    for (const heading of headings) {
+      expect(getComputedStyle(heading).position).not.toBe('sticky')
+    }
     const current = document.querySelector('.stage-section.is-current')
     expect(current).toBeTruthy()
     expect(within(current as HTMLElement).getByRole('heading', { level: 2 }).textContent).toBe('Verse 3')
+  })
+
+  it('nudges autoscroll speed in 0.1 steps', () => {
+    renderStage()
+    fireEvent.click(screen.getByRole('button', { name: 'Faster' }))
+    expect(screen.getByText('Speed 0.9')).toBeTruthy()
+    fireEvent.click(screen.getByRole('button', { name: 'Slower' }))
+    fireEvent.click(screen.getByRole('button', { name: 'Slower' }))
+    expect(screen.getByText('Speed 0.7')).toBeTruthy()
   })
 
   it('toggles Nashville numbers on stage without leaving the view', () => {

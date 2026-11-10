@@ -11,7 +11,15 @@ import { displayedSong, type Song } from '../domain/song'
 import { StageBarLine, StageLyricLine } from './stage-lines'
 
 const CHROME_IDLE_MS = 2600
+const DEFAULT_SPEED = 0.8
+const MIN_SPEED = 0.1
+const MAX_SPEED = 12
+const SPEED_STEP = 0.1
 const KEYS = ['C', 'Db', 'D', 'Eb', 'E', 'F', 'F#', 'G', 'Ab', 'A', 'Bb', 'B']
+
+function nudgeSpeed(value: number, delta: number) {
+  return Math.min(MAX_SPEED, Math.max(MIN_SPEED, Math.round((value + delta) * 10) / 10))
+}
 
 export type StageEntry = {
   song: Song
@@ -39,7 +47,7 @@ export function StageView({
   const [prefs, setPrefs] = useState(initialPrefs)
   const [chromeVisible, setChromeVisible] = useState(true)
   const [chromePinned, setChromePinned] = useState(false)
-  const [speed, setSpeed] = useState(3)
+  const [speed, setSpeed] = useState(DEFAULT_SPEED)
   const [playing, setPlaying] = useState(false)
   const body = useRef<HTMLDivElement>(null)
   const hideTimer = useRef<number>()
@@ -138,9 +146,9 @@ export function StageView({
           <button className="outline" type="button" aria-pressed={chromePinned} onClick={() => setChromePinned((value) => !value)}>
             {chromePinned ? 'Unpin' : 'Pin'}
           </button>
-          <button className="outline" type="button" aria-label="Slower" onClick={() => setSpeed((value) => Math.max(1, value - 1))}>−</button>
-          <span>Speed {speed}</span>
-          <button className="outline" type="button" aria-label="Faster" onClick={() => setSpeed((value) => Math.min(12, value + 1))}>+</button>
+          <button className="outline" type="button" aria-label="Slower" onClick={() => setSpeed((value) => nudgeSpeed(value, -SPEED_STEP))}>−</button>
+          <span>Speed {speed.toFixed(1)}</span>
+          <button className="outline" type="button" aria-label="Faster" onClick={() => setSpeed((value) => nudgeSpeed(value, SPEED_STEP))}>+</button>
           <button className="primary" type="button" onClick={() => setPlaying((value) => !value)}>{playing ? 'Pause' : 'Autoscroll'}</button>
           <button className="outline" type="button" onClick={() => goSection(1)}>Next section</button>
           {entries.length > 1 && (
