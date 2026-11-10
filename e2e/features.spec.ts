@@ -226,6 +226,38 @@ test('changes the PDF paper and fit from the export dialog', async ({ page }, te
   }
 })
 
+test('pads the export Cancel and Download actions evenly', async ({ page }, testInfo) => {
+  await page.setViewportSize({ width: testInfo.project.name === 'mobile' ? 390 : 1280, height: 640 })
+  await page.goto('/')
+  if (mobile(testInfo.project.name)) await page.getByRole('button', { name: 'Preview' }).click()
+  await page.getByRole('button', { name: 'Export PDF' }).click()
+  const dialog = page.getByRole('dialog', { name: 'Export PDF' })
+  const actions = dialog.locator('.row-meta')
+  const cancel = dialog.getByRole('button', { name: 'Cancel' })
+  const download = dialog.getByRole('button', { name: 'Download' })
+  await dialog.evaluate((el) => {
+    el.scrollTop = el.scrollHeight
+  })
+  const dialogBox = await dialog.boundingBox()
+  const actionsBox = await actions.boundingBox()
+  const cancelBox = await cancel.boundingBox()
+  const downloadBox = await download.boundingBox()
+  expect(dialogBox).not.toBeNull()
+  expect(actionsBox).not.toBeNull()
+  expect(cancelBox).not.toBeNull()
+  expect(downloadBox).not.toBeNull()
+  const left = cancelBox!.x - dialogBox!.x
+  const right = dialogBox!.x + dialogBox!.width - (downloadBox!.x + downloadBox!.width)
+  const top = downloadBox!.y - actionsBox!.y
+  const bottom = dialogBox!.y + dialogBox!.height - (downloadBox!.y + downloadBox!.height)
+  expect(left).toBeGreaterThanOrEqual(14)
+  expect(right).toBeGreaterThanOrEqual(14)
+  expect(top).toBeGreaterThanOrEqual(14)
+  expect(bottom).toBeGreaterThanOrEqual(14)
+  expect(Math.abs(left - right)).toBeLessThan(4)
+  expect(Math.abs(top - bottom)).toBeLessThan(6)
+})
+
 test('steps a projector slide and leaves the stage', async ({ page }) => {
   await page.goto('/')
   await editorAction(page, 'Projector View')
