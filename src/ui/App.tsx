@@ -404,7 +404,7 @@ export function App() {
               </div>
               <div className="transport">
                 <div className="transport-main">
-                  <div className="pill" role="group" aria-label="Key and capo">
+                  <div className="pill" role="group" aria-label="Transpose">
                     <button className="pill-btn" type="button" aria-label="Key down a semitone" onClick={() => setEditor(stepConcert(editor, -1))}>−</button>
                     <select className="pill-select pill-key" aria-label="Key" value={formatKey(editor.concert)} onChange={(event) => setEditor(chooseConcert(editor, parseKey(event.target.value)))}>
                       <optgroup label="Major">{KEYS.map((key) => <option key={key}>{key}</option>)}</optgroup>
@@ -422,7 +422,7 @@ export function App() {
                     <button
                       className="pill-btn pill-icon"
                       type="button"
-                      aria-label="Reset key and capo"
+                      aria-label="Reset transpose"
                       disabled={!viewDirty}
                       onClick={() => { setEditor(resetView(editor)); announce('Reset key and capo') }}
                     >
