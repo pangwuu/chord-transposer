@@ -1,0 +1,19 @@
+Chordie.com
+Free Guitar Chords
+Sign in
+Search songs
+
+Quiet Cup
+First Light Band
+Key: C
+
+{title: Quiet Cup}
+{key: C}
+{start_of_verse: Verse 1}
+[C]Morning on the [G]kitchen table
+[Am]Coffee in a [F]quiet cup
+{end_of_verse}
+
+Related songs
+Sponsored links
+Download the app
