@@ -168,8 +168,15 @@ button { cursor: pointer; }
 .toast { position: fixed; bottom: 20px; left: 50%; transform: translateX(-50%); background: var(--bg-raised); box-shadow: var(--shadow-lg); border-radius: 8px; padding: 10px 14px; z-index: 20; }
 .dialog-backdrop { position: fixed; inset: 0; background: rgba(0,0,0,.35); display: grid; place-items: center; z-index: 15; }
 .dialog { width: min(720px, calc(100% - 24px)); max-height: calc(100vh - 48px); overflow: auto; background: var(--bg-raised); border-radius: 12px; box-shadow: var(--shadow-lg); padding: 20px; }
-.pdf-export { width: min(960px, calc(100% - 24px)); min-height: 0; }
-.pdf-export .row-meta { position: sticky; bottom: 0; background: var(--bg-raised); padding-top: 8px; }
+.pdf-export { width: min(960px, calc(100% - 24px)); min-height: 0; padding-bottom: 0; }
+.pdf-export .row-meta {
+  position: sticky;
+  bottom: 0;
+  align-items: center;
+  background: var(--bg-raised);
+  margin: 0 -20px;
+  padding: 16px;
+}
 .pdf-export-grid { display: grid; grid-template-columns: minmax(260px, 340px) minmax(0, 1fr); gap: 16px; align-items: start; }
 .pdf-export-preview { background: var(--bg-canvas); border-radius: 8px; padding: 8px 0; }
 .setlist-right-hand { display: flex; align-items: center; gap: 8px; margin: 4px 0 8px; }
