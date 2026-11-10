@@ -1,18 +1,22 @@
 import { useState } from 'react'
 import { chordTextFromPdfItems, importText, type ImportResult } from '../domain/import-text'
-import { issuesIn, type Song } from '../domain/song'
+import { addBarChord, issuesIn, type Song } from '../domain/song'
 import { Chart } from './chart'
 
 export function ImportScreen({ onCancel, onSave }: { onCancel: () => void; onSave: (song: Song) => void }) {
   const [source, setSource] = useState('')
   const [notice, setNotice] = useState('')
-  const result: ImportResult | null = source.trim() ? importText(source) : null
+  const [result, setResult] = useState<ImportResult | null>(null)
+  const replaceSource = (text: string) => {
+    setSource(text)
+    setResult(text.trim() ? importText(text) : null)
+  }
   return (
     <div className="import-screen">
       <h2>Review import</h2>
       <p className="hint">Paste ChordPro or chords-over-lyrics. Copyrighted charts stay in a file on your computer.</p>
       <div className="row-meta">
-        <input aria-label="Import file" type="file" accept=".cho,.chordpro,.chopro,.crd,.txt,.pro,.pdf" onChange={(event) => { const file = event.target.files?.[0]; if (file) void readFile(file, setSource, setNotice) }} />
+        <input aria-label="Import file" type="file" accept=".cho,.chordpro,.chopro,.crd,.txt,.pro,.pdf" onChange={(event) => { const file = event.target.files?.[0]; if (file) void readFile(file, replaceSource, setNotice) }} />
         <span className="grow" />
         <button className="text-button" type="button" onClick={onCancel}>Cancel</button>
         <button className="primary" type="button" disabled={!result} onClick={() => result && onSave(result.song)}>Save song</button>
@@ -29,7 +33,7 @@ export function ImportScreen({ onCancel, onSave }: { onCancel: () => void; onSav
       )}
       {result?.issues.map((issue) => <p className="check-line" key={`${issue.line}-${issue.raw}`}>Line {issue.line}: {issue.raw} is kept as written.</p>)}
       <div className="split">
-        <textarea className="source" aria-label="Source text" value={source} onChange={(event) => setSource(event.target.value)} />
+        <textarea className="source" aria-label="Source text" value={source} onChange={(event) => replaceSource(event.target.value)} />
         <div className="result">
           {result && (
             <Chart
@@ -49,6 +53,14 @@ export function ImportScreen({ onCancel, onSave }: { onCancel: () => void; onSav
               onAddSection={() => {}}
               onComment={() => {}}
               onBars={() => {}}
+              onAddBar={(sectionId, lineId) => {
+                setResult((current) => {
+                  if (!current) return current
+                  const song = addBarChord(current.song, sectionId, lineId)
+                  if (song === current.song) return current
+                  return { ...current, song, chordCount: current.chordCount + 1 }
+                })
+              }}
               onNudge={() => {}}
               onMove={() => {}}
               onEdit={() => {}}

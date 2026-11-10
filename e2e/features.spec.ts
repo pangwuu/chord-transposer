@@ -80,7 +80,7 @@ test('adds a comment, a bar line, and an arrangement repeat', async ({ page }) =
   await page.getByRole('button', { name: 'Bars' }).first().click()
   await page.getByLabel('Bar line').fill('| C - - - |')
   await page.getByLabel('Bar line').press('Enter')
-  await expect(page.locator('.bars').getByRole('button', { name: 'C' })).toBeVisible()
+  await expect(page.locator('.bars').getByRole('button', { name: 'C', exact: true })).toBeVisible()
   await page.getByRole('button', { name: 'Verse 1', exact: true }).click()
   await expect(page.getByRole('button', { name: 'Verse 1 ×2' })).toBeVisible()
 })
@@ -96,6 +96,19 @@ test('keeps a ChordPro edit and the chart in sync', async ({ page }, testInfo) =
   await expect(page.getByRole('button', { name: /Chord C / }).first()).toBeVisible()
   await editorAction(page, testInfo.project.name, 'Visual')
   await expect(source).toHaveCount(0)
+})
+
+test('adds a chord to an imported instrumental and saves it', async ({ page }, testInfo) => {
+  await page.goto('/')
+  await songs(page, testInfo.project.name)
+  await page.getByRole('button', { name: 'Import' }).click()
+  await page.getByLabel('Source text').fill('Intro\nG    D    Em    C\n')
+  const bars = page.locator('.bars')
+  await expect(bars.getByRole('button', { name: 'C', exact: true })).toHaveCount(1)
+  await page.getByRole('button', { name: 'Add chord' }).click()
+  await expect(bars.getByRole('button', { name: 'C', exact: true })).toHaveCount(2)
+  await page.getByRole('button', { name: 'Save song' }).click()
+  await expect(page.locator('.bars').getByRole('button', { name: 'C', exact: true })).toHaveCount(2)
 })
 
 test('reviews an import and saves it into the library', async ({ page }, testInfo) => {

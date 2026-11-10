@@ -487,6 +487,26 @@ export function setArrangementRepeat(song: Song, index: number, repeat: number):
   return next
 }
 
+export function addBarChord(song: Song, sectionId: string, lineId: string | null, ids: IdGen = createId): Song {
+  const section = song.sections.find((item) => item.id === sectionId)
+  if (!section) return song
+  const tonic = tonicSymbol(song.originalKey)
+  if (!lineId) {
+    const line: BarLine = { id: ids(), type: 'bars', items: [{ id: ids(), kind: 'chord', symbol: structuredClone(tonic) }] }
+    return addLine(song, sectionId, line)
+  }
+  const line = section.lines.find((item) => item.id === lineId)
+  if (!line || line.type !== 'bars') return song
+  const next = structuredClone(song)
+  const target = next.sections.find((item) => item.id === sectionId)?.lines.find((item) => item.id === lineId)
+  if (!target || target.type !== 'bars') return song
+  const previous = [...target.items].reverse().find((item) => item.kind === 'chord')
+  const symbol = previous && previous.kind === 'chord' ? structuredClone(previous.symbol) : tonic
+  if (target.items.length > 0) target.items.push({ id: ids(), kind: 'bar' })
+  target.items.push({ id: ids(), kind: 'chord', symbol })
+  return next
+}
+
 export function addLine(song: Song, sectionId: string, line: Line): Song {
   const next = structuredClone(song)
   const section = next.sections.find((item) => item.id === sectionId)

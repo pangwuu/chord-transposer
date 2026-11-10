@@ -8,6 +8,7 @@ import {
   chooseConcert,
   deleteSectionOf,
   duplicateSectionOf,
+  addBarChordOf,
   addBarsOf,
   addCommentOf,
   applyChordProOf,
@@ -447,6 +448,7 @@ export function App() {
                 onAddSection={(kind, label) => setEditor(addSectionOf(editor, kind, label))}
                 onComment={(sectionId, text) => setEditor(addCommentOf(editor, sectionId, text))}
                 onBars={(sectionId, text) => setEditor(addBarsOf(editor, sectionId, text))}
+                onAddBar={(sectionId, lineId) => { setEditor(addBarChordOf(editor, sectionId, lineId)); announce('Chord added') }}
                 onNudge={(how) => { setEditor(nudge(editor, how)); announce('Chord moved') }}
                 onMove={(id, lineId, index) => {
                   const found = findPlacement(editor.song, id)
