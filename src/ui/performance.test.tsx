@@ -119,6 +119,29 @@ describe('StageView quiet chart', () => {
     expect(within(current as HTMLElement).getByRole('heading', { level: 2 }).textContent).toBe('Verse 3')
   })
 
+  it('opens with a solid header above the title and an eye that hides it', () => {
+    renderStage()
+
+    const header = document.querySelector('.stage-chrome') as HTMLElement
+    const title = screen.getByText('Keep Smiling')
+    expect(header.contains(title)).toBe(false)
+    expect(header.compareDocumentPosition(title) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy()
+    expect(screen.getByRole('button', { name: 'Hide header' })).toBeTruthy()
+    expect(screen.queryByRole('button', { name: 'Pin' })).toBeNull()
+    expect(screen.queryByRole('button', { name: 'Unpin' })).toBeNull()
+    expect(screen.getByRole('button', { name: 'Exit' })).toBeTruthy()
+
+    fireEvent.click(screen.getByRole('button', { name: 'Hide header' }))
+    expect(screen.queryByRole('button', { name: 'Exit' })).toBeNull()
+    expect(screen.queryByRole('button', { name: 'Autoscroll' })).toBeNull()
+    expect(screen.getByRole('button', { name: 'Show header' })).toBeTruthy()
+    expect(screen.getByText('Keep Smiling')).toBeTruthy()
+
+    fireEvent.click(screen.getByRole('button', { name: 'Show header' }))
+    expect(screen.getByRole('button', { name: 'Exit' })).toBeTruthy()
+    expect(screen.getByRole('button', { name: 'Hide header' })).toBeTruthy()
+  })
+
   it('nudges autoscroll speed in 0.1 steps', () => {
     renderStage()
     fireEvent.click(screen.getByRole('button', { name: 'Faster' }))
