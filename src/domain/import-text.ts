@@ -257,18 +257,17 @@ function parseBars(raw: string, ids: IdGen): import('./song').BarLine {
 function summarise(song: Song, format: ImportResult['format'], source: string): ImportResult {
   const issues: ImportIssue[] = []
   const sourceLines = source.split(/\r?\n/)
-  sourceLines.forEach((line, index) => {
-    for (const token of chordTokens(line)) {
-      const bare = token.replace(/^\[/, '').replace(/\]$/, '')
-      if (!bare || bare.startsWith('{') || isRest(bare)) continue
-      if (/^[A-Ga-g]/.test(bare) || bare.includes('/')) {
-        const parsed = parseChord(bare)
-        if (parsed.kind === 'invalid') issues.push({ line: index + 1, raw: bare })
-      }
-    }
-  })
+  const nextLine = new Map<string, number>()
   for (const issue of issuesIn(song)) {
-    if (!issues.some((item) => item.raw === issue.raw)) issues.push({ line: 0, raw: issue.raw })
+    const from = nextLine.get(issue.raw) ?? 0
+    let line = 0
+    for (let index = from; index < sourceLines.length; index += 1) {
+      if (!sourceLines[index].includes(issue.raw)) continue
+      line = index + 1
+      nextLine.set(issue.raw, index + 1)
+      break
+    }
+    issues.push({ line, raw: issue.raw })
   }
   return {
     song,
