@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
-import { formatKey, formatSymbol, keyFromPitch, normaliseSymbol, notePitch, parseChord, parseKey, shiftKey } from '../domain/chord'
+import { RotateCcw } from 'lucide-react'
+import { formatKey, formatSymbol, keyFromPitch, normaliseSymbol, notePitch, parseChord, parseKey, shiftKey, type SpellingPrefs } from '../domain/chord'
 import {
   addAt,
   addSectionOf,
@@ -22,6 +23,7 @@ import {
   renameSectionOf,
   repeatArrangementOf,
   replaceSelected,
+  resetView,
   saveConcertAsSongKey,
   selectChord,
   setChordText,
@@ -311,9 +313,22 @@ export function App() {
     setPlace('editor')
   }
 
+  function applyPrefs(prefs: SpellingPrefs) {
+    const next = { ...settings, prefs }
+    setSettings(next)
+    void library.current.saveSettings(next)
+    setEditor((state) => state && {
+      ...state,
+      prefs,
+      concert: keyFromPitch(notePitch(state.concert.tonic), state.concert.mode, prefs),
+    })
+  }
+
   const visible = songs.filter((song) => song.title.toLowerCase().includes(query.trim().toLowerCase()))
   const issues = view ? issuesIn(view) : []
   const transposed = editor ? formatKey(editor.concert) !== formatKey(editor.song.originalKey) : false
+  const viewDirty = editor ? transposed || editor.capo > 0 : false
+  const meter = editor ? meterLabel(editor.song) : null
   const selectedId = editor?.selectedIds[0] ?? null
   const concertLabel = editor && view && selectedId && editor.capo > 0 ? concertName(editor, selectedId) : null
 
@@ -379,34 +394,78 @@ export function App() {
               </div>
             )}
           </header>
-          <div className="transport">
-            <div className="transport-main">
-              <button className="outline" type="button" aria-label="Key down a semitone" onClick={() => setEditor(stepConcert(editor, -1))}>−</button>
-              <select className="select" aria-label="Key" value={formatKey(editor.concert)} onChange={(event) => setEditor(chooseConcert(editor, parseKey(event.target.value)))}>
-                <optgroup label="Major">{KEYS.map((key) => <option key={key}>{key}</option>)}</optgroup>
-                <optgroup label="Minor">{KEYS.map((key) => <option key={`${key}m`}>{key}m</option>)}</optgroup>
-              </select>
-              <button className="outline" type="button" aria-label="Key up a semitone" onClick={() => setEditor(stepConcert(editor, 1))}>+</button>
-              <select className="select transport-capo" aria-label="Capo" value={editor.capo} onChange={(event) => setEditor(chooseCapo(editor, Number(event.target.value)))}>
-                {Array.from({ length: 12 }, (_, capo) => <option key={capo} value={capo}>{capo === 0 ? 'Capo off' : `Capo ${capo}`}</option>)}
-              </select>
-              <button className="outline" type="button" aria-pressed={editor.nashville} onClick={() => setEditor({ ...editor, nashville: !editor.nashville })}>1-4-5</button>
-            </div>
-            <div className="transport-status">
-              {transposed && <span className="chip">From {formatKey(editor.song.originalKey)}</span>}
-              {transposed && <button className="text-button" type="button" onClick={() => { setEditor(saveConcertAsSongKey(editor)); announce(`Saved in ${formatKey(editor.concert)}`) }}>Save as song key</button>}
-              <button className={issues.length ? 'chip warn' : 'chip ok'} type="button" onClick={() => issues[0] && setEditor(selectChord(editor, issues[0].id))}>
-                {issues.length ? `${issues.length} to check` : 'All chords valid'}
-              </button>
-            </div>
-          </div>
           <div className={mode === 'chordpro' ? 'editor-body chordpro-mode' : 'editor-body'}>
             {mode === 'chordpro' && <ChordProPane song={editor.song} onApply={(text) => setEditor((state) => state ? applyChordProOf(state, text) : state)} />}
             <div className="editor-scroll">
-              <DetailField className="title-input" label="Title" value={editor.song.title} onCommit={(title) => setEditor(setSongDetails(editor, { title }))} />
+              <div className="song-hero">
+                <DetailField className="title-input" label="Title" value={editor.song.title} onCommit={(title) => setEditor(setSongDetails(editor, { title }))} />
+                <DetailField className="artist-input" label="Artist" placeholder="Artist" value={editor.song.artist ?? ''} onCommit={(artist) => setEditor(setSongDetails(editor, { artist }))} />
+                {meter && <span className="meter-pill">{meter}</span>}
+              </div>
+              <div className="transport">
+                <div className="transport-main">
+                  <div className="pill" role="group" aria-label="Transpose">
+                    <button className="pill-btn" type="button" aria-label="Key down a semitone" onClick={() => setEditor(stepConcert(editor, -1))}>−</button>
+                    <select className="pill-select pill-key" aria-label="Key" value={formatKey(editor.concert)} onChange={(event) => setEditor(chooseConcert(editor, parseKey(event.target.value)))}>
+                      <optgroup label="Major">{KEYS.map((key) => <option key={key}>{key}</option>)}</optgroup>
+                      <optgroup label="Minor">{KEYS.map((key) => <option key={`${key}m`}>{key}m</option>)}</optgroup>
+                    </select>
+                    <button className="pill-btn" type="button" aria-label="Key up a semitone" onClick={() => setEditor(stepConcert(editor, 1))}>+</button>
+                    <span className="pill-divider" aria-hidden="true" />
+                    <label className="pill-capo">
+                      <span className="pill-capo-label">Capo</span>
+                      <select className="pill-select" aria-label="Capo" value={editor.capo} onChange={(event) => setEditor(chooseCapo(editor, Number(event.target.value)))}>
+                        {Array.from({ length: 12 }, (_, capo) => <option key={capo} value={capo}>{capo === 0 ? 'None' : capo}</option>)}
+                      </select>
+                    </label>
+                    <span className="pill-divider" aria-hidden="true" />
+                    <button
+                      className="pill-btn pill-icon"
+                      type="button"
+                      aria-label="Reset transpose"
+                      disabled={!viewDirty}
+                      onClick={() => { setEditor(resetView(editor)); announce('Reset key and capo') }}
+                    >
+                      <RotateCcw size={15} strokeWidth={1.75} aria-hidden="true" />
+                    </button>
+                  </div>
+                  <div className="pill" role="group" aria-label="Accidental spelling">
+                    <button
+                      className="pill-btn"
+                      type="button"
+                      aria-label="Prefer flats"
+                      aria-pressed={settings.prefs.gb}
+                      onClick={() => applyPrefs({ ...settings.prefs, gb: !settings.prefs.gb })}
+                    >
+                      ♭
+                    </button>
+                    <span className="pill-divider" aria-hidden="true" />
+                    <button
+                      className="pill-btn"
+                      type="button"
+                      aria-label="Prefer sharps"
+                      aria-pressed={settings.prefs.csharp}
+                      onClick={() => applyPrefs({ ...settings.prefs, csharp: !settings.prefs.csharp })}
+                    >
+                      ♯
+                    </button>
+                  </div>
+                  <div className="transport-mode">
+                    <span className="transport-label">Numbers</span>
+                    <div className="pill" role="group" aria-label="Nashville numbers">
+                      <button className="pill-btn" type="button" aria-pressed={editor.nashville} onClick={() => setEditor({ ...editor, nashville: !editor.nashville })}>1-4-5</button>
+                    </div>
+                  </div>
+                </div>
+                <div className="transport-status">
+                  {transposed && <span className="chip">From {formatKey(editor.song.originalKey)}</span>}
+                  {transposed && <button className="text-button" type="button" onClick={() => { setEditor(saveConcertAsSongKey(editor)); announce(`Saved in ${formatKey(editor.concert)}`) }}>Save as song key</button>}
+                  <button className={issues.length ? 'chip warn' : 'chip ok'} type="button" onClick={() => issues[0] && setEditor(selectChord(editor, issues[0].id))}>
+                    {issues.length ? `${issues.length} to check` : 'All chords valid'}
+                  </button>
+                </div>
+              </div>
               <div className="properties">
-                <span className="meta">Artist</span>
-                <DetailField label="Artist" value={editor.song.artist ?? ''} onCommit={(artist) => setEditor(setSongDetails(editor, { artist }))} />
                 <span className="meta">Tempo</span>
                 <DetailField label="Tempo" value={editor.song.tempo ? String(editor.song.tempo) : ''} onCommit={(tempo) => { const value = Number(tempo); setEditor(setSongDetails(editor, { tempo: tempo.trim() && Number.isFinite(value) ? value : undefined })) }} />
                 <span className="meta">Time</span>
@@ -521,13 +580,21 @@ function copyShare(song: Song, announce: (message: string) => void) {
   announce('Share link copied')
 }
 
-function DetailField({ label, value, onCommit, className = 'field' }: { label: string; value: string; onCommit: (value: string) => void; className?: string }) {
+function meterLabel(song: Song): string | null {
+  const parts: string[] = []
+  if (song.timeSignature?.trim()) parts.push(song.timeSignature.trim())
+  if (song.tempo) parts.push(`${song.tempo} BPM`)
+  return parts.length > 0 ? parts.join(' · ') : null
+}
+
+function DetailField({ label, value, onCommit, className = 'field', placeholder }: { label: string; value: string; onCommit: (value: string) => void; className?: string; placeholder?: string }) {
   const [draft, setDraft] = useState(value)
   useEffect(() => setDraft(value), [value])
   return (
     <input
       className={className}
       aria-label={label}
+      placeholder={placeholder}
       value={draft}
       onChange={(event) => setDraft(event.target.value)}
       onBlur={() => {

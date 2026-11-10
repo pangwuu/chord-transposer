@@ -3,7 +3,7 @@ import { describe, expect, it } from 'vitest'
 import { PDFDocument } from 'pdf-lib'
 import { formatKey, formatSymbol, parseChord, parseKey } from './chord'
 import { applyRestore, planRestore } from './backup'
-import { addAt, addBarChordOf, addBarsOf, addCommentOf, addSectionOf, applyChordProOf, changeLyric, checkLine, deleteSectionOf, duplicateSectionOf, moveSectionOf, nudge, openEditor, placeSectionOf, removeSelected, renameSectionOf, repeatArrangementOf, saveConcertAsSongKey, setChordText, setSongDetails, stepConcert, undo, viewSong, chooseCapo } from './editor'
+import { addAt, addBarChordOf, addBarsOf, addCommentOf, addSectionOf, applyChordProOf, changeLyric, checkLine, deleteSectionOf, duplicateSectionOf, moveSectionOf, nudge, openEditor, placeSectionOf, removeSelected, renameSectionOf, repeatArrangementOf, resetView, saveConcertAsSongKey, setChordText, setSongDetails, stepConcert, undo, viewSong, chooseCapo } from './editor'
 import { amazingGrace, firstLight } from '../fixtures/charts'
 import { chordTextFromPdfItems, importText } from './import-text'
 import { padCollisions } from './line-layout'
@@ -175,6 +175,17 @@ describe('editing', () => {
     state = saveConcertAsSongKey(state)
     expect(formatSymbol(lyric(state.song).chords[0].symbol)).toBe('E/G#')
     expect(state.song.originalKey).toEqual(parseKey('E'))
+  })
+
+  it('resets concert key and capo to the stored song without editing chords', () => {
+    const song = fromChordPro('{title: Demo}\n{key: F}\n[F/A]Hello\n', idSequence('reset'))
+    let state = chooseCapo({ ...openEditor(song), concert: parseKey('E') }, 2)
+    expect(formatSymbol(lyric(viewSong(state)).chords[0].symbol)).toBe('D/F#')
+    state = resetView(state)
+    expect(state.concert).toEqual(parseKey('F'))
+    expect(state.capo).toBe(0)
+    expect(formatSymbol(lyric(state.song).chords[0].symbol)).toBe('F/A')
+    expect(formatSymbol(lyric(viewSong(state)).chords[0].symbol)).toBe('F/A')
   })
 
   it('writes a capo-shape edit back into the stored key', () => {
