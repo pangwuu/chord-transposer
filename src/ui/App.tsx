@@ -364,7 +364,7 @@ export function App() {
       setEditor(null)
       setPlace('songs')
     }
-    announce('Song deleted')
+    setLive('Song deleted')
   }
 
   function applyPrefs(prefs: SpellingPrefs) {
