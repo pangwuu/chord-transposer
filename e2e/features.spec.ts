@@ -62,7 +62,7 @@ test('adds a comment, a bar line, and an arrangement repeat', async ({ page }) =
   await page.getByRole('button', { name: 'Bars' }).first().click()
   await page.getByLabel('Bar line').fill('| C - - - |')
   await page.getByLabel('Bar line').press('Enter')
-  await expect(page.locator('.bars').getByRole('button', { name: 'C' })).toBeVisible()
+  await expect(page.locator('.bars').getByRole('button', { name: 'C', exact: true })).toBeVisible()
   await page.getByRole('button', { name: 'Verse 1', exact: true }).click()
   await expect(page.getByRole('button', { name: 'Verse 1 ×2' })).toBeVisible()
 })
