@@ -30,7 +30,34 @@ export type SpellingPrefs = {
   csharp: boolean
 }
 
+/**
+ * Exclusive accidental notation preference.
+ * - default: key-aware spelling (SPEC), ambiguous keys named F# and Db
+ * - flats / sharps: force flat or sharp chromatic spelling for displayed chords
+ */
+export type AccidentalBias = 'default' | 'flats' | 'sharps'
+
 export const DEFAULT_PREFS: SpellingPrefs = { gb: false, csharp: false }
+
+const FLAT_CHROMATIC = ['C', 'Db', 'D', 'Eb', 'E', 'F', 'Gb', 'G', 'Ab', 'A', 'Bb', 'B'] as const
+const SHARP_CHROMATIC = ['C', 'C#', 'D', 'D#', 'E', 'F', 'F#', 'G', 'G#', 'A', 'A#', 'B'] as const
+
+export function prefsForBias(bias: AccidentalBias): SpellingPrefs {
+  if (bias === 'flats') return { gb: true, csharp: false }
+  if (bias === 'sharps') return { gb: false, csharp: true }
+  return { ...DEFAULT_PREFS }
+}
+
+export function accidentalBias(prefs: SpellingPrefs): AccidentalBias {
+  if (prefs.gb && !prefs.csharp) return 'flats'
+  if (!prefs.gb && prefs.csharp) return 'sharps'
+  return 'default'
+}
+
+/** Select flats or sharps exclusively; selecting the active bias again restores the default (F# · Db). */
+export function chooseAccidentalBias(prefs: SpellingPrefs, next: 'flats' | 'sharps'): SpellingPrefs {
+  return accidentalBias(prefs) === next ? prefsForBias('default') : prefsForBias(next)
+}
 
 const LETTERS: Letter[] = ['C', 'D', 'E', 'F', 'G', 'A', 'B']
 const NATURAL: Record<Letter, number> = { C: 0, D: 2, E: 4, F: 5, G: 7, A: 9, B: 11 }
@@ -213,8 +240,18 @@ function signatureStyle(scale: Note[]): 'sharp' | 'flat' | 'open' {
   return 'open'
 }
 
-export function spellPitch(pitch: number, key: Key): Note {
+function noteFromName(name: string): Note {
+  const parsed = parseNote(name)
+  if (!parsed || parsed.rest.length > 0) throw new Error(`Unknown note ${name}`)
+  return parsed.note
+}
+
+export function spellPitch(pitch: number, key: Key, prefs: SpellingPrefs = DEFAULT_PREFS): Note {
   const wrapped = ((pitch % 12) + 12) % 12
+  const bias = accidentalBias(prefs)
+  if (bias === 'flats') return noteFromName(FLAT_CHROMATIC[wrapped])
+  if (bias === 'sharps') return noteFromName(SHARP_CHROMATIC[wrapped])
+
   const scale = scaleNotes(key)
   const diatonic = scale.find((note) => notePitch(note) === wrapped)
   if (diatonic) return { ...diatonic }
@@ -280,11 +317,16 @@ export function signedInterval(from: Key, to: Key): number {
   return delta
 }
 
-export function transposeSymbol(symbol: ChordSymbol, semitones: number, targetKey: Key): ChordSymbol {
+export function transposeSymbol(
+  symbol: ChordSymbol,
+  semitones: number,
+  targetKey: Key,
+  prefs: SpellingPrefs = DEFAULT_PREFS,
+): ChordSymbol {
   if (symbol.kind === 'nc') return { kind: 'nc', raw: symbol.raw }
   if (symbol.kind === 'invalid') return { kind: 'invalid', raw: symbol.raw }
-  const root = spellPitch(notePitch(symbol.chord.root) + semitones, targetKey)
-  const bass = symbol.chord.bass ? spellPitch(notePitch(symbol.chord.bass) + semitones, targetKey) : undefined
+  const root = spellPitch(notePitch(symbol.chord.root) + semitones, targetKey, prefs)
+  const bass = symbol.chord.bass ? spellPitch(notePitch(symbol.chord.bass) + semitones, targetKey, prefs) : undefined
   const chord: Chord = { root, quality: symbol.chord.quality, bass, raw: '' }
   chord.raw = formatChord(chord)
   return { kind: 'chord', chord }

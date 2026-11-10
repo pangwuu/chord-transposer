@@ -1,3 +1,4 @@
+import { accidentalBias, prefsForBias, type AccidentalBias } from '../domain/chord'
 import type { Settings } from '../domain/library-types'
 
 export function SettingsScreen({
@@ -11,6 +12,12 @@ export function SettingsScreen({
   onBackup: () => void
   onRestore: (file: File) => void
 }) {
+  const bias = accidentalBias(settings.prefs)
+
+  function setBias(next: AccidentalBias) {
+    onChange({ ...settings, prefs: prefsForBias(next) })
+  }
+
   return (
     <div className="settings">
       <h2>Settings</h2>
@@ -29,10 +36,21 @@ export function SettingsScreen({
         </select>
         <span>Chord names</span>
         <label className="hint"><input type="checkbox" checked={settings.normalise} onChange={(event) => onChange({ ...settings, normalise: event.target.checked })} /> Normalise aliases such as Cmin and CM7</label>
-        <span>F# / Gb</span>
-        <label className="hint"><input type="checkbox" checked={settings.prefs.gb} onChange={(event) => onChange({ ...settings, prefs: { ...settings.prefs, gb: event.target.checked } })} /> Spell F# as Gb</label>
-        <span>Db / C#</span>
-        <label className="hint"><input type="checkbox" checked={settings.prefs.csharp} onChange={(event) => onChange({ ...settings, prefs: { ...settings.prefs, csharp: event.target.checked } })} /> Spell Db as C#</label>
+        <span>Accidentals</span>
+        <div className="hint" role="radiogroup" aria-label="Accidental spelling">
+          <label className="hint">
+            <input type="radio" name="enharmonic-bias" checked={bias === 'default'} onChange={() => setBias('default')} />
+            Default (key-aware · F# / Db)
+          </label>
+          <label className="hint">
+            <input type="radio" name="enharmonic-bias" checked={bias === 'flats'} onChange={() => setBias('flats')} />
+            Prefer flats (Gb · Db · Ab…)
+          </label>
+          <label className="hint">
+            <input type="radio" name="enharmonic-bias" checked={bias === 'sharps'} onChange={() => setBias('sharps')} />
+            Prefer sharps (F# · C# · G#…)
+          </label>
+        </div>
         <span>PDF paper</span>
         <select className="select" aria-label="Default paper" value={settings.paper} onChange={(event) => onChange({ ...settings, paper: event.target.value as Settings['paper'] })}>
           <option value="a4">A4</option>

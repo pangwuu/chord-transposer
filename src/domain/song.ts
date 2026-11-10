@@ -165,8 +165,13 @@ export function mapSymbols(song: Song, fn: (symbol: ChordSymbol) => ChordSymbol)
   return next
 }
 
-export function transposeSong(song: Song, semitones: number, targetKey: Key): Song {
-  return mapSymbols(song, (symbol) => transposeSymbol(symbol, semitones, targetKey))
+export function transposeSong(
+  song: Song,
+  semitones: number,
+  targetKey: Key,
+  prefs: SpellingPrefs = DEFAULT_PREFS,
+): Song {
+  return mapSymbols(song, (symbol) => transposeSymbol(symbol, semitones, targetKey, prefs))
 }
 
 export function displaySemitones(song: Song, concert: Key, capo: number): number {
@@ -175,7 +180,7 @@ export function displaySemitones(song: Song, concert: Key, capo: number): number
 
 export function displayedSong(song: Song, concert: Key, capo: number, prefs: SpellingPrefs = DEFAULT_PREFS): Song {
   const steps = displaySemitones(song, concert, capo)
-  return transposeSong(song, steps, shiftKey(concert, -capo, prefs))
+  return transposeSong(song, steps, shiftKey(concert, -capo, prefs), prefs)
 }
 
 export function storeSymbol(displayed: ChordSymbol, song: Song, concert: Key, capo: number): ChordSymbol {
