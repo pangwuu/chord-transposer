@@ -9,6 +9,10 @@ async function songs(page: Page, project: string) {
   if (mobile(project)) await page.locator('.phone-tabs').getByRole('button', { name: 'Songs' }).click()
 }
 
+function exportButton(page: Page) {
+  return page.locator('.editor-bar').getByRole('button', { name: /^Export/ })
+}
+
 async function editorAction(page: Page, name: string) {
   await page.getByRole('button', { name: 'More actions' }).click()
   await page.getByRole('menuitem', { name, exact: true }).click()
@@ -91,20 +95,23 @@ test('moves, duplicates and deletes a section from one actions menu', async ({ p
   await expect(page.getByRole('status')).toContainText('Deleted Verse 2 copy')
 })
 
-test('adds a comment, a bar line, and an arrangement repeat', async ({ page }) => {
+test('adds, edits and removes a note, and repeats an arrangement item', async ({ page }) => {
   await openFirstSong(page)
-  await sectionAction(page, 'Verse 1', 'Add comment')
-  await expect(page.getByLabel('Comment')).toBeVisible()
-  await page.getByLabel('Comment').press('Escape')
-  await expect(page.getByLabel('Comment')).toHaveCount(0)
-  await sectionAction(page, 'Verse 1', 'Add comment')
-  await page.getByLabel('Comment').fill('Build')
-  await page.getByLabel('Comment').press('Enter')
-  await expect(page.locator('.comment').filter({ hasText: 'Build' })).toBeVisible()
-  await sectionAction(page, 'Verse 1', 'Add bar line')
-  await page.getByLabel('Bar line').fill('| C - - - |')
-  await page.getByLabel('Bar line').press('Enter')
-  await expect(page.locator('.bars').getByRole('button', { name: 'C', exact: true })).toBeVisible()
+  await sectionAction(page, 'Verse 1', 'Add note')
+  await expect(page.getByLabel('New note')).toBeVisible()
+  await page.getByLabel('New note').press('Escape')
+  await expect(page.getByLabel('New note')).toHaveCount(0)
+  await sectionAction(page, 'Verse 1', 'Add note')
+  await page.getByLabel('New note').fill('Quiet, then build')
+  await page.getByLabel('New note').press('Enter')
+  const note = page.getByLabel('Note', { exact: true })
+  await expect(note).toHaveValue('Quiet, then build')
+  await expect(page.locator('.paper .paper-note').filter({ hasText: 'Quiet, then build' }).first()).toBeAttached()
+  await note.fill('All in')
+  await note.press('Enter')
+  await expect(note).toHaveValue('All in')
+  await page.getByRole('button', { name: 'Remove note' }).click()
+  await expect(note).toHaveCount(0)
   await page.getByRole('button', { name: 'Verse 1', exact: true }).click()
   await expect(page.getByRole('button', { name: 'Verse 1 ×2' })).toBeVisible()
 })
@@ -211,8 +218,7 @@ test('scrolls a setlist export when the pages run past the window', async ({ pag
 test('previews a song PDF beside the export settings and scrolls it', async ({ page }, testInfo) => {
   await page.setViewportSize({ width: testInfo.project.name === 'mobile' ? 390 : 1280, height: 640 })
   await openFirstSong(page)
-  if (mobile(testInfo.project.name)) await page.getByRole('button', { name: 'Preview' }).click()
-  await page.getByRole('button', { name: 'Export PDF' }).click()
+  await exportButton(page).click()
   const dialog = page.getByRole('dialog', { name: 'Export PDF' })
   const paper = dialog.locator('.paper').first()
   const paperChoice = dialog.getByLabel('Paper')
@@ -246,13 +252,9 @@ test('leaves room between a section heading and its first line in the preview', 
   expect(gap).toBeGreaterThan(8)
 })
 
-test('changes the PDF paper and fit from the export dialog', async ({ page }, testInfo) => {
+test('changes the PDF paper and fit from the export dialog', async ({ page }) => {
   await openFirstSong(page)
-  if (mobile(testInfo.project.name)) {
-    await page.getByRole('button', { name: 'Preview' }).click()
-    await expect(page.getByRole('button', { name: 'Back' })).toBeVisible()
-  }
-  await page.getByRole('button', { name: 'Export PDF' }).click()
+  await exportButton(page).click()
   const dialog = page.getByRole('dialog')
   await expect(dialog).toContainText('Amazing Grace - G.pdf')
   await page.getByLabel('Paper').selectOption('letter')
@@ -260,17 +262,13 @@ test('changes the PDF paper and fit from the export dialog', async ({ page }, te
   await expect(dialog).toContainText('1 page')
   await page.getByRole('button', { name: 'Cancel' }).click()
   await expect(dialog).toHaveCount(0)
-  if (mobile(testInfo.project.name)) {
-    await page.getByRole('button', { name: 'Back' }).click()
-    await expect(page.getByLabel('Title')).toBeVisible()
-  }
+  await expect(page.getByLabel('Title')).toBeVisible()
 })
 
 test('pads the export Cancel and Download actions evenly', async ({ page }, testInfo) => {
   await page.setViewportSize({ width: testInfo.project.name === 'mobile' ? 390 : 1280, height: 640 })
   await openFirstSong(page)
-  if (mobile(testInfo.project.name)) await page.getByRole('button', { name: 'Preview' }).click()
-  await page.getByRole('button', { name: 'Export PDF' }).click()
+  await exportButton(page).click()
   const dialog = page.getByRole('dialog', { name: 'Export PDF' })
   const actions = dialog.locator('.row-meta')
   const cancel = dialog.getByRole('button', { name: 'Cancel' })
@@ -434,39 +432,34 @@ test('shows the arrangement as a plain line, not pills', async ({ page }) => {
   await expect(order.locator('.chip')).toHaveCount(0)
 })
 
-test('puts Export PDF and Performance view in the editor bar', async ({ page }, testInfo) => {
+test('puts Export PDF and Performance view in the editor bar', async ({ page }) => {
   await openFirstSong(page)
   const bar = page.locator('.editor-bar')
   await bar.getByRole('button', { name: 'Performance view' }).click()
   await expect(page.locator('.stage')).toContainText('Amazing grace')
   await page.getByRole('button', { name: 'Exit' }).click()
-  if (mobile(testInfo.project.name)) {
-    await expect(bar.getByRole('button', { name: 'Preview' })).toBeVisible()
-  } else {
-    await expect(bar.getByRole('button', { name: 'Preview' })).toBeHidden()
-    await expect(page.getByRole('button', { name: 'Export PDF' })).toHaveCount(1)
-    await bar.getByRole('button', { name: 'Export PDF' }).click()
-    await expect(page.getByRole('dialog', { name: 'Export PDF' })).toBeVisible()
-  }
+  await expect(page.getByRole('button', { name: 'Preview' })).toHaveCount(0)
+  await expect(page.getByRole('button', { name: /^Export/ })).toHaveCount(1)
+  await exportButton(page).click()
+  await expect(page.getByRole('dialog', { name: 'Export PDF' })).toBeVisible()
+  await expect(page.locator('.editor-bar .lucide-guitar')).toBeVisible()
 })
 
-async function openSongExport(page: Page, project: string) {
-  if (mobile(project)) await page.getByRole('button', { name: 'Preview' }).click()
-  await page.getByRole('button', { name: 'Export PDF' }).click()
+async function openSongExport(page: Page) {
+  await exportButton(page).click()
   return page.getByRole('dialog', { name: 'Export PDF' })
 }
 
-test('warns under the export settings when a chord is not recognised', async ({ page }, testInfo) => {
+test('warns under the export settings when a chord is not recognised', async ({ page }) => {
   await openFirstSong(page)
-  let dialog = await openSongExport(page, testInfo.project.name)
+  let dialog = await openSongExport(page)
   await expect(dialog.getByText(/isn't recognised/)).toHaveCount(0)
   await dialog.getByRole('button', { name: 'Cancel' }).click()
-  if (mobile(testInfo.project.name)) await page.getByRole('button', { name: 'Back' }).click()
 
   await page.locator('.letter').nth(4).click()
   await page.getByLabel('Chord name').fill('Hx7')
   await page.getByLabel('Chord name').press('Enter')
-  dialog = await openSongExport(page, testInfo.project.name)
+  dialog = await openSongExport(page)
   const warning = dialog.getByText("1 chord isn't recognised and will print as typed")
   await expect(warning).toBeVisible()
   const fields = await dialog.getByLabel('Show section divider').boundingBox()
@@ -474,10 +467,10 @@ test('warns under the export settings when a chord is not recognised', async ({ 
   expect(warningBox!.y).toBeGreaterThan(fields!.y)
 })
 
-test('picks flats or sharps for a song PDF', async ({ page }, testInfo) => {
+test('picks flats or sharps for a song PDF', async ({ page }) => {
   await openFirstSong(page)
   await page.getByRole('combobox', { name: 'Key' }).selectOption('Db')
-  const dialog = await openSongExport(page, testInfo.project.name)
+  const dialog = await openSongExport(page)
   const paper = dialog.locator('.paper').first()
   await dialog.getByLabel('Accidentals').selectOption('sharps')
   await expect(paper).toContainText('F#')

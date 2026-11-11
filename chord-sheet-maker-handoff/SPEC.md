@@ -185,7 +185,7 @@ The PDF must be readable at a distance on a music stand, with pages laid side by
 
 ### 6.4 Export options
 - Concert key or capo shapes; letters or Nashville numbers; full chart, chords only, or lyrics only.
-- Single song or a whole setlist as one PDF. For a setlist, each song starts on a new page (option: start each song on a right-hand page for two-up stands).
+- Single song or a whole setlist as one PDF. For a setlist, each song starts on a new page.
 - File name: `Song Title - Key.pdf` (with `- Capo 4` when relevant); setlist: `Setlist Name - Date.pdf`.
 - Export options include **Accidentals** (Follow the key, Flats, Sharps). For a song it is the same setting as the editor's ♭/♯ toggle; for a setlist it applies to that export only. The export dialog warns, under the options, when any chord isn't recognised.
 - The PDF is generated identically on phone and laptop (same layout engine, same fonts).

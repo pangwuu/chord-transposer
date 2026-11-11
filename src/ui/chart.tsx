@@ -1,5 +1,5 @@
 import { Fragment, useEffect, useRef, useState, type PointerEvent as ReactPointerEvent, type ReactNode } from 'react'
-import { ArrowDown, ArrowUp, Copy, Ellipsis, GripVertical, MessageSquare, Music, Trash2 } from 'lucide-react'
+import { ArrowDown, ArrowUp, Copy, Ellipsis, GripVertical, StickyNote, Trash2, X } from 'lucide-react'
 import { formatSymbol, nashville, type ChordSymbol, type Key } from '../domain/chord'
 import { padCollisions, wrapLyricDisplay } from '../domain/line-layout'
 import type { SectionKind, Song } from '../domain/song'
@@ -41,8 +41,9 @@ export function Chart({
   onMoveSection,
   onPlaceSection,
   onAddSection,
-  onComment,
-  onBars,
+  onAddNote,
+  onEditNote,
+  onRemoveLine,
   onAddBar,
   onNudge,
   onMove,
@@ -65,8 +66,9 @@ export function Chart({
   onMoveSection: (sectionId: string, direction: -1 | 1) => void
   onPlaceSection: (sectionId: string, index: number) => void
   onAddSection: (kind: SectionKind, label: string) => void
-  onComment: (sectionId: string, text: string) => void
-  onBars: (sectionId: string, text: string) => void
+  onAddNote: (sectionId: string, text: string) => void
+  onEditNote: (lineId: string, text: string) => void
+  onRemoveLine: (lineId: string) => void
   onAddBar: (sectionId: string, lineId: string | null) => void
   onNudge: (how: NudgeHow) => void
   onMove: (id: string, lineId: string, index: number) => void
@@ -77,7 +79,7 @@ export function Chart({
   const [caret, setCaret] = useState<{ lineId: string; index: number } | null>(null)
   const [sectionMenu, setSectionMenu] = useState(false)
   const [openMenu, setOpenMenu] = useState<string | null>(null)
-  const [lineDraft, setLineDraft] = useState<{ id: string; kind: 'comment' | 'bars' } | null>(null)
+  const [noteDraft, setNoteDraft] = useState<string | null>(null)
   const { ref, capacity } = useCharCapacity<HTMLDivElement>(lyricFontSize)
   return (
     <div ref={ref} className={dragging ? 'document dragging' : 'document'} onClick={() => onSelect(null)}>
@@ -111,11 +113,8 @@ export function Chart({
                       <button type="button" role="menuitem" onClick={() => onDuplicate(section.id)}>
                         <Copy size={14} aria-hidden="true" />Duplicate
                       </button>
-                      <button type="button" role="menuitem" onClick={() => setLineDraft({ id: section.id, kind: 'comment' })}>
-                        <MessageSquare size={14} aria-hidden="true" />Add comment
-                      </button>
-                      <button type="button" role="menuitem" onClick={() => setLineDraft({ id: section.id, kind: 'bars' })}>
-                        <Music size={14} aria-hidden="true" />Add bar line
+                      <button type="button" role="menuitem" onClick={() => setNoteDraft(section.id)}>
+                        <StickyNote size={14} aria-hidden="true" />Add note
                       </button>
                     </>
                   )}
@@ -126,25 +125,33 @@ export function Chart({
               </span>
             )}
           </div>
-          {lineDraft?.id === section.id && (
-            <form onClick={(event) => event.stopPropagation()} onSubmit={(event) => { event.preventDefault(); const data = new FormData(event.currentTarget); const text = String(data.get('line') ?? ''); if (lineDraft.kind === 'comment') onComment(section.id, text); else onBars(section.id, text); setLineDraft(null) }}>
-              <input
-                className="field"
-                name="line"
-                aria-label={lineDraft.kind === 'comment' ? 'Comment' : 'Bar line'}
-                placeholder={lineDraft.kind === 'comment' ? 'Repeat ×2' : '| C - - - | F/A - - - |'}
-                autoFocus
-                onKeyDown={(event) => { if (event.key === 'Escape') { event.stopPropagation(); setLineDraft(null) } }}
-              />
-            </form>
-          )}
           {section.lines.length === 0 && (
             <p className="hint">
               Empty section. <button type="button" className="text-button" onClick={(event) => { event.stopPropagation(); onAddBar(section.id, null) }}>Add chord</button>
             </p>
           )}
           {section.lines.map((line, lineNumber) => {
-            if (line.type === 'comment') return <p className="comment" key={line.id}>{line.text}</p>
+            if (line.type === 'comment') {
+              return (
+                <div className="note" key={line.id} onClick={(event) => event.stopPropagation()}>
+                  <span className="note-label">Note</span>
+                  <input
+                    key={line.text}
+                    className="note-text"
+                    aria-label="Note"
+                    defaultValue={line.text}
+                    disabled={readOnly}
+                    onBlur={(event) => onEditNote(line.id, event.target.value)}
+                    onKeyDown={(event) => { if (event.key === 'Enter') event.currentTarget.blur() }}
+                  />
+                  {!readOnly && (
+                    <button className="note-remove" type="button" aria-label="Remove note" onClick={() => onRemoveLine(line.id)}>
+                      <X size={14} aria-hidden="true" />
+                    </button>
+                  )}
+                </div>
+              )
+            }
             if (line.type === 'bars') {
               return (
                 <p className="bars" key={line.id}>
@@ -226,6 +233,20 @@ export function Chart({
               </div>
             )
           })}
+          {noteDraft === section.id && (
+            <form className="note note-draft" onClick={(event) => event.stopPropagation()} onSubmit={(event) => { event.preventDefault(); const text = String(new FormData(event.currentTarget).get('note') ?? ''); onAddNote(section.id, text); setNoteDraft(null) }}>
+              <span className="note-label">Note</span>
+              <input
+                className="note-text"
+                name="note"
+                aria-label="New note"
+                placeholder="Quiet, then build"
+                autoFocus
+                onBlur={(event) => { if (!event.target.value.trim()) setNoteDraft(null) }}
+                onKeyDown={(event) => { if (event.key === 'Escape') { event.stopPropagation(); setNoteDraft(null) } }}
+              />
+            </form>
+          )}
         </section>
       ))}
       {!readOnly && !compact && (

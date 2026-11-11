@@ -105,6 +105,38 @@ function swipe(dx: number, dy = 0) {
 
 const stageTitle = () => document.querySelector('.stage-title')?.textContent
 
+describe('StageView header', () => {
+  it('keeps the original key in the badge while transposing', () => {
+    renderStage()
+    expect(document.querySelector('.stage-key')?.textContent).toBe('Original: D')
+    fireEvent.click(screen.getByRole('button', { name: 'Key up a semitone' }))
+    expect(document.querySelector('.stage-key')?.textContent).toBe('Original: D')
+  })
+
+  it('shows the song order under the artist and no Numbers label', () => {
+    renderStage()
+    expect(screen.getByText('Order: Verse 1 · Verse 2 · Verse 3')).toBeTruthy()
+    expect(screen.queryByText('Numbers')).toBeNull()
+  })
+
+  it('goes to the section after the one scrolled to, not after the last one clicked', () => {
+    renderStage()
+    const body = document.querySelector('.stage-body') as HTMLElement
+    const sections = [...document.querySelectorAll<HTMLElement>('[data-stage-section-index]')]
+    const tops = [-400, 0, 300]
+    body.getBoundingClientRect = () => ({ top: 0, bottom: 600, height: 600 }) as DOMRect
+    const scrolled: number[] = []
+    sections.forEach((node, index) => {
+      node.getBoundingClientRect = () => ({ top: tops[index], bottom: tops[index] + 200, height: 200 }) as DOMRect
+      node.scrollIntoView = () => scrolled.push(index)
+    })
+    fireEvent.click(screen.getByRole('button', { name: 'Next section' }))
+    expect(scrolled).toEqual([2])
+    const current = document.querySelector('.stage-section.is-current') as HTMLElement
+    expect(current.dataset.stageSection).toBe('Verse 3')
+  })
+})
+
 describe('StageView setlist songs', () => {
   it('steps back to the previous song', () => {
     renderSetlistStage()

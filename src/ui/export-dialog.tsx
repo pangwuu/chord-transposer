@@ -124,10 +124,8 @@ export function SetlistExportDialog({
   layout,
   choices,
   accidentals,
-  rightHand,
   onChange,
   onAccidentals,
-  onRightHand,
   onClose,
   onDownload,
 }: {
@@ -135,11 +133,9 @@ export function SetlistExportDialog({
   layout: SetlistLayout
   choices: PdfChoices
   accidentals: AccidentalBias
-  rightHand: boolean
   onChange: (choices: PdfChoices) => void
   onAccidentals: (bias: AccidentalBias) => void
   onClose: () => void
-  onRightHand: (rightHand: boolean) => void
   onDownload: () => void
 }) {
   const scrollRef = useRef<HTMLDivElement>(null)
@@ -162,15 +158,6 @@ export function SetlistExportDialog({
         <div className="pdf-export-grid">
           <div>
             <PdfChoiceFields choices={choices} accidentals={accidentals} onChange={onChange} onAccidentals={onAccidentals} />
-            <label className="hint setlist-right-hand">
-              <input
-                type="checkbox"
-                aria-label="Right-hand pages"
-                checked={rightHand}
-                onChange={(event) => onRightHand(event.target.checked)}
-              />
-              Right-hand pages
-            </label>
           </div>
           <div className="pdf-export-preview" ref={scrollRef}>
             {pages.length === 0 && (

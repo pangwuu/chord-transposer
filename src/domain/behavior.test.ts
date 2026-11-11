@@ -3,7 +3,7 @@ import { describe, expect, it } from 'vitest'
 import { PDFDocument } from 'pdf-lib'
 import { formatKey, formatSymbol, parseChord, parseKey } from './chord'
 import { applyRestore, planRestore } from './backup'
-import { addAt, addBarChordOf, addBarsOf, addCommentOf, addSectionOf, applyChordProOf, changeLyric, checkLine, deleteSectionOf, duplicateSectionOf, moveSectionOf, nudge, openEditor, placeSectionOf, removeSelected, renameSectionOf, repeatArrangementOf, resetView, saveConcertAsSongKey, setChordText, setSongDetails, stepConcert, undo, viewSong, chooseCapo } from './editor'
+import { addAt, addBarChordOf, addBarsOf, addCommentOf, editNoteOf, removeLineOf, addSectionOf, applyChordProOf, changeLyric, checkLine, deleteSectionOf, duplicateSectionOf, moveSectionOf, nudge, openEditor, placeSectionOf, removeSelected, renameSectionOf, repeatArrangementOf, resetView, saveConcertAsSongKey, setChordText, setSongDetails, stepConcert, undo, viewSong, chooseCapo } from './editor'
 import { amazingGrace, firstLight } from '../fixtures/charts'
 import { chordTextFromPdfItems, importText } from './import-text'
 import { padCollisions } from './line-layout'
@@ -123,6 +123,25 @@ describe('plain import', () => {
     const result = importText('G H7 D\n', idSequence('badbar'))
     expect(symbolsIn(result.song.sections[0])).toEqual(['G', 'bar', 'H7', 'bar', 'D'])
     expect(result.issues.map((issue) => issue.raw)).toContain('H7')
+  })
+})
+
+describe('notes', () => {
+  it('adds, edits and removes a note, and prints it on the PDF', () => {
+    const section = amazingGrace.sections[0]
+    const added = addCommentOf(openEditor(amazingGrace), section.id, 'Quiet, then build')
+    const note = added.song.sections[0].lines.at(-1)!
+    expect(note).toMatchObject({ type: 'comment', text: 'Quiet, then build' })
+    const pdf = layoutPdf(added.song, pdfOptions(added.song.originalKey))
+    expect(pdf.pages.flatMap((page) => page.blocks)).toContainEqual(expect.objectContaining({ kind: 'comment', text: 'Quiet, then build' }))
+
+    const edited = editNoteOf(added, note.id, 'All in')
+    expect(edited.song.sections[0].lines.at(-1)).toMatchObject({ id: note.id, text: 'All in' })
+    const cleared = editNoteOf(edited, note.id, '  ')
+    expect(cleared.song.sections[0].lines.some((line) => line.id === note.id)).toBe(false)
+    const removed = removeLineOf(edited, note.id)
+    expect(removed.song.sections[0].lines).toEqual(amazingGrace.sections[0].lines)
+    expect(undo(removed).song.sections[0].lines.at(-1)).toMatchObject({ text: 'All in' })
   })
 })
 
@@ -501,7 +520,7 @@ describe('pdf', () => {
     expect(blockHeight(plain, 12, 1)).toBeCloseTo(21.8)
     expect(blockHeight(bars, 12, 1)).toBeCloseTo(25.8)
     expect(blockHeight(section, 12, 1)).toBe(42)
-    expect(blockHeight(comment, 12, 1)).toBe(16)
+    expect(blockHeight(comment, 12, 1)).toBe(24)
   })
 
   it('puts fewer lines on a page by default, and lets the room go first when fitting', () => {

@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
-import { Eye, EyeOff, RotateCcw } from 'lucide-react'
+import { ChevronsDown, Eye, EyeOff, RotateCcw, SkipBack, SkipForward } from 'lucide-react'
 import {
   accidentalBias,
   chooseAccidentalBias,
@@ -19,6 +19,7 @@ const MIN_SPEED = 0.1
 const MAX_SPEED = 12
 const SPEED_STEP = 0.1
 const SWIPE_DISTANCE = 60
+const SECTION_TOP_SLACK = 24
 const BASE_KEYS = ['C', 'Db', 'D', 'Eb', 'E', 'F', 'F#', 'G', 'Ab', 'A', 'Bb', 'B'] as const
 
 function keyOptions(prefs: SpellingPrefs): string[] {
@@ -109,6 +110,10 @@ export function StageView({
   const shapeKey = shiftKey(concert, -capo, prefs)
   const viewDirty = formatKey(concert) !== formatKey(entry.song.originalKey) || capo > 0
   const bias = accidentalBias(prefs)
+  const order = song.arrangement
+    .map((item) => song.sections.find((candidate) => candidate.id === item.sectionId)?.label ?? '')
+    .filter(Boolean)
+    .join(' · ')
 
   function applyStagePrefs(next: SpellingPrefs) {
     setPrefs(next)
@@ -121,14 +126,28 @@ export function StageView({
   }
 
   const goSection = (direction: 1 | -1) => {
-    setSection((value) => {
-      const next = Math.min(played.length - 1, Math.max(0, value + direction))
-      const target = body.current?.querySelector(`[data-stage-section-index="${next}"]`)
-      if (target && typeof target.scrollIntoView === 'function') {
-        target.scrollIntoView({ behavior: 'smooth', block: 'start' })
-      }
-      return next
+    const next = Math.min(played.length - 1, Math.max(0, (sectionInView() ?? section) + direction))
+    const target = body.current?.querySelector(`[data-stage-section-index="${next}"]`)
+    if (target && typeof target.scrollIntoView === 'function') {
+      target.scrollIntoView({ behavior: 'smooth', block: 'start' })
+    }
+    setSection(next)
+  }
+
+  /** The section at the top of the reading area, or null when there is no layout to measure. */
+  function sectionInView(): number | null {
+    const node = body.current
+    if (!node) return null
+    const nodes = [...node.querySelectorAll<HTMLElement>('[data-stage-section-index]')]
+    const rects = nodes.map((item) => item.getBoundingClientRect())
+    if (rects.every((rect) => rect.height === 0)) return null
+    const top = node.getBoundingClientRect().top + SECTION_TOP_SLACK
+    let found = 0
+    rects.forEach((rect, index) => {
+      if (rect.top <= top) found = index
     })
+    const atEnd = node.scrollHeight > 0 && node.scrollTop + node.clientHeight >= node.scrollHeight - 2
+    return atEnd ? Math.max(found, section) : found
   }
 
   return (
@@ -138,17 +157,102 @@ export function StageView({
           {headerOpen && (
             <>
               <button className="text-button" type="button" onClick={onExit}>Exit</button>
-              <span className="stage-key">{formatKey(concert)}</span>
+              <span className="stage-key">Original: {formatKey(entry.song.originalKey)}</span>
+              <div className="stage-transport">
+                <div className="transport-main">
+                  <div className="pill" role="group" aria-label="Transpose">
+                    <button className="pill-btn" type="button" aria-label="Key down a semitone" onClick={() => setConcert((value) => shiftKey(value, -1, prefs))}>−</button>
+                    <select
+                      className="pill-select pill-key"
+                      aria-label="Key"
+                      value={formatKey(concert)}
+                      onChange={(event) => setConcert(parseKey(event.target.value))}
+                    >
+                      <optgroup label="Major">{keyOptions(prefs).map((key) => <option key={key}>{key}</option>)}</optgroup>
+                      <optgroup label="Minor">{keyOptions(prefs).map((key) => <option key={`${key}m`}>{key}m</option>)}</optgroup>
+                    </select>
+                    <button className="pill-btn" type="button" aria-label="Key up a semitone" onClick={() => setConcert((value) => shiftKey(value, 1, prefs))}>+</button>
+                    <span className="pill-divider" aria-hidden="true" />
+                    <label className="pill-capo">
+                      <span className="pill-capo-label">Capo</span>
+                      <select
+                        className="pill-select"
+                        aria-label="Capo"
+                        value={capo}
+                        onChange={(event) => setCapo(Math.max(0, Math.min(11, Number(event.target.value))))}
+                      >
+                        {Array.from({ length: 12 }, (_, value) => (
+                          <option key={value} value={value}>{value === 0 ? 'None' : value}</option>
+                        ))}
+                      </select>
+                    </label>
+                    <span className="pill-divider" aria-hidden="true" />
+                    <button
+                      className="pill-btn pill-icon"
+                      type="button"
+                      aria-label="Reset transpose"
+                      disabled={!viewDirty}
+                      onClick={() => {
+                        setConcert(entry.song.originalKey)
+                        setCapo(0)
+                      }}
+                    >
+                      <RotateCcw size={15} strokeWidth={1.75} aria-hidden="true" />
+                    </button>
+                  </div>
+                  <div className="pill" role="group" aria-label="Accidental spelling">
+                    <button
+                      className="pill-btn"
+                      type="button"
+                      aria-label="Prefer flats"
+                      aria-pressed={bias === 'flats'}
+                      onClick={() => applyStagePrefs(chooseAccidentalBias(prefs, 'flats'))}
+                    >
+                      ♭
+                    </button>
+                    <span className="pill-divider" aria-hidden="true" />
+                    <button
+                      className="pill-btn"
+                      type="button"
+                      aria-label="Prefer sharps"
+                      aria-pressed={bias === 'sharps'}
+                      onClick={() => applyStagePrefs(chooseAccidentalBias(prefs, 'sharps'))}
+                    >
+                      ♯
+                    </button>
+                  </div>
+                  <div className="transport-mode">
+                    <div className="pill" role="group" aria-label="Nashville numbers">
+                      <button
+                        className="pill-btn"
+                        type="button"
+                        aria-pressed={nashville}
+                        onClick={() => setNashville((value) => !value)}
+                      >
+                        1-4-5
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              </div>
               <span className="grow" />
-              <button className="outline" type="button" aria-label="Slower" onClick={() => setSpeed((value) => nudgeSpeed(value, -SPEED_STEP))}>−</button>
-              <span>Speed {speed.toFixed(1)}</span>
-              <button className="outline" type="button" aria-label="Faster" onClick={() => setSpeed((value) => nudgeSpeed(value, SPEED_STEP))}>+</button>
+              <span className="stage-speed">
+                <button className="outline" type="button" aria-label="Slower" onClick={() => setSpeed((value) => nudgeSpeed(value, -SPEED_STEP))}>−</button>
+                <span>Speed {speed.toFixed(1)}</span>
+                <button className="outline" type="button" aria-label="Faster" onClick={() => setSpeed((value) => nudgeSpeed(value, SPEED_STEP))}>+</button>
+              </span>
               <button className="primary" type="button" onClick={() => setPlaying((value) => !value)}>{playing ? 'Pause' : 'Autoscroll'}</button>
-              <button className="outline" type="button" onClick={() => goSection(1)}>Next section</button>
+              <button className="outline stage-icon" type="button" aria-label="Next section" title="Next section" onClick={() => goSection(1)}>
+                <ChevronsDown size={16} aria-hidden="true" />
+              </button>
               {entries.length > 1 && (
                 <>
-                  <button className="outline" type="button" disabled={songIndex === 0} onClick={() => goSong(-1)}>Previous song</button>
-                  <button className="outline" type="button" disabled={songIndex >= entries.length - 1} onClick={() => goSong(1)}>Next song</button>
+                  <button className="outline stage-icon" type="button" aria-label="Previous song" title="Previous song" disabled={songIndex === 0} onClick={() => goSong(-1)}>
+                    <SkipBack size={16} aria-hidden="true" />
+                  </button>
+                  <button className="outline stage-icon" type="button" aria-label="Next song" title="Next song" disabled={songIndex >= entries.length - 1} onClick={() => goSong(1)}>
+                    <SkipForward size={16} aria-hidden="true" />
+                  </button>
                 </>
               )}
             </>
@@ -165,88 +269,14 @@ export function StageView({
               : <EyeOff size={16} strokeWidth={1.75} aria-hidden="true" />}
           </button>
         </div>
-        {headerOpen && <div className="stage-transport transport">
-          <div className="transport-main">
-            <div className="pill" role="group" aria-label="Transpose">
-              <button className="pill-btn" type="button" aria-label="Key down a semitone" onClick={() => setConcert((value) => shiftKey(value, -1, prefs))}>−</button>
-              <select
-                className="pill-select pill-key"
-                aria-label="Key"
-                value={formatKey(concert)}
-                onChange={(event) => setConcert(parseKey(event.target.value))}
-              >
-                <optgroup label="Major">{keyOptions(prefs).map((key) => <option key={key}>{key}</option>)}</optgroup>
-                <optgroup label="Minor">{keyOptions(prefs).map((key) => <option key={`${key}m`}>{key}m</option>)}</optgroup>
-              </select>
-              <button className="pill-btn" type="button" aria-label="Key up a semitone" onClick={() => setConcert((value) => shiftKey(value, 1, prefs))}>+</button>
-              <span className="pill-divider" aria-hidden="true" />
-              <label className="pill-capo">
-                <span className="pill-capo-label">Capo</span>
-                <select
-                  className="pill-select"
-                  aria-label="Capo"
-                  value={capo}
-                  onChange={(event) => setCapo(Math.max(0, Math.min(11, Number(event.target.value))))}
-                >
-                  {Array.from({ length: 12 }, (_, value) => (
-                    <option key={value} value={value}>{value === 0 ? 'None' : value}</option>
-                  ))}
-                </select>
-              </label>
-              <span className="pill-divider" aria-hidden="true" />
-              <button
-                className="pill-btn pill-icon"
-                type="button"
-                aria-label="Reset transpose"
-                disabled={!viewDirty}
-                onClick={() => {
-                  setConcert(entry.song.originalKey)
-                  setCapo(0)
-                }}
-              >
-                <RotateCcw size={15} strokeWidth={1.75} aria-hidden="true" />
-              </button>
-            </div>
-            <div className="pill" role="group" aria-label="Accidental spelling">
-              <button
-                className="pill-btn"
-                type="button"
-                aria-label="Prefer flats"
-                aria-pressed={bias === 'flats'}
-                onClick={() => applyStagePrefs(chooseAccidentalBias(prefs, 'flats'))}
-              >
-                ♭
-              </button>
-              <span className="pill-divider" aria-hidden="true" />
-              <button
-                className="pill-btn"
-                type="button"
-                aria-label="Prefer sharps"
-                aria-pressed={bias === 'sharps'}
-                onClick={() => applyStagePrefs(chooseAccidentalBias(prefs, 'sharps'))}
-              >
-                ♯
-              </button>
-            </div>
-            <div className="transport-mode">
-              <span className="transport-label">Numbers</span>
-              <div className="pill" role="group" aria-label="Nashville numbers">
-                <button
-                  className="pill-btn"
-                  type="button"
-                  aria-pressed={nashville}
-                  onClick={() => setNashville((value) => !value)}
-                >
-                  1-4-5
-                </button>
-              </div>
-            </div>
-          </div>
-        </div>}
       </div>
       <div
         className="stage-body"
         ref={body}
+        onScroll={() => {
+          const inView = sectionInView()
+          if (inView !== null) setSection(inView)
+        }}
         onTouchStart={(event) => {
           const touch = event.touches[0]
           touchStart.current = touch ? { x: touch.clientX, y: touch.clientY } : null
@@ -265,6 +295,7 @@ export function StageView({
         <header className="stage-head">
           <strong className="stage-title">{song.title}</strong>
           {song.artist && <p className="stage-artist">{song.artist}</p>}
+          {order && <p className="stage-order">Order: {order}</p>}
         </header>
         {played.map(({ section: item }, index) => (
           <section

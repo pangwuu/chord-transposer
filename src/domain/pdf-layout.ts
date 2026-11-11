@@ -169,7 +169,8 @@ export function blockHeight(
   let raw: number
   if (block.kind === 'section')
     raw = sectionBlockHeight(sectionLeadIn, headingSize)
-  else if (block.kind === 'comment' || block.kind === 'pointer') raw = 16
+  else if (block.kind === 'comment') raw = 24
+  else if (block.kind === 'pointer') raw = 16
   else if (block.kind === 'bars') raw = Math.ceil(fontSize * 1.7)
   else if (block.chords.length === 0) raw = Math.ceil(fontSize * 1.35)
   else {

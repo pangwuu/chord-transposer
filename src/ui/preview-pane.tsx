@@ -13,12 +13,8 @@ import {
 
 export function PreviewPane({
   layout,
-  onExport,
-  onBack,
 }: {
   layout: PdfDocument
-  onExport?: () => void
-  onBack?: () => void
 }) {
   const scrollRef = useRef<HTMLDivElement>(null)
   const paneWidth = usePaneWidth(scrollRef)
@@ -26,18 +22,7 @@ export function PreviewPane({
   return (
     <aside className="preview">
       <div className="preview-bar">
-        {onBack && (
-          <button className="text-button" type="button" onClick={onBack}>
-            Back
-          </button>
-        )}
         <span className="meta">{layoutStatus(layout)}</span>
-        <span className="grow" />
-        {onExport && (
-          <button className="primary" type="button" onClick={onExport}>
-            Export PDF
-          </button>
-        )}
       </div>
       {layout.fitWarning && <p className="fit-warning">{layout.fitWarning}</p>}
       <div className="preview-scroll" ref={scrollRef}>
@@ -263,7 +248,13 @@ function PreviewBlock({
         {block.label}
       </div>
     )
-  if (block.kind === 'comment' || block.kind === 'pointer')
+  if (block.kind === 'comment')
+    return (
+      <div style={{ height, paddingTop: 3, boxSizing: 'border-box' }}>
+        <span className="paper-note">{block.text}</span>
+      </div>
+    )
+  if (block.kind === 'pointer')
     return (
       <p style={{ height, margin: 0 }}>
         <em>{block.text}</em>
