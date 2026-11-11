@@ -76,7 +76,8 @@ function parseBarLine(raw: string, ids: IdGen): BarLine {
 
 export function formatLyric(line: LyricLine): string {
   const chars = [...line.text]
-  const chords = [...line.chords].sort((a, b) => b.index - a.index || b.id.localeCompare(a.id))
+  // Inserted last to first, so chords sharing an index keep their written order.
+  const chords = [...line.chords].sort((a, b) => a.index - b.index).reverse()
   for (const chord of chords) chars.splice(Math.max(0, Math.min(chars.length, chord.index)), 0, `[${formatSymbol(chord.symbol)}]`)
   return chars.join('')
 }
@@ -102,6 +103,7 @@ export function fromChordPro(text: string, ids: IdGen = createId): Song {
   song.sections = []
   song.arrangement = []
   let section: Section | null = null
+  let written: string | null = null
   const ensure = () => {
     if (!section) {
       section = { id: ids(), kind: 'verse', label: 'Verse 1', lines: [] }
@@ -124,6 +126,7 @@ export function fromChordPro(text: string, ids: IdGen = createId): Song {
       else if (name === 'tempo') song.tempo = Number(value)
       else if (name === 'time' || name === 'time_signature') song.timeSignature = value
       else if (name === 'ccli') song.ccli = value
+      else if (name === 'x_arrangement') written = value
       else if (name.startsWith('start_of_')) {
         const kindName = name.slice('start_of_'.length)
         const label = value || defaultLabel(kindName)
@@ -147,7 +150,31 @@ export function fromChordPro(text: string, ids: IdGen = createId): Song {
     ensure().lines.push(isBarLine(line) ? parseBarLine(line, ids) : barsForChordOnly(parseBracketLine(line, ids), ids))
   }
   if (song.sections.length === 0) return emptySong({ title: song.title, originalKey: song.originalKey, artist: song.artist }, ids)
+  if (written) song.arrangement = readArrangement(written, song)
   return song
+}
+
+function readArrangement(written: string, song: Song): Song['arrangement'] {
+  const items = written.split(/\s+/).flatMap((token) => {
+    const match = token.match(/^(\d+)(?:x(\d+))?$/)
+    const section = match ? song.sections[Number(match[1]) - 1] : undefined
+    if (!match || !section) return []
+    return [match[2] && Number(match[2]) > 1 ? { sectionId: section.id, repeat: Number(match[2]) } : { sectionId: section.id }]
+  })
+  return items.length > 0 ? items : song.arrangement
+}
+
+/** One number per section played. Written only when the song doesn't simply play its sections in order. */
+function writeArrangement(song: Song): string | null {
+  const straight = song.arrangement.length === song.sections.length && song.arrangement.every((item, index) => item.sectionId === song.sections[index].id && (item.repeat ?? 1) === 1)
+  if (straight || song.arrangement.length === 0) return null
+  return song.arrangement
+    .flatMap((item) => {
+      const position = song.sections.findIndex((section) => section.id === item.sectionId)
+      if (position < 0) return []
+      return [(item.repeat ?? 1) > 1 ? `${position + 1}x${item.repeat}` : `${position + 1}`]
+    })
+    .join(' ')
 }
 
 export function toChordPro(song: Song): string {
@@ -167,5 +194,7 @@ export function toChordPro(song: Song): string {
     }
     lines.push(`{end_of_${section.kind}}`)
   }
+  const arrangement = writeArrangement(song)
+  if (arrangement) lines.push(`{x_arrangement: ${arrangement}}`)
   return lines.join('\n')
 }

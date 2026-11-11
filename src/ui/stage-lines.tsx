@@ -1,11 +1,8 @@
-import { useEffect, useRef, useState } from 'react'
 import type { Key } from '../domain/chord'
 import { padCollisions, wrapLyricDisplay } from '../domain/line-layout'
 import type { BarLine, LyricLine } from '../domain/song'
 import { symbolLabel } from './chart'
-
-/** Same advance factor PDF layout uses for mono capacity. */
-const MONO = 0.6
+import { useCharCapacity } from './use-char-capacity'
 
 export function StageLyricLine({
   line,
@@ -16,22 +13,7 @@ export function StageLyricLine({
   numbers: boolean
   shapeKey: Key
 }) {
-  const ref = useRef<HTMLDivElement>(null)
-  const [capacity, setCapacity] = useState(0)
-
-  useEffect(() => {
-    const node = ref.current
-    if (!node) return
-    const update = () => {
-      const fontSize = parseFloat(getComputedStyle(node).fontSize) || 16
-      setCapacity(Math.max(0, Math.floor(node.clientWidth / (fontSize * MONO))))
-    }
-    update()
-    if (typeof ResizeObserver === 'undefined') return
-    const observer = new ResizeObserver(update)
-    observer.observe(node)
-    return () => observer.disconnect()
-  }, [])
+  const { ref, capacity } = useCharCapacity<HTMLDivElement>()
 
   const laid = padCollisions(
     line.text,

@@ -1,7 +1,8 @@
-import { useState, type PointerEvent as ReactPointerEvent } from 'react'
+import { Fragment, useState, type PointerEvent as ReactPointerEvent } from 'react'
 import { formatSymbol, nashville, type ChordSymbol, type Key } from '../domain/chord'
-import { padCollisions } from '../domain/line-layout'
+import { padCollisions, wrapLyricDisplay } from '../domain/line-layout'
 import type { SectionKind, Song } from '../domain/song'
+import { useCharCapacity } from './use-char-capacity'
 
 export type NudgeHow = 'left' | 'right' | 'word-left' | 'word-right' | 'start' | 'end'
 
@@ -21,12 +22,15 @@ export function symbolLabel(symbol: ChordSymbol, numbers: boolean, key: Key): st
   return numbers ? nashville(symbol, key) : formatSymbol(symbol)
 }
 
+const lyricFontSize = (node: HTMLElement) => parseFloat(getComputedStyle(node).getPropertyValue('--fs-lyric')) || 15
+
 export function Chart({
   song,
   shapeKey,
   numbers,
   selectedIds,
   readOnly,
+  compact = false,
   onSelect,
   onAdd,
   onCheck,
@@ -49,6 +53,8 @@ export function Chart({
   numbers: boolean
   selectedIds: string[]
   readOnly: boolean
+  /** Only the section actions that fix an import: rename and delete. */
+  compact?: boolean
   onSelect: (id: string | null, shift?: boolean) => void
   onAdd: (lineId: string, index: number) => void
   onCheck: (lineId: string) => void
@@ -70,19 +76,26 @@ export function Chart({
   const [caret, setCaret] = useState<{ lineId: string; index: number } | null>(null)
   const [sectionMenu, setSectionMenu] = useState(false)
   const [lineDraft, setLineDraft] = useState<{ id: string; kind: 'comment' | 'bars' } | null>(null)
+  const { ref, capacity } = useCharCapacity<HTMLDivElement>(lyricFontSize)
   return (
-    <div className={dragging ? 'document dragging' : 'document'} onClick={() => onSelect(null)}>
+    <div ref={ref} className={dragging ? 'document dragging' : 'document'} onClick={() => onSelect(null)}>
       {song.sections.map((section) => (
         <section className="section" key={section.id}>
           <div className="section-head">
             <input key={`${section.id}:${section.label}`} className="section-label" aria-label={`${section.label} name`} defaultValue={section.label} disabled={readOnly} onBlur={(event) => onRename(section.id, event.target.value)} onKeyDown={(event) => { if (event.key === 'Enter') event.currentTarget.blur() }} />
             {!readOnly && (
               <span className="section-actions">
+                {!compact && (
+                  <>
                 <button className="text-button" type="button" aria-label={`Drag ${section.label}`} onPointerDown={(event) => { event.stopPropagation(); beginSectionDrag(event, section.id, onPlaceSection) }}>Drag</button>
                 <button className="text-button" type="button" aria-label={`Move ${section.label} up`} onClick={() => onMoveSection(section.id, -1)}>Up</button>
                 <button className="text-button" type="button" aria-label={`Move ${section.label} down`} onClick={() => onMoveSection(section.id, 1)}>Down</button>
                 <button className="text-button" type="button" onClick={() => onDuplicate(section.id)}>Duplicate</button>
+                  </>
+                )}
                 <button className="text-button" type="button" onClick={() => onDeleteSection(section.id)}>Delete</button>
+                {!compact && (
+                  <>
                 <button
                   className="text-button"
                   type="button"
@@ -99,6 +112,8 @@ export function Chart({
                 >
                   Bars
                 </button>
+                  </>
+                )}
               </span>
             )}
           </div>
@@ -130,6 +145,7 @@ export function Chart({
             }
             const ordered = [...line.chords].sort((a, b) => a.index - b.index)
             const padded = padCollisions(line.text, ordered.map((chord) => ({ label: symbolLabel(chord.symbol, numbers, shapeKey), index: chord.index })))
+            const segments = wrapLyricDisplay(padded.text, padded.chords.map((placed, position) => ({ ...placed, id: ordered[position].id })), capacity, padded.origins)
             const selected = ordered.find((chord) => selectedIds.includes(chord.id))
             const showTools = selected && selectedIds[0] === selected.id && !readOnly && !dragging
             return (
@@ -144,41 +160,50 @@ export function Chart({
                     <button className="icon-button" type="button" aria-label="Delete chord" onClick={onDelete}>Delete</button>
                   </div>
                 )}
-                <div className="chord-row">
-                  {ordered.map((chord) => {
-                    const placed = padded.chords[ordered.indexOf(chord)]
-                    return (
-                      <button
-                        key={chord.id}
-                        type="button"
-                        className={chordClass(chord.symbol, selectedIds.includes(chord.id))}
-                        style={{ left: `${placed?.index ?? chord.index}ch` }}
-                        aria-label={`Chord ${symbolLabel(chord.symbol, false, shapeKey)} over "${wordAt(line.text, chord.index)}", ${section.label} line ${lineNumber + 1}`}
-                        onClick={(event) => { event.stopPropagation(); onSelect(chord.id, event.shiftKey) }}
-                        onDoubleClick={(event) => { event.stopPropagation(); onEdit(chord.id) }}
-                        onPointerDown={(event) => beginDrag(event, chord.id, onMove, () => onEdit(chord.id), setDragging, setCaret)}
-                      >
-                        {symbolLabel(chord.symbol, numbers, shapeKey)}
-                      </button>
-                    )
-                  })}
-                </div>
-                <div className="lyric-row" data-line={line.id} data-origins={padded.origins.join(',')}>
-                  {caret?.lineId === line.id && <span className="caret" style={{ left: `${visualColumn(padded.origins, caret.index)}ch` }} />}
-                  {padded.text.split('').map((character, index) => (
+                {segments.map((segment, segmentIndex) => {
+                  const origins = segment.origins ?? []
+                  const holdsCaret = caret?.lineId === line.id && (origins.includes(caret.index) || segmentIndex === segments.length - 1)
+                  return (
+                    <Fragment key={segmentIndex}>
+                      <div className="chord-row">
+                        {segment.chords.map((placed) => {
+                          const chord = ordered.find((item) => item.id === placed.id)
+                          if (!chord) return null
+                          return (
+                            <button
+                              key={chord.id}
+                              type="button"
+                              className={chordClass(chord.symbol, selectedIds.includes(chord.id))}
+                              style={{ left: `${placed.index}ch` }}
+                              aria-label={`Chord ${symbolLabel(chord.symbol, false, shapeKey)} over "${wordAt(line.text, chord.index)}", ${section.label} line ${lineNumber + 1}`}
+                              onClick={(event) => { event.stopPropagation(); onSelect(chord.id, event.shiftKey) }}
+                              onDoubleClick={(event) => { event.stopPropagation(); onEdit(chord.id) }}
+                              onPointerDown={(event) => beginDrag(event, chord.id, onMove, () => onEdit(chord.id), setDragging, setCaret)}
+                            >
+                              {symbolLabel(chord.symbol, numbers, shapeKey)}
+                            </button>
+                          )
+                        })}
+                      </div>
+                      <div className="lyric-row" data-line={line.id} data-origins={origins.join(',')}>
+                        {holdsCaret && caret && <span className="caret" style={{ left: `${visualColumn(origins, caret.index)}ch` }} />}
+{segment.text.split('').map((character, index) => (
                     <button
                       key={`${line.id}-${index}`}
                       type="button"
                       className="letter"
                       aria-label={character === ' ' ? 'Add a chord on the space' : `Add a chord on ${character}`}
-                      disabled={readOnly || padded.origins[index] < 0}
-                      onClick={(event) => { event.stopPropagation(); if (padded.origins[index] >= 0) onAdd(line.id, padded.origins[index]) }}
+                      disabled={readOnly || origins[index] < 0}
+                      onClick={(event) => { event.stopPropagation(); if (origins[index] >= 0) onAdd(line.id, origins[index]) }}
                     >
                       {character === ' ' ? '\u00a0' : character}
                     </button>
                   ))}
-                  {padded.text.length === 0 && !readOnly && <button type="button" className="letter" onClick={(event) => { event.stopPropagation(); onAdd(line.id, 0) }}>+ chord</button>}
+                  {segment.text.length === 0 && !readOnly && <button type="button" className="letter" onClick={(event) => { event.stopPropagation(); onAdd(line.id, 0) }}>+ chord</button>}
                 </div>
+                    </Fragment>
+                  )
+                })}
                 {line.needsCheck && (
                   <p className="check-line">Chords on this line moved with the words. <button type="button" onClick={() => onCheck(line.id)}>Checked</button></p>
                 )}
@@ -187,7 +212,7 @@ export function Chart({
           })}
         </section>
       ))}
-      {!readOnly && (
+      {!readOnly && !compact && (
         <div className="add-section">
           <button className="outline" type="button" aria-expanded={sectionMenu} onClick={(event) => { event.stopPropagation(); setSectionMenu((open) => !open) }}>+ Add section</button>
           {sectionMenu && (

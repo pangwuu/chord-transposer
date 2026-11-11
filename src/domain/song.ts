@@ -110,12 +110,12 @@ export function inferKind(label: string): SectionKind {
   if (name.startsWith('intro')) return 'intro'
   if (name.startsWith('pre')) return 'prechorus'
   if (name.startsWith('verse')) return 'verse'
-  if (name.startsWith('chorus')) return 'chorus'
+  if (/^(chorus|refrain|hook)/.test(name)) return 'chorus'
   if (name.startsWith('bridge')) return 'bridge'
   if (name.startsWith('tag')) return 'tag'
-  if (name.startsWith('instrumental') || name.startsWith('inst')) return 'instrumental'
+  if (/^(inst|solo|turnaround|break|vamp|guitar|piano|keys)/.test(name)) return 'instrumental'
   if (name.startsWith('interlude')) return 'interlude'
-  if (name.startsWith('outro') || name.startsWith('ending')) return 'outro'
+  if (/^(outro|ending|coda)/.test(name)) return 'outro'
   return 'custom'
 }
 
@@ -385,6 +385,17 @@ function wordAt(text: string, index: number): string {
   while (start > 0 && /\S/.test(text[start - 1])) start -= 1
   while (end < text.length && /\S/.test(text[end])) end += 1
   return text.slice(start, end) || 'the line'
+}
+
+/** Every chord in written order, on lyric lines and bar lines. */
+export function symbolsIn(song: Song): ChordSymbol[] {
+  return song.sections.flatMap((section) =>
+    section.lines.flatMap((line) => {
+      if (line.type === 'lyric') return line.chords.map((chord) => chord.symbol)
+      if (line.type === 'bars') return line.items.flatMap((item) => (item.kind === 'chord' ? [item.symbol] : []))
+      return []
+    }),
+  )
 }
 
 export function issuesIn(song: Song): { id: string; raw: string }[] {

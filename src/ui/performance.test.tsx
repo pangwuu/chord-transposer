@@ -2,7 +2,7 @@ import { cleanup, fireEvent, render, screen, within } from '@testing-library/rea
 import { afterEach, describe, expect, it } from 'vitest'
 import { DEFAULT_PREFS, parseChord, parseKey } from '../domain/chord'
 import { emptySong, idSequence } from '../domain/song'
-import { StageView } from './performance'
+import { ProjectorView, StageView } from './performance'
 
 afterEach(() => cleanup())
 
@@ -202,5 +202,25 @@ describe('StageView quiet chart', () => {
     expect(screen.getByRole('button', { name: 'Prefer sharps' }).getAttribute('aria-pressed')).toBe('true')
     expect(screen.getByRole('button', { name: 'Prefer flats' }).getAttribute('aria-pressed')).toBe('false')
     expect(screen.getAllByText('C#m').length).toBeGreaterThan(0)
+  })
+})
+
+describe('playing the arrangement', () => {
+  function repeatedSong() {
+    const song = songWithChords()
+    const [first, second] = song.sections
+    song.arrangement = [{ sectionId: first.id }, { sectionId: second.id }, { sectionId: first.id, repeat: 2 }]
+    return song
+  }
+
+  it('shows every section the arrangement plays on stage', () => {
+    const song = repeatedSong()
+    const { container } = render(<StageView entries={[{ song, concert: song.originalKey, capo: 0 }]} nashville={false} prefs={DEFAULT_PREFS} onExit={() => {}} />)
+    expect([...container.querySelectorAll('.stage-section-label')].map((node) => node.textContent)).toEqual(['Verse 1', 'Verse 2', 'Verse 1', 'Verse 1'])
+  })
+
+  it('gives every played section a projector slide', () => {
+    render(<ProjectorView song={repeatedSong()} onExit={() => {}} />)
+    expect(screen.getByText(/1\/4/)).toBeTruthy()
   })
 })

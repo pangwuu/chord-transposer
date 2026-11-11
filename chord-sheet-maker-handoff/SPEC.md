@@ -147,11 +147,13 @@ Editing works with mouse, keyboard, and touch. Every action is undoable (undo/re
 ## 5. Importing songs
 
 1. **Bracket/ChordPro text** (`What [C]gift of grace`, with `{title:}`, `{key:}`, `{start_of_chorus}` and similar directives).
-2. **Chords-over-lyrics plain text** (the common format on worship sites). Detect chord lines (lines where every token parses as a chord) and map each chord to the lyric character beneath its column. Detect section headings ("Verse 1", "Chorus:", "Bridge").
+2. **Chords-over-lyrics plain text** (the common format on worship sites). Detect chord lines (every token is a chord or annotation like `(x2)`, or at least two-thirds are chords and the rest start with a note letter) and map each chord to the lyric character beneath its column, measured from the lyric's own indent. Detect section headings ("Verse 1", "Chorus:", "[Bridge]", "Intro: G C G 2x") only when the line is nothing but the label. Rejoin lines a phone wrapped, read pastes with a blank line after every row, and read text where each chord splits its words onto new lines. Text from a whole web page is reduced to the chart, on any site.
 3. **ChordPro files** (`.cho`, `.chordpro`, `.chopro`, `.crd`).
 4. **PDF upload** (best effort): extract text with positions (pdf.js), rebuild chords-over-lyrics lines from x/y coordinates, then run importer 2.
 
-**Every import goes through a review screen before saving**: the rendered result side by side with the source text, a count of chords found, and any unparseable tokens highlighted. Nothing that looks like a chord is ever discarded without being shown to the user.
+**Key and repeats:** a stated key is used; otherwise the key is guessed from all the chords and marked as guessed. Written with a capo, chords are treated as shapes: the song stores the sounding key and keeps a capo view of the shapes. A section written out again, or named with nothing under it, becomes another entry in the arrangement.
+
+**Every import goes through a review screen before saving**: the rendered result side by side with the source text (on a phone, the chart fills the screen and the source is one tap away), a count of chords found, and any unparseable tokens highlighted. Headings, chords, title, artist and key can be fixed in review. Nothing that looks like a chord is ever discarded without being shown to the user.
 
 ---
 

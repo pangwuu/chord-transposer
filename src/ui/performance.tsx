@@ -11,7 +11,7 @@ import {
   type Key,
   type SpellingPrefs,
 } from '../domain/chord'
-import { displayedSong, type Song } from '../domain/song'
+import { displayedSong, performance as playedSections, type Song } from '../domain/song'
 import { StageBarLine, StageLyricLine } from './stage-lines'
 
 const DEFAULT_SPEED = 0.8
@@ -103,6 +103,7 @@ export function StageView({
   if (!entry) return null
 
   const song = displayedSong(entry.song, concert, capo, prefs)
+  const played = playedSections(song)
   const shapeKey = shiftKey(concert, -capo, prefs)
   const viewDirty = formatKey(concert) !== formatKey(entry.song.originalKey) || capo > 0
   const bias = accidentalBias(prefs)
@@ -114,7 +115,7 @@ export function StageView({
 
   const goSection = (direction: 1 | -1) => {
     setSection((value) => {
-      const next = Math.min(song.sections.length - 1, Math.max(0, value + direction))
+      const next = Math.min(played.length - 1, Math.max(0, value + direction))
       const target = body.current?.querySelector(`[data-stage-section-index="${next}"]`)
       if (target && typeof target.scrollIntoView === 'function') {
         target.scrollIntoView({ behavior: 'smooth', block: 'start' })
@@ -247,9 +248,9 @@ export function StageView({
           <strong className="stage-title">{song.title}</strong>
           {song.artist && <p className="stage-artist">{song.artist}</p>}
         </header>
-        {song.sections.map((item, index) => (
+        {played.map(({ section: item }, index) => (
           <section
-            key={item.id}
+            key={`${item.id}-${index}`}
             className={index === section ? 'stage-section is-current' : 'stage-section'}
             data-stage-section={item.label}
             data-stage-section-index={index}
@@ -272,7 +273,7 @@ export function StageView({
 }
 
 export function ProjectorView({ song, onExit }: { song: Song; onExit: () => void }) {
-  const slides = song.sections.filter((section) => section.lines.some((line) => line.type === 'lyric' && line.text.trim()))
+  const slides = playedSections(song).map((played) => played.section).filter((section) => section.lines.some((line) => line.type === 'lyric' && line.text.trim()))
   const [index, setIndex] = useState(0)
   const slide = slides[Math.min(index, Math.max(0, slides.length - 1))]
   useEffect(() => {

@@ -60,4 +60,35 @@ describe('wrapLyricDisplay', () => {
       ['D', 6],
     ])
   })
+
+  it('reports which lyric letter each wrapped column came from', () => {
+    const text = 'Sometimes you are no longer together'
+    const origins = [...text].map((_, index) => index)
+    const segments = wrapLyricDisplay(text, [{ label: 'G', index: 22 }], 20, origins)
+    expect(segments[0].origins).toEqual(origins.slice(0, 20))
+    expect(segments[1].origins).toEqual([-1, -1, ...origins.slice(21)])
+    expect(segments[1].origins?.[segments[1].chords[0].index]).toBe(22)
+  })
+
+  it('keeps extra fields on each chord', () => {
+    const segments = wrapLyricDisplay('Sometimes you are no longer together', [{ label: 'G', index: 22, id: 'kept' }], 20)
+    expect(segments[1].chords[0].id).toBe('kept')
+  })
+
+  it('keeps chords at one index in the order given', () => {
+    const laid = padCollisions('ab', [{ label: 'G', index: 1 }, { label: 'C', index: 1 }])
+    expect(laid.chords.map((chord) => chord.label)).toEqual(['G', 'C'])
+  })
+
+  it('keeps a chord at the very end of a wrapped line', () => {
+    const text = 'Sometimes you are no longer together'
+    const segments = wrapLyricDisplay(text, [{ label: 'G', index: text.length }], 20)
+    expect(segments.flatMap((segment) => segment.chords.map((chord) => chord.label))).toEqual(['G'])
+  })
+
+  it('keeps a chord past a lyric padded out with spaces', () => {
+    const text = 'Hold on'.padEnd(40)
+    const segments = wrapLyricDisplay(text, [{ label: 'C', index: 30 }, { label: 'G', index: 40 }], 20)
+    expect(segments.flatMap((segment) => segment.chords.map((chord) => chord.label))).toEqual(['C', 'G'])
+  })
 })

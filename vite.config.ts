@@ -13,6 +13,7 @@ export default defineConfig({
         short_name: 'Charts',
         description: 'Edit, transpose, and print chord charts on this device.',
         display: 'standalone',
+        share_target: { action: '/', method: 'GET', params: { title: 'title', text: 'text', url: 'url' } },
         background_color: '#ffffff',
         theme_color: '#7540E6',
         icons: [{ src: 'favicon.svg', sizes: 'any', type: 'image/svg+xml', purpose: 'any' }],

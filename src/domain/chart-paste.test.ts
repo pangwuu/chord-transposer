@@ -40,7 +40,7 @@ describe('importChartPaste', () => {
     expect(result.source).toBe('ultimate-guitar')
     expect(result.song.title).toBe('Morning Kitchen')
     expect(result.song.artist).toBe('First Light Band')
-    expect(formatKey(result.song.originalKey)).toBe('G')
+    expect(formatKey(result.song.originalKey)).toBe('A')
     expect(result.song.views).toEqual([
       expect.objectContaining({ name: 'Capo 2', capo: 2 }),
     ])
@@ -50,7 +50,7 @@ describe('importChartPaste', () => {
     expect(verse.type).toBe('lyric')
     if (verse.type !== 'lyric') return
     expect(verse.text).toBe('Morning on the kitchen table')
-    expect(verse.chords.map((chord) => formatSymbol(chord.symbol))).toEqual(['G', 'D'])
+    expect(verse.chords.map((chord) => formatSymbol(chord.symbol))).toEqual(['A', 'E'])
   })
 
   it('unwraps Ultimate Guitar [ch] markup into a chord chart', () => {
@@ -107,7 +107,7 @@ describe('importChartPaste', () => {
     expect(result.source).toBe('e-chords')
     expect(result.song.title).toBe('Morning Kitchen')
     expect(result.song.artist).toBe('First Light Band')
-    expect(formatKey(result.song.originalKey)).toBe('G')
+    expect(formatKey(result.song.originalKey)).toBe('Ab')
     expect(result.song.views).toEqual([expect.objectContaining({ name: 'Capo 1', capo: 1 })])
     expect(result.song.sections.map((section) => section.label)).toEqual(['Verse 1', 'Chorus'])
     expect(result.chordCount).toBe(8)
@@ -115,7 +115,7 @@ describe('importChartPaste', () => {
     expect(verse.type).toBe('lyric')
     if (verse.type !== 'lyric') return
     expect(verse.text).toBe('Morning on the kitchen table')
-    expect(verse.chords.map((chord) => formatSymbol(chord.symbol))).toEqual(['G', 'D'])
+    expect(verse.chords.map((chord) => formatSymbol(chord.symbol))).toEqual(['Ab', 'Eb'])
   })
 })
 

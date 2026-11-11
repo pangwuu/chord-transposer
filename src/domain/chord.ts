@@ -124,8 +124,19 @@ const QUALITIES = new Set([
   'm9',
   'm11',
   'm13',
+  '7sus',
+  '7sus2',
   '7sus4',
   '9sus4',
+  '7b5',
+  '7#5',
+  '7b9',
+  '7#9',
+  'madd9',
+  'madd11',
+  'mM7',
+  'mmaj7',
+  'maj13',
   'maj7#11',
 ])
 
@@ -389,6 +400,47 @@ function degreeLabel(note: Note, key: Key): string {
   const upper = steps.indexOf((rel + 1) % 12)
   if (upper >= 0) return `b${upper + 1}`
   return String(rel)
+}
+
+type ChordFamily = 'major' | 'minor' | 'dim' | 'any'
+
+function chordFamily(quality: string): ChordFamily {
+  if (/^(sus|5|2|4)/.test(quality)) return 'any'
+  if (/^(dim|°|ø|m7b5)/.test(quality)) return 'dim'
+  if (/^(m(?!aj)|min)/.test(quality)) return 'minor'
+  return 'major'
+}
+
+function fits(chord: Chord, key: Key, tonicPitch: number): number {
+  const steps = key.mode === 'major' ? MAJOR_STEPS : MINOR_STEPS
+  const qualities = key.mode === 'major' ? MAJOR_QUALITIES : MINOR_QUALITIES
+  const degree = steps.indexOf((notePitch(chord.root) - tonicPitch + 12) % 12)
+  if (degree < 0) return -1
+  const family = chordFamily(chord.quality)
+  return family === 'any' || family === chordFamily(qualities[degree]) ? 1 : -1
+}
+
+/** The key whose scale best holds these chords in playing order. Songs tend to open and close at home; ties go to major. */
+export function inferKey(symbols: ChordSymbol[]): Key | null {
+  const chords = symbols.flatMap((symbol) => (symbol.kind === 'chord' ? [symbol.chord] : []))
+  if (chords.length === 0) return null
+  let best: { key: Key; score: number } | null = null
+  for (const mode of ['major', 'minor'] as const) {
+    for (let pitch = 0; pitch < 12; pitch += 1) {
+      const key = keyFromPitch(pitch, mode)
+      const isHome = (chord: Chord) => notePitch(chord.root) === pitch && fits(chord, key, pitch) === 1
+      let score = chords.reduce((total, chord) => total + fits(chord, key, pitch), 0)
+      const opensHome = isHome(chords[0])
+      if (opensHome) score += 1.5
+      // A minor tune usually opens there too; ending on vi alone is a major song resting.
+      if (isHome(chords[chords.length - 1]) && (mode === 'major' || opensHome)) score += 3
+      if (!best || score > best.score) best = { key, score }
+    }
+  }
+  if (!best) return null
+  const { key: chosen } = best
+  const named = chords.find((chord) => notePitch(chord.root) === notePitch(chosen.tonic))
+  return named ? { tonic: named.root, mode: chosen.mode } : chosen
 }
 
 export function friendlyCapos(concert: Key): { capo: number; shapes: string }[] {

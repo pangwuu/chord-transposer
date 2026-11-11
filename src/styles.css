@@ -316,3 +316,23 @@ button { cursor: pointer; }
   .preview-bar .meta { font-size: clamp(9px, 2.7vw, 13px); }
   .preview-bar .primary { padding: 8px 12px; }
 }
+
+.import-actions { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; margin-top: 4px; }
+.import-actions .file-button { margin-top: 0; }
+.review-fields { display: grid; grid-template-columns: minmax(0, 1fr) 5.5rem; gap: 8px; align-items: end; margin-bottom: 10px; }
+.review-fields .field { width: 100%; min-width: 0; box-sizing: border-box; }
+.review-title { grid-column: 1 / -1; font-weight: 600; }
+.review-key { display: grid; gap: 2px; min-width: 0; }
+.import-screen .section-head { display: flex; align-items: center; gap: 8px; }
+.import-screen .section-label { flex: 1; min-width: 0; }
+.import-screen .section-actions { flex: none; }
+.review-chord { flex: none; display: flex; gap: 8px; padding: 8px 16px; border-top: 1px solid var(--border); background: var(--bg); }
+.review-chord .field { flex: 1; min-width: 0; font-family: var(--mono); font-size: 16px; }
+.import-cta { margin: 0 12px 8px; min-height: 44px; }
+.song-details { margin: 8px 0; }
+.song-details summary { cursor: pointer; padding: 6px 0; color: var(--text-muted, inherit); }
+.import-body.reviewing { overflow-y: auto; padding: 12px 16px; display: block; }
+.import-body.reviewing h2 { display: none; }
+.import-body.reviewing .import-panes { display: block; margin-top: 8px; }
+.import-body.reviewing .import-panes .source { height: 30vh; margin-bottom: 12px; }
+.import-body.reviewing .import-panes .result { overflow: visible; padding: 0; background: transparent; min-height: 0; }

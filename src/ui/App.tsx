@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from 'react'
+import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
 import { RotateCcw } from 'lucide-react'
 import { accidentalBias, chooseAccidentalBias, formatKey, formatSymbol, keyFromPitch, normaliseSymbol, notePitch, parseChord, parseKey, shiftKey, type SpellingPrefs } from '../domain/chord'
 import {
@@ -45,7 +45,7 @@ import { emptySong } from '../domain/song'
 import { Chart, type NudgeHow } from './chart'
 import { ChordProPane } from './chordpro-pane'
 import { defaultPdfChoices, ExportDialog, SetlistExportDialog, type PdfChoices } from './export-dialog'
-import { ImportScreen } from './import-screen'
+import { ImportScreen, readSharedPaste } from './import-screen'
 import { Inspector } from './inspector'
 import { PreviewPane } from './preview-pane'
 import { ProjectorView, StageView, type StageEntry } from './performance'
@@ -62,12 +62,16 @@ function keyOptions(prefs: SpellingPrefs): string[] {
   })
 }
 
+/** Read outside render: it clears the address bar, and strict mode renders twice. */
+const launchPaste = readSharedPaste()
+
 export function App() {
   const library = useRef(idbLibrary())
   const editorRef = useRef<EditorState | null>(null)
   const searchRef = useRef<HTMLInputElement>(null)
   const phone = usePhone()
-  const [place, setPlace] = useState<'songs' | 'editor' | 'sets' | 'settings' | 'import'>(() => (phone ? 'songs' : 'editor'))
+  const [sharedPaste, setSharedPaste] = useState(launchPaste)
+  const [place, setPlace] = useState<'songs' | 'editor' | 'sets' | 'settings' | 'import'>(() => (sharedPaste ? 'import' : phone ? 'songs' : 'editor'))
   const [showPreview, setShowPreview] = useState(false)
   const [mode, setMode] = useState<'visual' | 'chordpro'>('visual')
   const [menuOpen, setMenuOpen] = useState(false)
@@ -385,6 +389,7 @@ export function App() {
       <aside className="library">
         <div className="brand"><span>Chord Sheet Maker</span></div>
         <input ref={searchRef} className="search" aria-label="Search songs" placeholder="Search songs" value={query} onChange={(event) => setQuery(event.target.value)} />
+        {phone && <button className="primary import-cta" type="button" onClick={() => setPlace('import')}>Paste a chart</button>}
         <div className="library-scroll">
           {visible.length === 0 && <p className="empty">No songs match.</p>}
           {visible.map((song) => (
@@ -497,6 +502,7 @@ export function App() {
                   </button>
                 </div>
               </div>
+              <PhoneDetails phone={phone}>
               <div className="properties">
                 <span className="meta">Tempo</span>
                 <DetailField label="Tempo" value={editor.song.tempo ? String(editor.song.tempo) : ''} onCommit={(tempo) => { const value = Number(tempo); setEditor(setSongDetails(editor, { tempo: tempo.trim() && Number.isFinite(value) ? value : undefined })) }} />
@@ -511,6 +517,7 @@ export function App() {
                 <span className="meta">Original key</span>
                 <DetailField label="Original key" value={formatKey(editor.song.originalKey)} onCommit={(text) => { try { setEditor(setSongDetails(editor, { originalKey: parseKey(text) })) } catch { announce(`‘${text}’ isn't a key`) } }} />
               </div>
+              </PhoneDetails>
               <div className="chips" aria-label="Arrangement">
                 {editor.song.arrangement.map((item, index) => {
                   const section = editor.song.sections.find((candidate) => candidate.id === item.sectionId)
@@ -569,7 +576,7 @@ export function App() {
           </div>
         </main>
       )}
-      {place === 'import' && <main className="editor"><ImportScreen onCancel={() => setPlace('editor')} onSave={(song) => { void library.current.saveSong(song); setSongs((current) => [song, ...current.filter((item) => item.id !== song.id)]); const opened = openEditor(song); setEditor({ ...opened, prefs: settings.prefs }); setPlace('editor') }} /></main>}
+      {place === 'import' && <main className="editor"><ImportScreen phone={phone} shared={sharedPaste} onCancel={() => { setSharedPaste(null); setPlace(phone ? 'songs' : 'editor') }} onSave={(song) => { setSharedPaste(null); void library.current.saveSong(song); setSongs((current) => [song, ...current.filter((item) => item.id !== song.id)]); const opened = openEditor(song); setEditor({ ...opened, prefs: settings.prefs }); setPlace('editor') }} /></main>}
       {place === 'sets' && <main className="editor"><SetlistScreen songs={songs} setlists={setlists} onCreate={() => { const setlist: Setlist = { id: crypto.randomUUID(), name: 'Sunday', date: new Date().toISOString().slice(0, 10), entries: [] }; setSetlists((current) => [...current, setlist]); void library.current.saveSetlist(setlist) }} onChange={(setlist) => { setSetlists((current) => current.map((item) => item.id === setlist.id ? setlist : item)); void library.current.saveSetlist(setlist) }} onDelete={(id) => { setSetlists((current) => current.filter((item) => item.id !== id)); void library.current.deleteSetlist(id) }} onExport={(setlist) => setSetlistExport(setlist)} onStage={(setlist) => { const ordered = setlist.entries.flatMap((entry) => { const song = songs.find((item) => item.id === entry.songId); return song ? [{ song, concert: entry.key ?? song.originalKey, capo: entry.capo ?? 0 }] : [] }); if (ordered.length > 0) setPerformance({ mode: 'stage', entries: ordered, nashville: false }) }} /></main>}
       {place === 'settings' && <main className="editor"><SettingsScreen settings={settings} onChange={(next) => { setSettings(next); void library.current.saveSettings(next); document.documentElement.dataset.theme = next.theme === 'system' ? '' : next.theme; document.documentElement.dataset.size = next.textSize; try { localStorage.setItem('csm-theme', next.theme) } catch { /* ignore */ } setEditor((state) => state && { ...state, prefs: next.prefs, concert: keyFromPitch(notePitch(state.concert.tonic), state.concert.mode, next.prefs) }) }} onBackup={() => { const backup: BackupFile = { version: 1, songs, setlists, settings }; const blob = new Blob([JSON.stringify(backup, null, 2)], { type: 'application/json' }); const url = URL.createObjectURL(blob); const link = document.createElement('a'); link.href = url; link.download = 'chord-sheet-backup.json'; link.click(); URL.revokeObjectURL(url) }} onRestore={(file) => void restoreBackup(file)} /></main>}
       {place === 'editor' && layout && <PreviewPane layout={layout} onExport={() => setExportOpen(true)} onBack={phone ? () => setShowPreview(false) : undefined} />}
@@ -618,6 +625,16 @@ function meterLabel(song: Song): string | null {
   if (song.timeSignature?.trim()) parts.push(song.timeSignature.trim())
   if (song.tempo) parts.push(`${song.tempo} BPM`)
   return parts.length > 0 ? parts.join(' · ') : null
+}
+
+function PhoneDetails({ phone, children }: { phone: boolean; children: ReactNode }) {
+  if (!phone) return <>{children}</>
+  return (
+    <details className="song-details">
+      <summary>Details</summary>
+      {children}
+    </details>
+  )
 }
 
 function DetailField({ label, value, onCommit, className = 'field', placeholder }: { label: string; value: string; onCommit: (value: string) => void; className?: string; placeholder?: string }) {
