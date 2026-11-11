@@ -99,25 +99,35 @@ export function Chart({
               </button>
             )}
             <input key={`${section.id}:${section.label}`} className="section-label" size={Math.max(4, section.label.length)} aria-label={`${section.label} name`} defaultValue={section.label} disabled={readOnly} onBlur={(event) => onRename(section.id, event.target.value)} onKeyDown={(event) => { if (event.key === 'Enter') event.currentTarget.blur() }} />
-            {!readOnly && (
+            {!readOnly && compact && (
+              <button
+                className="section-menu-button section-delete"
+                type="button"
+                aria-label={`Delete ${section.label}`}
+                title="Delete section"
+                onClick={(event) => {
+                  event.stopPropagation()
+                  if (window.confirm(`Delete “${section.label}”? Its lines leave this import.`)) onDeleteSection(section.id)
+                }}
+              >
+                <Trash2 size={15} aria-hidden="true" />
+              </button>
+            )}
+            {!readOnly && !compact && (
               <span className="section-actions">
                 <SectionMenu label={section.label} open={openMenu === section.id} onOpen={(open) => setOpenMenu(open ? section.id : null)}>
-                  {!compact && (
-                    <>
-                      <button type="button" role="menuitem" disabled={sectionIndex === 0} onClick={() => onMoveSection(section.id, -1)}>
-                        <ArrowUp size={14} aria-hidden="true" />Move up
-                      </button>
-                      <button type="button" role="menuitem" disabled={sectionIndex === song.sections.length - 1} onClick={() => onMoveSection(section.id, 1)}>
-                        <ArrowDown size={14} aria-hidden="true" />Move down
-                      </button>
-                      <button type="button" role="menuitem" onClick={() => onDuplicate(section.id)}>
-                        <Copy size={14} aria-hidden="true" />Duplicate
-                      </button>
-                      <button type="button" role="menuitem" onClick={() => setNoteDraft(section.id)}>
-                        <StickyNote size={14} aria-hidden="true" />Add note
-                      </button>
-                    </>
-                  )}
+                  <button type="button" role="menuitem" disabled={sectionIndex === 0} onClick={() => onMoveSection(section.id, -1)}>
+                    <ArrowUp size={14} aria-hidden="true" />Move up
+                  </button>
+                  <button type="button" role="menuitem" disabled={sectionIndex === song.sections.length - 1} onClick={() => onMoveSection(section.id, 1)}>
+                    <ArrowDown size={14} aria-hidden="true" />Move down
+                  </button>
+                  <button type="button" role="menuitem" onClick={() => onDuplicate(section.id)}>
+                    <Copy size={14} aria-hidden="true" />Duplicate
+                  </button>
+                  <button type="button" role="menuitem" onClick={() => setNoteDraft(section.id)}>
+                    <StickyNote size={14} aria-hidden="true" />Add note
+                  </button>
                   <button type="button" role="menuitem" className="danger" onClick={() => onDeleteSection(section.id)}>
                     <Trash2 size={14} aria-hidden="true" />Delete
                   </button>
