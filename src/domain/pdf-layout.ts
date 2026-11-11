@@ -169,7 +169,8 @@ export function blockHeight(
   let raw: number
   if (block.kind === 'section')
     raw = sectionBlockHeight(sectionLeadIn, headingSize)
-  else if (block.kind === 'comment' || block.kind === 'pointer') raw = 16
+  else if (block.kind === 'comment') raw = 24
+  else if (block.kind === 'pointer') raw = 16
   else if (block.kind === 'bars') raw = Math.ceil(fontSize * 1.7)
   else if (block.chords.length === 0) raw = Math.ceil(fontSize * 1.35)
   else {
@@ -216,16 +217,10 @@ function readDisplay(options: PdfOptions) {
 
 function headerMeta(song: Song, options: PdfOptions): string {
   const display = readDisplay(options)
-  const prefs = options.prefs ?? DEFAULT_PREFS
-  const keyName = formatKey(options.concert)
-  const shape = formatKey(shiftKey(options.concert, -options.capo, prefs))
   return [
-    display.showKey ? `Key ${keyName}` : null,
+    display.showKey ? `Key ${formatKey(options.concert)}` : null,
     display.showTime ? song.timeSignature : null,
     display.showKey && song.tempo ? `${song.tempo} bpm` : null,
-    display.showKey && options.numbers
-      ? `Numbers in ${options.capo > 0 ? shape : keyName}`
-      : null,
   ]
     .filter(Boolean)
     .join('    ')

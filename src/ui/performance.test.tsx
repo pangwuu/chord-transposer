@@ -81,6 +81,95 @@ function renderStage(overrides: { nashville?: boolean } = {}) {
   )
 }
 
+function renderSetlistStage() {
+  const first = songWithChords()
+  const second = { ...songWithChords(), id: 'second', title: 'Second Song' }
+  return render(
+    <StageView
+      entries={[
+        { song: first, concert: first.originalKey, capo: 0 },
+        { song: second, concert: second.originalKey, capo: 0 },
+      ]}
+      nashville={false}
+      prefs={DEFAULT_PREFS}
+      onExit={() => {}}
+    />,
+  )
+}
+
+function swipe(dx: number, dy = 0) {
+  const body = document.querySelector('.stage-body') as HTMLElement
+  fireEvent.touchStart(body, { touches: [{ clientX: 200, clientY: 300 }] })
+  fireEvent.touchEnd(body, { changedTouches: [{ clientX: 200 + dx, clientY: 300 + dy }] })
+}
+
+const stageTitle = () => document.querySelector('.stage-title')?.textContent
+
+describe('StageView header', () => {
+  it('keeps the original key in the badge while transposing', () => {
+    renderStage()
+    expect(document.querySelector('.stage-key')?.textContent).toBe('Original: D')
+    fireEvent.click(screen.getByRole('button', { name: 'Key up a semitone' }))
+    expect(document.querySelector('.stage-key')?.textContent).toBe('Original: D')
+  })
+
+  it('shows the song order under the artist and no Numbers label', () => {
+    renderStage()
+    expect(screen.getByText('Order: Verse 1 · Verse 2 · Verse 3')).toBeTruthy()
+    expect(screen.queryByText('Numbers')).toBeNull()
+  })
+
+  it('goes to the section after the one scrolled to, not after the last one clicked', () => {
+    renderStage()
+    const body = document.querySelector('.stage-body') as HTMLElement
+    const sections = [...document.querySelectorAll<HTMLElement>('[data-stage-section-index]')]
+    const tops = [-400, 0, 300]
+    body.getBoundingClientRect = () => ({ top: 0, bottom: 600, height: 600 }) as DOMRect
+    const scrolled: number[] = []
+    sections.forEach((node, index) => {
+      node.getBoundingClientRect = () => ({ top: tops[index], bottom: tops[index] + 200, height: 200 }) as DOMRect
+      node.scrollIntoView = () => scrolled.push(index)
+    })
+    fireEvent.click(screen.getByRole('button', { name: 'Next section' }))
+    expect(scrolled).toEqual([2])
+    const current = document.querySelector('.stage-section.is-current') as HTMLElement
+    expect(current.dataset.stageSection).toBe('Verse 3')
+  })
+})
+
+describe('StageView setlist songs', () => {
+  it('steps back to the previous song', () => {
+    renderSetlistStage()
+    const previous = screen.getByRole('button', { name: 'Previous song' }) as HTMLButtonElement
+    expect(previous.disabled).toBe(true)
+    fireEvent.click(screen.getByRole('button', { name: 'Next song' }))
+    expect(stageTitle()).toBe('Second Song')
+    expect((screen.getByRole('button', { name: 'Next song' }) as HTMLButtonElement).disabled).toBe(true)
+    fireEvent.click(screen.getByRole('button', { name: 'Previous song' }))
+    expect(stageTitle()).toBe('Keep Smiling')
+  })
+
+  it('swipes left for the next song and right for the previous one', () => {
+    renderSetlistStage()
+    swipe(-120)
+    expect(stageTitle()).toBe('Second Song')
+    swipe(120)
+    expect(stageTitle()).toBe('Keep Smiling')
+  })
+
+  it('ignores a mostly vertical drag so scrolling never changes song', () => {
+    renderSetlistStage()
+    swipe(-90, 200)
+    expect(stageTitle()).toBe('Keep Smiling')
+  })
+
+  it('has no song buttons for a single song', () => {
+    renderStage()
+    expect(screen.queryByRole('button', { name: 'Previous song' })).toBeNull()
+    expect(screen.queryByRole('button', { name: 'Next song' })).toBeNull()
+  })
+})
+
 describe('StageView quiet chart', () => {
   it('shows chords over lyrics with hideable transport, not song edit fields', () => {
     renderStage()

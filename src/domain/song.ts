@@ -523,6 +523,23 @@ export function addBarChord(song: Song, sectionId: string, lineId: string | null
   return next
 }
 
+export function removeLine(song: Song, lineId: string): Song {
+  if (!song.sections.some((section) => section.lines.some((line) => line.id === lineId))) return song
+  const next = structuredClone(song)
+  for (const section of next.sections) section.lines = section.lines.filter((line) => line.id !== lineId)
+  return next
+}
+
+export function setCommentText(song: Song, lineId: string, text: string): Song {
+  const found = song.sections.flatMap((section) => section.lines).find((line) => line.id === lineId)
+  if (!found || found.type !== 'comment' || found.text === text) return song
+  const next = structuredClone(song)
+  for (const section of next.sections) {
+    section.lines = section.lines.map((line) => (line.id === lineId && line.type === 'comment' ? { ...line, text } : line))
+  }
+  return next
+}
+
 export function addLine(song: Song, sectionId: string, line: Line): Song {
   const next = structuredClone(song)
   const section = next.sections.find((item) => item.id === sectionId)

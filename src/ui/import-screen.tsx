@@ -189,8 +189,9 @@ export function ImportScreen({
                 onMoveSection={() => {}}
                 onPlaceSection={() => {}}
                 onAddSection={() => {}}
-                onComment={() => {}}
-                onBars={() => {}}
+                onAddNote={() => {}}
+                onEditNote={() => {}}
+                onRemoveLine={() => {}}
                 onAddBar={(sectionId, lineId) => setEditor(addBarChordOf(editor, sectionId, lineId))}
                 onNudge={(how) => setEditor(nudge(editor, how))}
                 onMove={(id, lineId, index) => setEditor(moveChord(editor, id, lineId, index))}

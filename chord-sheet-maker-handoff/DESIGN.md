@@ -199,10 +199,10 @@ Each screen below lists purpose, layout and key states. Wireframes are approxima
 
 Structure, top to bottom:
 
-1. **Editor bar (48 px):** breadcrumb `Songs / Title` and autosave status (`· Saving…` then `· Saved`); mode switch **Visual | ChordPro**; Undo, Redo, Stage, Projector, (tablet) Preview, Inspector toggle.
-2. **Transport bar:** the key control `[− Key C +]`, Capo button, Nashville toggle `1-4-5`, the transposed chip (`From C · Save as song key`), and on the right the **chord check chip** (`✓ All chords valid` in green, or `⚠ 2 chords to check` in red, which jumps to the first problem when clicked).
+1. **Editor bar (48 px):** breadcrumb `Songs / Title` and autosave status (`· Saving…` then `· Saved`); mode switch **Visual | ChordPro**; Performance view (guitar icon, with a label on laptop), **Export PDF** ("Export" on phone; its dialog has its own preview, so there is no Preview toggle), Menu (Undo, Redo, editor mode, ChordPro download, share link, Projector, delete).
+2. **Transport bar:** the key control `[− Key C +]`, Capo button, Nashville toggle `1-4-5`, the transposed chip (`From C · Save as song key`), and, on the same line just right of `1-4-5`, the **chord check mark**: a small green ✓ (labelled "All chords valid") or a red ⚠ followed by the count (labelled "2 chords to check"), which jumps to the first problem when clicked. It never takes a line of its own.
 3. **Document column** (max 760 px, Notion-style): title (editable inline), properties table (Artist, Key, Tempo · Time, Arrangement), the **capo banner** when a capo is set (`♫ Capo 4 · showing G shapes · sounds in B`), a hairline, then sections.
-4. **Sections:** label (editable inline; Enter commits), a faint kind tag only when the label doesn't already say it (e.g. "Final refrain / tag" shows REFRAIN), and hover actions (Duplicate, Delete, More ⋯). A drag grip appears in the left gutter on hover.
+4. **Sections:** label (editable inline; Enter commits), a faint kind tag only when the label doesn't already say it (e.g. "Final refrain / tag" shows REFRAIN), and one ⋯ button beside the label that opens the section menu (§4.x Sections). A drag grip appears in the left gutter on hover (not on touch screens).
 5. **Lines:** three kinds.
    - **Lyric line:** chord row (21 px) above a lyric row (22 px), both monospace. Chords are absolutely positioned at the column of their character index.
    - **Bar line:** `C - - - | F/A - - - |` in mono. Chords are bold, separators faint. Each chord can be selected and edited; it moves by beat, not by letter.
@@ -312,10 +312,10 @@ Two modes.
 ### 4.7 Section management
 
 - **Rename:** click the label (contenteditable), Enter or blur commits.
-- **Hover actions:** Duplicate, Delete (toast with Undo), More ⋯ menu: Move up / Move down (⌥⇧↑/↓), Duplicate (⌘D), Add chord-only bar line, Add comment line, Add to arrangement, Delete section (⌘⌫).
+- **Section menu:** one ⋯ button next to the label opens a small popover: Move up / Move down (⌥⇧↑/↓), Duplicate (⌘D), Add note, Delete (toast with Undo). A **note** ("Quiet, then build") is a small boxed line at the end of the section: edit it in place, remove it with ×. Notes print as a boxed line on the PDF and show as a boxed amber line on stage. Keeping these in one menu keeps the chart quiet, especially on a phone.
 - **Reorder:** drag the grip in the left gutter. A 2 px purple insertion line shows the drop point. Keyboard: ⌥⇧↑/↓.
 - **Add section:** opens a kind menu (Intro, Verse n, Pre-Chorus, Chorus, Bridge, Tag, Instrumental, Interlude, Outro, Custom…). The new section gets one empty lyric line with placeholder text and its label is selected for typing.
-- **Arrangement row** (in the properties table): chips in performance order, chorus-like chips tinted purple. Drag to reorder, click a chip for `×2`, `Repeat`, `Remove`. `+ Add` lists sections. Reusing a section never copies its content (SPEC §4.3).
+- **Arrangement row:** a plain muted line, `ORDER Verse 1 · Chorus ×2 · Verse 2`, no pills. Drag to reorder, click an item for `×2`, `Repeat`, `Remove`. `+ Add` lists sections. Reusing a section never copies its content (SPEC §4.3).
 - **Lyric text editing:** double-click a lyric row (or press ↵ with the caret in a line) to edit the text inline. Chord anchors follow their characters by diffing the old and new text; a chord whose character is deleted moves to the nearest surviving character and is briefly flashed. (Not in the mockup: the mockup edits text through ChordPro mode.)
 
 ### 4.8 ChordPro mode
@@ -349,7 +349,7 @@ Pasted text · chords-over-lyrics detected. Check it before it's saved.
 
 ### 4.10 PDF preview pane and export dialog
 
-**Preview pane:** header `Preview · A4 · 2 pages · key C` with **Export PDF** (primary). Pages are rendered at true A4 proportions (595×842 pt) and scaled to the pane width, with a `Page n` label above each one, 18 px apart on `--bg-canvas`. The selected chord is outlined in purple on the page. Clicking a line on a page scrolls the editor to it.
+**Preview pane:** header `Preview · A4 · 2 pages · key C` with **Export PDF** (primary) on phone; on wider screens Export PDF sits in the editor bar instead. Pages are rendered at true A4 proportions (595×842 pt) and scaled to the pane width, with a `Page n` label above each one, 18 px apart on `--bg-canvas`. The selected chord is outlined in purple on the page. Clicking a line on a page scrolls the editor to it.
 
 **Export dialog** (modal, 720 px):
 
@@ -372,11 +372,11 @@ Options update the preview pane live behind the dialog. On phone the dialog beco
 
 ### 4.11 Setlists
 
-Two columns on laptop: a list of setlists (name, date, song count, `+ New setlist`) and the selected setlist. Each song row has a drag grip, number, title, notes ("Capo 4 for acoustic"), a key badge (click for the key popover), capo and shapes, and a ⋯ menu. Header actions: **Share**, **Stage** (steps through the set), **Export PDF** (one file; each song starts on a new page; footer `Song 2 of 4 · Page 1 of 2`; option to start each song on a left-hand page for two-up stands). On phone the two columns stack.
+Two columns on laptop: a list of setlists (name, date, song count, `+ New setlist`; a new setlist starts with an empty name and date, never a made-up one) and the selected setlist. Each song row has a drag grip, number, title, notes ("Capo 4 for acoustic"), a key badge (click for the key popover), capo and shapes, and a ⋯ menu. Header actions: **Perform** (steps through the set on stage), **Export PDF** (one file; each song starts on a new page; footer `Song 2 of 4 · Page 1 of 2`; an Accidentals choice of Follow the key, Flats or Sharps applies to that export only). On phone the two columns stack.
 
 ### 4.12 Stage view
 
-Full-screen Quiet Chart reading mode, always dark (`#050505`), regardless of theme. Solid header (`#242424`, not a fade): **Exit**, key badge, Speed / **Autoscroll**, **Next section**, and **Next song** when staging a setlist, plus the editor transport pills (transpose, Capo, ♭/♯, Nashville `1-4-5`). An eye at the end of the header stays on screen. Open eye shows the header; closed eye hides it and leaves only the icon. The header does not auto-hide and sits above the title. Controls are session-local and do not write back to the editor on Exit. Body is continuous scroll: serif title + artist, in-flow section headings (not sticky), mono lyrics with warm chord labels above (`#f0b429`). Autoscroll defaults to **0.8** and nudges in **0.1** steps (range 0.1–12). Long lines wrap with a 2ch hanging indent (same rules as PDF). Screen Wake Lock is on while open. Escape exits; Space toggles autoscroll. Prototype variants (Focus Column, Spotlight) live on branch `cursor/quiet-chart-stage-a1fb`.
+Full-screen Quiet Chart reading mode, always dark (`#050505`), regardless of theme. Solid header (`#242424`, not a fade): **Exit**, an `Original: C` badge that never changes while you transpose, the transport pills (no Numbers label), Speed / **Autoscroll**, **Next section** (goes to the section after the one at the top of the screen, even if you scrolled there), and **Previous song** / **Next song** when staging a setlist (a horizontal swipe on the chart does the same on touch screens), all on one line that scrolls sideways on a phone. Under the artist: `Order: Verse 1 · Chorus · …`. An eye at the end of the header stays on screen. Open eye shows the header; closed eye hides it and leaves only the icon. The header does not auto-hide and sits above the title. Controls are session-local and do not write back to the editor on Exit. Body is continuous scroll: serif title + artist, in-flow section headings (not sticky), mono lyrics with warm chord labels above (`#f0b429`). Autoscroll defaults to **0.8** and nudges in **0.1** steps (range 0.1–12). Long lines wrap with a 2ch hanging indent (same rules as PDF). Screen Wake Lock is on while open. Escape exits; Space toggles autoscroll. Prototype variants (Focus Column, Spotlight) live on branch `cursor/quiet-chart-stage-a1fb`.
 
 ### 4.13 Projector view
 
@@ -566,7 +566,7 @@ Order: Intro · V1 · Intro · V2 · Intro · V3 · Intro · V4 · Tag · Intro 
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━  ← 1 pt rule
 ```
 
-The capo box is the one boxed element on the page, so a guitarist can't miss it on a music stand. In Nashville mode the meta line adds `Numbers in G`.
+The capo box is the one boxed element on the page, so a guitarist can't miss it on a music stand. In Nashville mode the meta line stays the same: the key it already names is the key the numbers count from (with a capo, the capo box names the shapes).
 
 ### 9.3 Running header (pages 2+)
 

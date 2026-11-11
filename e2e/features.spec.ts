@@ -9,6 +9,10 @@ async function songs(page: Page, project: string) {
   if (mobile(project)) await page.locator('.phone-tabs').getByRole('button', { name: 'Songs' }).click()
 }
 
+function exportButton(page: Page) {
+  return page.locator('.editor-bar').getByRole('button', { name: /^Export/ })
+}
+
 async function editorAction(page: Page, name: string) {
   await page.getByRole('button', { name: 'More actions' }).click()
   await page.getByRole('menuitem', { name, exact: true }).click()
@@ -67,21 +71,47 @@ test('keeps bar-line chords on the bar line', async ({ page }, testInfo) => {
   expect(chordBox!.y).toBeGreaterThan((headerBox?.y ?? 0) + (headerBox?.height ?? 0))
 })
 
-test('adds a comment, a bar line, and an arrangement repeat', async ({ page }) => {
+async function sectionAction(page: Page, section: string, name: string) {
+  await page.getByRole('button', { name: `${section} actions` }).click()
+  await page.getByRole('menuitem', { name, exact: true }).click()
+}
+
+async function sectionLabels(page: Page) {
+  return page.locator('.document .section-label').evaluateAll((nodes) => nodes.map((node) => (node as HTMLInputElement).value))
+}
+
+test('moves, duplicates and deletes a section from one actions menu', async ({ page }) => {
   await openFirstSong(page)
-  const comment = page.getByRole('button', { name: 'Comment' }).first()
-  await comment.click()
-  await expect(page.getByLabel('Comment')).toBeVisible()
-  await comment.click()
-  await expect(page.getByLabel('Comment')).toHaveCount(0)
-  await comment.click()
-  await page.getByLabel('Comment').fill('Build')
-  await page.getByLabel('Comment').press('Enter')
-  await expect(page.locator('.comment').filter({ hasText: 'Build' })).toBeVisible()
-  await page.getByRole('button', { name: 'Bars' }).first().click()
-  await page.getByLabel('Bar line').fill('| C - - - |')
-  await page.getByLabel('Bar line').press('Enter')
-  await expect(page.locator('.bars').getByRole('button', { name: 'C', exact: true })).toBeVisible()
+  await expect(page.getByLabel('Verse 1 name')).toBeVisible()
+  await expect(page.locator('.section-actions').first().getByRole('button')).toHaveCount(1)
+  await sectionAction(page, 'Verse 1', 'Move down')
+  await expect.poll(() => sectionLabels(page)).toEqual(['Verse 2', 'Verse 1', 'Verse 3', 'Verse 4'])
+  await sectionAction(page, 'Verse 1', 'Move up')
+  await expect.poll(() => sectionLabels(page)).toEqual(['Verse 1', 'Verse 2', 'Verse 3', 'Verse 4'])
+  await sectionAction(page, 'Verse 2', 'Duplicate')
+  await expect.poll(() => sectionLabels(page)).toEqual(['Verse 1', 'Verse 2', 'Verse 2 copy', 'Verse 3', 'Verse 4'])
+  await sectionAction(page, 'Verse 2 copy', 'Delete')
+  await expect.poll(() => sectionLabels(page)).toEqual(['Verse 1', 'Verse 2', 'Verse 3', 'Verse 4'])
+  await expect(page.getByRole('status')).toContainText('Deleted Verse 2 copy')
+})
+
+test('adds, edits and removes a note, and repeats an arrangement item', async ({ page }) => {
+  await openFirstSong(page)
+  await sectionAction(page, 'Verse 1', 'Add note')
+  await expect(page.getByLabel('New note')).toBeVisible()
+  await page.getByLabel('New note').press('Escape')
+  await expect(page.getByLabel('New note')).toHaveCount(0)
+  await sectionAction(page, 'Verse 1', 'Add note')
+  await page.getByLabel('New note').fill('Quiet, then build')
+  await page.getByLabel('New note').press('Enter')
+  const note = page.getByLabel('Note', { exact: true })
+  await expect(note).toHaveValue('Quiet, then build')
+  await expect(page.locator('.paper .paper-note').filter({ hasText: 'Quiet, then build' }).first()).toBeAttached()
+  await note.fill('All in')
+  await note.press('Enter')
+  await expect(note).toHaveValue('All in')
+  await page.getByRole('button', { name: 'Remove note' }).click()
+  await expect(note).toHaveCount(0)
   await page.getByRole('button', { name: 'Verse 1', exact: true }).click()
   await expect(page.getByRole('button', { name: 'Verse 1 ×2' })).toBeVisible()
 })
@@ -170,8 +200,8 @@ test('scrolls a setlist export when the pages run past the window', async ({ pag
       : page.locator('.side-nav').getByRole('button', { name: 'Setlists' })
   await setlists.click()
   await page.getByRole('button', { name: '+ New setlist' }).click()
-  await page.getByLabel('Add a song to Sunday').selectOption({ label: 'Amazing Grace' })
-  await page.getByLabel('Add a song to Sunday').selectOption({ label: 'First Light' })
+  await page.getByLabel('Add a song').selectOption({ label: 'Amazing Grace' })
+  await page.getByLabel('Add a song').selectOption({ label: 'First Light' })
   await page.getByRole('button', { name: 'Export PDF' }).click()
   const dialog = page.getByRole('dialog', { name: 'Export setlist PDF' })
   await expect(dialog).toBeVisible()
@@ -188,8 +218,7 @@ test('scrolls a setlist export when the pages run past the window', async ({ pag
 test('previews a song PDF beside the export settings and scrolls it', async ({ page }, testInfo) => {
   await page.setViewportSize({ width: testInfo.project.name === 'mobile' ? 390 : 1280, height: 640 })
   await openFirstSong(page)
-  if (mobile(testInfo.project.name)) await page.getByRole('button', { name: 'Preview' }).click()
-  await page.getByRole('button', { name: 'Export PDF' }).click()
+  await exportButton(page).click()
   const dialog = page.getByRole('dialog', { name: 'Export PDF' })
   const paper = dialog.locator('.paper').first()
   const paperChoice = dialog.getByLabel('Paper')
@@ -223,13 +252,9 @@ test('leaves room between a section heading and its first line in the preview', 
   expect(gap).toBeGreaterThan(8)
 })
 
-test('changes the PDF paper and fit from the export dialog', async ({ page }, testInfo) => {
+test('changes the PDF paper and fit from the export dialog', async ({ page }) => {
   await openFirstSong(page)
-  if (mobile(testInfo.project.name)) {
-    await page.getByRole('button', { name: 'Preview' }).click()
-    await expect(page.getByRole('button', { name: 'Back' })).toBeVisible()
-  }
-  await page.getByRole('button', { name: 'Export PDF' }).click()
+  await exportButton(page).click()
   const dialog = page.getByRole('dialog')
   await expect(dialog).toContainText('Amazing Grace - G.pdf')
   await page.getByLabel('Paper').selectOption('letter')
@@ -237,17 +262,13 @@ test('changes the PDF paper and fit from the export dialog', async ({ page }, te
   await expect(dialog).toContainText('1 page')
   await page.getByRole('button', { name: 'Cancel' }).click()
   await expect(dialog).toHaveCount(0)
-  if (mobile(testInfo.project.name)) {
-    await page.getByRole('button', { name: 'Back' }).click()
-    await expect(page.getByLabel('Title')).toBeVisible()
-  }
+  await expect(page.getByLabel('Title')).toBeVisible()
 })
 
 test('pads the export Cancel and Download actions evenly', async ({ page }, testInfo) => {
   await page.setViewportSize({ width: testInfo.project.name === 'mobile' ? 390 : 1280, height: 640 })
   await openFirstSong(page)
-  if (mobile(testInfo.project.name)) await page.getByRole('button', { name: 'Preview' }).click()
-  await page.getByRole('button', { name: 'Export PDF' }).click()
+  await exportButton(page).click()
   const dialog = page.getByRole('dialog', { name: 'Export PDF' })
   const actions = dialog.locator('.row-meta')
   const cancel = dialog.getByRole('button', { name: 'Cancel' })
@@ -283,7 +304,7 @@ test('steps a projector slide and leaves the stage', async ({ page }) => {
   await expect(page.locator('.projector')).toContainText('grace that taught')
   await page.getByRole('button', { name: 'Exit' }).click()
   await expect(page.locator('.projector')).toHaveCount(0)
-  await editorAction(page, 'Performance View')
+  await page.getByRole('button', { name: 'Performance view' }).click()
   await expect(page.locator('.stage')).toContainText('Amazing grace')
   await page.getByRole('button', { name: 'Next section' }).click()
   await page.getByRole('button', { name: 'Exit' }).click()
@@ -342,7 +363,7 @@ test('keeps the setlist when delete confirmation is cancelled', async ({ page },
       : page.locator('.side-nav').getByRole('button', { name: 'Setlists' })
   await setlists.click()
   await page.getByRole('button', { name: '+ New setlist' }).click()
-  await expect(page.getByLabel('Setlist name')).toHaveValue('Sunday')
+  await page.getByLabel('Setlist name').fill('Sunday')
   page.once('dialog', (dialog) => {
     expect(dialog.message()).toMatch(/Delete setlist “Sunday”/)
     void dialog.dismiss()
@@ -383,4 +404,111 @@ test('fixes an import in review and saves the fix', async ({ page }, testInfo) =
   await page.getByLabel('Imported title').fill('Kitchen Table')
   await page.getByRole('button', { name: 'Save song' }).click()
   await expect(page.getByLabel('Title')).toHaveValue('Kitchen Table')
+})
+
+test('keeps the chord check as a small mark beside Numbers', async ({ page }) => {
+  await openFirstSong(page)
+  const numbers = page.getByRole('group', { name: 'Nashville numbers' })
+  const valid = page.getByLabel('All chords valid')
+  await expect(valid).toBeVisible()
+  await expect(page.getByText('All chords valid', { exact: true })).toHaveCount(0)
+  const numbersBox = await numbers.boundingBox()
+  const validBox = await valid.boundingBox()
+  expect(validBox!.x).toBeGreaterThan(numbersBox!.x + numbersBox!.width - 1)
+  expect(Math.abs(validBox!.y + validBox!.height / 2 - (numbersBox!.y + numbersBox!.height / 2))).toBeLessThan(6)
+
+  await page.locator('.letter').nth(4).click()
+  await page.getByLabel('Chord name').fill('Hx7')
+  await page.getByLabel('Chord name').press('Enter')
+  const warn = page.getByRole('button', { name: '1 chord to check' })
+  await expect(warn).toHaveText('1')
+  await expect(valid).toHaveCount(0)
+})
+
+test('shows the arrangement as a plain line, not pills', async ({ page }) => {
+  await openFirstSong(page)
+  const order = page.getByRole('group', { name: 'Arrangement' })
+  await expect(order.getByRole('button', { name: 'Verse 1', exact: true })).toBeVisible()
+  await expect(order.locator('.chip')).toHaveCount(0)
+})
+
+test('puts Export PDF and Performance view in the editor bar', async ({ page }) => {
+  await openFirstSong(page)
+  const bar = page.locator('.editor-bar')
+  await bar.getByRole('button', { name: 'Performance view' }).click()
+  await expect(page.locator('.stage')).toContainText('Amazing grace')
+  await page.getByRole('button', { name: 'Exit' }).click()
+  await expect(page.getByRole('button', { name: 'Preview' })).toHaveCount(0)
+  await expect(page.getByRole('button', { name: /^Export/ })).toHaveCount(1)
+  await exportButton(page).click()
+  await expect(page.getByRole('dialog', { name: 'Export PDF' })).toBeVisible()
+  await expect(page.locator('.editor-bar .lucide-guitar')).toBeVisible()
+})
+
+async function openSongExport(page: Page) {
+  await exportButton(page).click()
+  return page.getByRole('dialog', { name: 'Export PDF' })
+}
+
+test('warns under the export settings when a chord is not recognised', async ({ page }) => {
+  await openFirstSong(page)
+  let dialog = await openSongExport(page)
+  await expect(dialog.getByText(/isn't recognised/)).toHaveCount(0)
+  await dialog.getByRole('button', { name: 'Cancel' }).click()
+
+  await page.locator('.letter').nth(4).click()
+  await page.getByLabel('Chord name').fill('Hx7')
+  await page.getByLabel('Chord name').press('Enter')
+  dialog = await openSongExport(page)
+  const warning = dialog.getByText("1 chord isn't recognised and will print as typed")
+  await expect(warning).toBeVisible()
+  const fields = await dialog.getByLabel('Show section divider').boundingBox()
+  const warningBox = await warning.boundingBox()
+  expect(warningBox!.y).toBeGreaterThan(fields!.y)
+})
+
+test('picks flats or sharps for a song PDF', async ({ page }) => {
+  await openFirstSong(page)
+  await page.getByRole('combobox', { name: 'Key' }).selectOption('Db')
+  const dialog = await openSongExport(page)
+  const paper = dialog.locator('.paper').first()
+  await dialog.getByLabel('Accidentals').selectOption('sharps')
+  await expect(paper).toContainText('F#')
+  await expect(paper).toContainText('Key C#')
+  await dialog.getByLabel('Accidentals').selectOption('flats')
+  await expect(paper).toContainText('Gb')
+  await expect(paper).toContainText('Key Db')
+})
+
+test('picks flats or sharps for a setlist PDF', async ({ page }, testInfo) => {
+  await page.goto('/')
+  const setlists = mobile(testInfo.project.name)
+    ? page.locator('.phone-tabs').getByRole('button', { name: 'Setlists' })
+    : page.locator('.side-nav').getByRole('button', { name: 'Setlists' })
+  await setlists.click()
+  await page.getByRole('button', { name: '+ New setlist' }).click()
+  await page.getByLabel('Add a song').selectOption({ label: 'Amazing Grace' })
+  await page.getByLabel('Key for Amazing Grace').selectOption('Db')
+  await page.getByRole('button', { name: 'Export PDF' }).click()
+  const dialog = page.getByRole('dialog', { name: 'Export setlist PDF' })
+  const paper = dialog.locator('.paper').first()
+  await dialog.getByLabel('Accidentals').selectOption('sharps')
+  await expect(paper).toContainText('F#')
+  await expect(paper).toContainText('Key C#')
+  await dialog.getByLabel('Accidentals').selectOption('flats')
+  await expect(paper).toContainText('Gb')
+})
+
+test('starts a setlist without a made-up name and keeps Add song compact', async ({ page }, testInfo) => {
+  await page.goto('/')
+  const setlists = mobile(testInfo.project.name)
+    ? page.locator('.phone-tabs').getByRole('button', { name: 'Setlists' })
+    : page.locator('.side-nav').getByRole('button', { name: 'Setlists' })
+  await setlists.click()
+  await page.getByRole('button', { name: '+ New setlist' }).click()
+  await expect(page.getByLabel('Setlist name')).toHaveValue('')
+  await expect(page.getByLabel('Setlist name')).toHaveAttribute('placeholder', 'Setlist name')
+  await expect(page.getByLabel('Setlist date')).toHaveValue('')
+  const add = await page.getByLabel('Add a song').boundingBox()
+  expect(add!.width).toBeLessThanOrEqual(260)
 })

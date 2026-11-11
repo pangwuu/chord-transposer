@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState, type ReactNode, type RefObject } from 'react'
+import { Guitar } from 'lucide-react'
 import { formatKey, parseKey } from '../domain/chord'
 import type { Setlist, SetlistEntry } from '../domain/library-types'
 import type { Song } from '../domain/song'
@@ -20,12 +21,11 @@ export function SetlistScreen({
   onCreate: () => void
   onChange: (setlist: Setlist) => void
   onDelete: (id: string) => void
-  onExport: (setlist: Setlist, rightHand: boolean) => void
+  onExport: (setlist: Setlist) => void
   onStage: (setlist: Setlist) => void
 }) {
   const rootRef = useRef<HTMLDivElement>(null)
   const narrow = useNarrowPane(rootRef, NARROW_PANE)
-  const [rightHand, setRightHand] = useState(false)
   const [openedId, setOpenedId] = useState<string | null>(null)
   const [extra, setExtra] = useState<{ index: number; field: 'capo' | 'notes' } | null>(null)
   const seen = useRef<Set<string> | null>(null)
@@ -69,8 +69,8 @@ export function SetlistScreen({
                   aria-current={shown?.id === setlist.id ? 'true' : undefined}
                   onClick={() => { setExtra(null); setOpenedId(setlist.id) }}
                 >
-                  <strong>{setlist.name}</strong>
-                  <span className="meta">{setlist.date} · {songCount(setlist.entries.length)}</span>
+                  <strong>{setlistName(setlist)}</strong>
+                  <span className="meta">{[setlist.date, songCount(setlist.entries.length)].filter(Boolean).join(' · ')}</span>
                 </button>
               ))}
             </div>
@@ -81,10 +81,8 @@ export function SetlistScreen({
             setlist={shown}
             songs={songs}
             narrow={narrow}
-            rightHand={rightHand}
             extra={extra}
             onBack={() => { setExtra(null); setOpenedId(null) }}
-            onRightHand={setRightHand}
             onChange={onChange}
             onDelete={(id) => { setOpenedId(null); onDelete(id) }}
             onExport={onExport}
@@ -101,10 +99,8 @@ function SetlistDetail({
   setlist,
   songs,
   narrow,
-  rightHand,
   extra,
   onBack,
-  onRightHand,
   onChange,
   onDelete,
   onExport,
@@ -114,13 +110,11 @@ function SetlistDetail({
   setlist: Setlist
   songs: Song[]
   narrow: boolean
-  rightHand: boolean
   extra: { index: number; field: 'capo' | 'notes' } | null
   onBack: () => void
-  onRightHand: (value: boolean) => void
   onChange: (setlist: Setlist) => void
   onDelete: (id: string) => void
-  onExport: (setlist: Setlist, rightHand: boolean) => void
+  onExport: (setlist: Setlist) => void
   onStage: (setlist: Setlist) => void
   onExtra: (extra: { index: number; field: 'capo' | 'notes' } | null) => void
 }) {
@@ -128,21 +122,19 @@ function SetlistDetail({
     <article className="setlist-detail">
       {narrow && <button className="text-button setlist-back" type="button" onClick={onBack}>‹ Setlists</button>}
       <div className="setlist-detail-head">
-        <input className="field setlist-name" aria-label="Setlist name" value={setlist.name} onChange={(event) => onChange({ ...setlist, name: event.target.value })} />
+        <input className="field setlist-name" aria-label="Setlist name" placeholder="Setlist name" autoFocus={setlist.name === '' && setlist.entries.length === 0} value={setlist.name} onChange={(event) => onChange({ ...setlist, name: event.target.value })} />
         <input className="field setlist-date" aria-label="Setlist date" type="date" value={setlist.date} onChange={(event) => onChange({ ...setlist, date: event.target.value })} />
         <div className="setlist-actions">
-          <button className="primary" type="button" onClick={() => onExport(setlist, rightHand)}>Export PDF</button>
+          <button className="outline setlist-perform" type="button" disabled={setlist.entries.length === 0} onClick={() => onStage(setlist)}>
+            <Guitar size={16} strokeWidth={1.75} aria-hidden="true" />Perform
+          </button>
+          <button className="primary" type="button" onClick={() => onExport(setlist)}>Export PDF</button>
           <Menu label="Setlist actions">
-            <button type="button" role="menuitem" onClick={() => onStage(setlist)}>Stage</button>
-            <label className="menu-check">
-              <input type="checkbox" checked={rightHand} onChange={(event) => onRightHand(event.target.checked)} />
-              Right-hand pages
-            </label>
             <button
               type="button"
               role="menuitem"
               onClick={() => {
-                if (!window.confirm(`Delete setlist “${setlist.name}”? This cannot be undone.`)) return
+                if (!window.confirm(`Delete setlist “${setlistName(setlist)}”? This cannot be undone.`)) return
                 onDelete(setlist.id)
               }}
             >
@@ -202,7 +194,7 @@ function SetlistDetail({
       })}
       <select
         className="select setlist-add"
-        aria-label={`Add a song to ${setlist.name}`}
+        aria-label="Add a song"
         value=""
         onChange={(event) => { if (event.target.value) onChange({ ...setlist, entries: [...setlist.entries, { songId: event.target.value }] }) }}
       >
@@ -265,6 +257,10 @@ function entrySummary(entry: SetlistEntry): string | null {
   if ((entry.capo ?? 0) > 0) parts.push(`Capo ${entry.capo}`)
   if (entry.notes?.trim()) parts.push(entry.notes.trim())
   return parts.length > 0 ? parts.join(' · ') : null
+}
+
+export function setlistName(setlist: Setlist): string {
+  return setlist.name.trim() || 'Untitled setlist'
 }
 
 function songCount(count: number): string {

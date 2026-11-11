@@ -15,6 +15,8 @@ import {
   movePlacements,
   moveSection,
   placeSection,
+  removeLine,
+  setCommentText,
   nearestSymbol,
   renameSection,
   replaceAll,
@@ -192,6 +194,20 @@ export function addCommentOf(state: EditorState, sectionId: string, text: string
   if (!comment) return state
   const line: CommentLine = { id: createId(), type: 'comment', text: comment }
   return commit(state, addLine(state.song, sectionId, line))
+}
+
+export function removeLineOf(state: EditorState, lineId: string): EditorState {
+  const song = removeLine(state.song, lineId)
+  if (song === state.song) return state
+  return commit(state, song)
+}
+
+export function editNoteOf(state: EditorState, lineId: string, text: string): EditorState {
+  const note = text.trim()
+  if (!note) return removeLineOf(state, lineId)
+  const song = setCommentText(state.song, lineId, note)
+  if (song === state.song) return state
+  return commit(state, song)
 }
 
 export function addBarChordOf(state: EditorState, sectionId: string, lineId: string | null): EditorState {

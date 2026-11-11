@@ -1,4 +1,5 @@
-import { Fragment, useState, type PointerEvent as ReactPointerEvent } from 'react'
+import { Fragment, useEffect, useRef, useState, type PointerEvent as ReactPointerEvent, type ReactNode } from 'react'
+import { ArrowDown, ArrowUp, Copy, Ellipsis, GripVertical, StickyNote, Trash2, X } from 'lucide-react'
 import { formatSymbol, nashville, type ChordSymbol, type Key } from '../domain/chord'
 import { padCollisions, wrapLyricDisplay } from '../domain/line-layout'
 import type { SectionKind, Song } from '../domain/song'
@@ -40,8 +41,9 @@ export function Chart({
   onMoveSection,
   onPlaceSection,
   onAddSection,
-  onComment,
-  onBars,
+  onAddNote,
+  onEditNote,
+  onRemoveLine,
   onAddBar,
   onNudge,
   onMove,
@@ -64,8 +66,9 @@ export function Chart({
   onMoveSection: (sectionId: string, direction: -1 | 1) => void
   onPlaceSection: (sectionId: string, index: number) => void
   onAddSection: (kind: SectionKind, label: string) => void
-  onComment: (sectionId: string, text: string) => void
-  onBars: (sectionId: string, text: string) => void
+  onAddNote: (sectionId: string, text: string) => void
+  onEditNote: (lineId: string, text: string) => void
+  onRemoveLine: (lineId: string) => void
   onAddBar: (sectionId: string, lineId: string | null) => void
   onNudge: (how: NudgeHow) => void
   onMove: (id: string, lineId: string, index: number) => void
@@ -75,60 +78,80 @@ export function Chart({
   const [dragging, setDragging] = useState(false)
   const [caret, setCaret] = useState<{ lineId: string; index: number } | null>(null)
   const [sectionMenu, setSectionMenu] = useState(false)
-  const [lineDraft, setLineDraft] = useState<{ id: string; kind: 'comment' | 'bars' } | null>(null)
+  const [openMenu, setOpenMenu] = useState<string | null>(null)
+  const [noteDraft, setNoteDraft] = useState<string | null>(null)
   const { ref, capacity } = useCharCapacity<HTMLDivElement>(lyricFontSize)
   return (
     <div ref={ref} className={dragging ? 'document dragging' : 'document'} onClick={() => onSelect(null)}>
-      {song.sections.map((section) => (
+      {song.sections.map((section, sectionIndex) => (
         <section className="section" key={section.id}>
           <div className="section-head">
-            <input key={`${section.id}:${section.label}`} className="section-label" aria-label={`${section.label} name`} defaultValue={section.label} disabled={readOnly} onBlur={(event) => onRename(section.id, event.target.value)} onKeyDown={(event) => { if (event.key === 'Enter') event.currentTarget.blur() }} />
+            {!readOnly && !compact && (
+              <button
+                className="section-grip"
+                type="button"
+                aria-label={`Drag ${section.label}`}
+                title="Drag to reorder"
+                onPointerDown={(event) => { event.stopPropagation(); beginSectionDrag(event, section.id, onPlaceSection) }}
+                onClick={(event) => event.stopPropagation()}
+              >
+                <GripVertical size={14} aria-hidden="true" />
+              </button>
+            )}
+            <input key={`${section.id}:${section.label}`} className="section-label" size={Math.max(4, section.label.length)} aria-label={`${section.label} name`} defaultValue={section.label} disabled={readOnly} onBlur={(event) => onRename(section.id, event.target.value)} onKeyDown={(event) => { if (event.key === 'Enter') event.currentTarget.blur() }} />
             {!readOnly && (
               <span className="section-actions">
-                {!compact && (
-                  <>
-                <button className="text-button" type="button" aria-label={`Drag ${section.label}`} onPointerDown={(event) => { event.stopPropagation(); beginSectionDrag(event, section.id, onPlaceSection) }}>Drag</button>
-                <button className="text-button" type="button" aria-label={`Move ${section.label} up`} onClick={() => onMoveSection(section.id, -1)}>Up</button>
-                <button className="text-button" type="button" aria-label={`Move ${section.label} down`} onClick={() => onMoveSection(section.id, 1)}>Down</button>
-                <button className="text-button" type="button" onClick={() => onDuplicate(section.id)}>Duplicate</button>
-                  </>
-                )}
-                <button className="text-button" type="button" onClick={() => onDeleteSection(section.id)}>Delete</button>
-                {!compact && (
-                  <>
-                <button
-                  className="text-button"
-                  type="button"
-                  aria-pressed={lineDraft?.id === section.id && lineDraft.kind === 'comment'}
-                  onClick={() => setLineDraft((current) => current?.id === section.id && current.kind === 'comment' ? null : { id: section.id, kind: 'comment' })}
-                >
-                  Comment
-                </button>
-                <button
-                  className="text-button"
-                  type="button"
-                  aria-pressed={lineDraft?.id === section.id && lineDraft.kind === 'bars'}
-                  onClick={() => setLineDraft((current) => current?.id === section.id && current.kind === 'bars' ? null : { id: section.id, kind: 'bars' })}
-                >
-                  Bars
-                </button>
-                  </>
-                )}
+                <SectionMenu label={section.label} open={openMenu === section.id} onOpen={(open) => setOpenMenu(open ? section.id : null)}>
+                  {!compact && (
+                    <>
+                      <button type="button" role="menuitem" disabled={sectionIndex === 0} onClick={() => onMoveSection(section.id, -1)}>
+                        <ArrowUp size={14} aria-hidden="true" />Move up
+                      </button>
+                      <button type="button" role="menuitem" disabled={sectionIndex === song.sections.length - 1} onClick={() => onMoveSection(section.id, 1)}>
+                        <ArrowDown size={14} aria-hidden="true" />Move down
+                      </button>
+                      <button type="button" role="menuitem" onClick={() => onDuplicate(section.id)}>
+                        <Copy size={14} aria-hidden="true" />Duplicate
+                      </button>
+                      <button type="button" role="menuitem" onClick={() => setNoteDraft(section.id)}>
+                        <StickyNote size={14} aria-hidden="true" />Add note
+                      </button>
+                    </>
+                  )}
+                  <button type="button" role="menuitem" className="danger" onClick={() => onDeleteSection(section.id)}>
+                    <Trash2 size={14} aria-hidden="true" />Delete
+                  </button>
+                </SectionMenu>
               </span>
             )}
           </div>
-          {lineDraft?.id === section.id && (
-            <form onSubmit={(event) => { event.preventDefault(); const data = new FormData(event.currentTarget); const text = String(data.get('line') ?? ''); if (lineDraft.kind === 'comment') onComment(section.id, text); else onBars(section.id, text); setLineDraft(null) }}>
-              <input className="field" name="line" aria-label={lineDraft.kind === 'comment' ? 'Comment' : 'Bar line'} placeholder={lineDraft.kind === 'comment' ? 'Repeat ×2' : '| C - - - | F/A - - - |'} autoFocus />
-            </form>
-          )}
           {section.lines.length === 0 && (
             <p className="hint">
               Empty section. <button type="button" className="text-button" onClick={(event) => { event.stopPropagation(); onAddBar(section.id, null) }}>Add chord</button>
             </p>
           )}
           {section.lines.map((line, lineNumber) => {
-            if (line.type === 'comment') return <p className="comment" key={line.id}>{line.text}</p>
+            if (line.type === 'comment') {
+              return (
+                <div className="note" key={line.id} onClick={(event) => event.stopPropagation()}>
+                  <span className="note-label">Note</span>
+                  <input
+                    key={line.text}
+                    className="note-text"
+                    aria-label="Note"
+                    defaultValue={line.text}
+                    disabled={readOnly}
+                    onBlur={(event) => onEditNote(line.id, event.target.value)}
+                    onKeyDown={(event) => { if (event.key === 'Enter') event.currentTarget.blur() }}
+                  />
+                  {!readOnly && (
+                    <button className="note-remove" type="button" aria-label="Remove note" onClick={() => onRemoveLine(line.id)}>
+                      <X size={14} aria-hidden="true" />
+                    </button>
+                  )}
+                </div>
+              )
+            }
             if (line.type === 'bars') {
               return (
                 <p className="bars" key={line.id}>
@@ -210,6 +233,20 @@ export function Chart({
               </div>
             )
           })}
+          {noteDraft === section.id && (
+            <form className="note note-draft" onClick={(event) => event.stopPropagation()} onSubmit={(event) => { event.preventDefault(); const text = String(new FormData(event.currentTarget).get('note') ?? ''); onAddNote(section.id, text); setNoteDraft(null) }}>
+              <span className="note-label">Note</span>
+              <input
+                className="note-text"
+                name="note"
+                aria-label="New note"
+                placeholder="Quiet, then build"
+                autoFocus
+                onBlur={(event) => { if (!event.target.value.trim()) setNoteDraft(null) }}
+                onKeyDown={(event) => { if (event.key === 'Escape') { event.stopPropagation(); setNoteDraft(null) } }}
+              />
+            </form>
+          )}
         </section>
       ))}
       {!readOnly && !compact && (
@@ -237,6 +274,44 @@ export function Chart({
         </div>
       )}
     </div>
+  )
+}
+
+function SectionMenu({ label, open, onOpen, children }: { label: string; open: boolean; onOpen: (open: boolean) => void; children: ReactNode }) {
+  const anchor = useRef<HTMLSpanElement>(null)
+  useEffect(() => {
+    if (!open) return
+    const onPointer = (event: PointerEvent) => {
+      if (!anchor.current?.contains(event.target as Node)) onOpen(false)
+    }
+    const onKey = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') onOpen(false)
+    }
+    document.addEventListener('pointerdown', onPointer)
+    document.addEventListener('keydown', onKey)
+    return () => {
+      document.removeEventListener('pointerdown', onPointer)
+      document.removeEventListener('keydown', onKey)
+    }
+  }, [open, onOpen])
+  return (
+    <span className="section-menu" ref={anchor} onClick={(event) => event.stopPropagation()}>
+      <button
+        className="section-menu-button"
+        type="button"
+        aria-label={`${label} actions`}
+        aria-haspopup="menu"
+        aria-expanded={open}
+        onClick={() => onOpen(!open)}
+      >
+        <Ellipsis size={16} aria-hidden="true" />
+      </button>
+      {open && (
+        <span className="menu section-menu-list" role="menu" onClick={() => onOpen(false)}>
+          {children}
+        </span>
+      )}
+    </span>
   )
 }
 

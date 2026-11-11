@@ -1,6 +1,6 @@
-import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
-import { RotateCcw } from 'lucide-react'
-import { accidentalBias, chooseAccidentalBias, formatKey, formatSymbol, keyFromPitch, normaliseSymbol, notePitch, parseChord, parseKey, shiftKey, type SpellingPrefs } from '../domain/chord'
+import { Fragment, useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
+import { Check, Guitar, RotateCcw, TriangleAlert } from 'lucide-react'
+import { accidentalBias, chooseAccidentalBias, formatKey, prefsForBias, formatSymbol, keyFromPitch, normaliseSymbol, notePitch, parseChord, parseKey, shiftKey, type SpellingPrefs } from '../domain/chord'
 import {
   addAt,
   addSectionOf,
@@ -10,7 +10,8 @@ import {
   deleteSectionOf,
   duplicateSectionOf,
   addBarChordOf,
-  addBarsOf,
+  editNoteOf,
+  removeLineOf,
   addCommentOf,
   applyChordProOf,
   moveChord,
@@ -49,7 +50,7 @@ import { ImportScreen, readSharedPaste } from './import-screen'
 import { Inspector } from './inspector'
 import { PreviewPane } from './preview-pane'
 import { ProjectorView, StageView, type StageEntry } from './performance'
-import { SetlistScreen } from './setlist-screen'
+import { SetlistScreen, setlistName } from './setlist-screen'
 import { SettingsScreen } from './settings-screen'
 
 const BASE_KEYS = ['C', 'Db', 'D', 'Eb', 'E', 'F', 'F#', 'G', 'Ab', 'A', 'Bb', 'B'] as const
@@ -72,7 +73,6 @@ export function App() {
   const phone = usePhone()
   const [sharedPaste, setSharedPaste] = useState(launchPaste)
   const [place, setPlace] = useState<'songs' | 'editor' | 'sets' | 'settings' | 'import'>(() => (sharedPaste ? 'import' : phone ? 'songs' : 'editor'))
-  const [showPreview, setShowPreview] = useState(false)
   const [mode, setMode] = useState<'visual' | 'chordpro'>('visual')
   const [menuOpen, setMenuOpen] = useState(false)
   const [performance, setPerformance] = useState<
@@ -82,7 +82,7 @@ export function App() {
   >(null)
   const [exportOpen, setExportOpen] = useState(false)
   const [setlistExport, setSetlistExport] = useState<Setlist | null>(null)
-  const [rightHand, setRightHand] = useState(false)
+  const [setlistPrefs, setSetlistPrefs] = useState<SpellingPrefs>(() => defaultSettings().prefs)
   const [songs, setSongs] = useState<Song[]>([])
   const [setlists, setSetlists] = useState<Setlist[]>([])
   const [settings, setSettings] = useState<Settings>(defaultSettings())
@@ -240,15 +240,16 @@ export function App() {
     const entries = setlistExport.entries.flatMap((entry) => {
       const song = songs.find((item) => item.id === entry.songId)
       if (!song) return []
-      return [{ song, capo: entry.capo ?? 0, concert: entry.key ?? song.originalKey }]
+      const concert = entry.key ?? song.originalKey
+      return [{ song, capo: entry.capo ?? 0, concert: keyFromPitch(notePitch(concert.tonic), concert.mode, setlistPrefs) }]
     })
     return layoutSetlist(entries, {
       ...pdfChoices,
       numbers: settings.numbers,
-      prefs: settings.prefs,
+      prefs: setlistPrefs,
       allowTwoColumns: settings.allowTwoColumns,
-    }, rightHand)
-  }, [setlistExport, songs, pdfChoices, settings.numbers, settings.prefs, settings.allowTwoColumns, rightHand])
+    }, false)
+  }, [setlistExport, songs, pdfChoices, settings.numbers, setlistPrefs, settings.allowTwoColumns])
 
   function announce(text: string) {
     setLive(text)
@@ -297,15 +298,14 @@ export function App() {
 
   async function exportSetlist() {
     if (!setlistExport || !setlistLayout || setlistLayout.pageCount === 0) return
-    const [{ renderPdf, mergePdfs, rightHandParts }, { loadPdfFonts }] = await Promise.all([import('../domain/pdf-render'), import('./fonts')])
+    const [{ renderPdf, mergePdfs }, { loadPdfFonts }] = await Promise.all([import('../domain/pdf-render'), import('./fonts')])
     const fonts = await loadPdfFonts()
     const parts: Uint8Array[] = []
     for (const sheet of setlistLayout.sheets) {
       if (sheet.kind === 'song') parts.push(await renderPdf(sheet.layout, fonts))
     }
     if (parts.length === 0) return
-    const pages = rightHand ? await rightHandParts(parts) : parts
-    await downloadBytes(await mergePdfs(pages), `${setlistExport.name} - ${setlistExport.date}.pdf`)
+    await downloadBytes(await mergePdfs(parts), setlistFileName(setlistExport))
     setSetlistExport(null)
   }
 
@@ -315,7 +315,6 @@ export function App() {
     const opened = openEditor(song)
     setEditor({ ...opened, prefs: settings.prefs, concert: keyFromPitch(notePitch(opened.concert.tonic), opened.concert.mode, settings.prefs) })
     setPlace('editor')
-    setShowPreview(false)
   }
 
   async function restoreBackup(file: File) {
@@ -415,7 +414,7 @@ export function App() {
 
 
   return (
-    <div className={['app', phone ? `phone-${phoneScreen}` : '', phonePerformance, showPreview ? 'show-preview' : ''].filter(Boolean).join(' ')}>
+    <div className={['app', phone ? `phone-${phoneScreen}` : '', phonePerformance].filter(Boolean).join(' ')}>
       <aside className="library">
         <div className="brand"><span>Chord Sheet Maker</span></div>
         <input ref={searchRef} className="search" aria-label="Search songs" placeholder="Search songs" value={query} onChange={(event) => setQuery(event.target.value)} />
@@ -443,9 +442,18 @@ export function App() {
             <strong>{editor.song.title}</strong>
             <span className="meta">{status === 'Not saved' ? '· Not saved' : status === 'Saving…' ? '· Saving…' : '· Saved'}</span>
             <span className="grow" />
-            
               <div className="editor-bar-phone" ref={menuRef}>
-                <button className="text-button" type="button" aria-pressed={showPreview} onClick={() => setShowPreview((value) => !value)}>Preview</button>
+                <button
+                  className="text-button bar-perform"
+                  type="button"
+                  aria-label="Performance view"
+                  title="Performance view"
+                  onClick={() => setPerformance({ mode: 'stage', entries: [{ song: editor.song, concert: editor.concert, capo: editor.capo }], nashville: editor.nashville })}
+                >
+                  <Guitar size={16} strokeWidth={1.75} aria-hidden="true" />
+                  <span className="bar-perform-label">Performance view</span>
+                </button>
+                <button className="primary" type="button" onClick={() => setExportOpen(true)}>{phone ? 'Export' : 'Export PDF'}</button>
                 <button className="text-button" type="button" aria-label="More actions" aria-expanded={menuOpen} aria-haspopup="menu" onClick={() => setMenuOpen((open) => !open)}>Menu</button>
                 {menuOpen && (
                   <div className="menu editor-menu" role="menu">
@@ -454,7 +462,6 @@ export function App() {
                     <button type="button" role="menuitem" onClick={() => { setMode((value) => value === 'visual' ? 'chordpro' : 'visual'); setMenuOpen(false) }}>{mode === 'visual' ? 'Use ChordPro Editor' : 'Use Visual Editor'}</button>
                     <button type="button" role="menuitem" onClick={() => { downloadCho(editor.song); setMenuOpen(false) }}>Download as ChordPro</button>
                     <button type="button" role="menuitem" onClick={() => { copyShare(editor.song, announce); setMenuOpen(false) }}>Copy Share Link</button>
-                    <button type="button" role="menuitem" onClick={() => { if (editor) setPerformance({ mode: 'stage', entries: [{ song: editor.song, concert: editor.concert, capo: editor.capo }], nashville: editor.nashville }); setMenuOpen(false) }}>Performance View</button>
                     <button type="button" role="menuitem" onClick={() => { if (view) setPerformance({ mode: 'projector', songs: [view] }); setMenuOpen(false) }}>Projector View</button>
                     <button type="button" role="menuitem" onClick={() => { void deleteCurrentSong() }}>Delete song</button>
                   </div>
@@ -468,7 +475,6 @@ export function App() {
               <div className="song-hero">
                 <DetailField className="title-input" label="Title" value={editor.song.title} onCommit={(title) => setEditor(setSongDetails(editor, { title }))} />
                 <DetailField className="artist-input" label="Artist" placeholder="Artist" value={editor.song.artist ?? ''} onCommit={(artist) => setEditor(setSongDetails(editor, { artist }))} />
-                {meter && <span className="meter-pill">{meter}</span>}
               </div>
               <div className="transport">
                 <div className="transport-main">
@@ -519,19 +525,34 @@ export function App() {
                     </button>
                   </div>
                   <div className="transport-mode">
-                    <span className="transport-label">Numbers</span>
                     <div className="pill" role="group" aria-label="Nashville numbers">
                       <button className="pill-btn" type="button" aria-pressed={editor.nashville} onClick={() => setEditor({ ...editor, nashville: !editor.nashville })}>1-4-5</button>
                     </div>
+                    {issues.length > 0 ? (
+                      <button
+                        className="check-mark warn"
+                        type="button"
+                        aria-label={issues.length === 1 ? '1 chord to check' : `${issues.length} chords to check`}
+                        title="Show the first chord to check"
+                        onClick={() => setEditor(selectChord(editor, issues[0].id))}
+                      >
+                        <TriangleAlert size={14} strokeWidth={2} aria-hidden="true" />
+                        {issues.length}
+                      </button>
+                    ) : (
+                      <span className="check-mark ok" role="img" aria-label="All chords valid" title="All chords valid">
+                        <Check size={15} strokeWidth={2.25} aria-hidden="true" />
+                      </span>
+                    )}
+                    {meter && <span className="meter">{meter}</span>}
                   </div>
                 </div>
-                <div className="transport-status">
-                  {transposed && <span className="chip">From {formatKey(editor.song.originalKey)}</span>}
-                  {transposed && <button className="text-button" type="button" onClick={() => { setEditor(saveConcertAsSongKey(editor)); announce(`Saved in ${formatKey(editor.concert)}`) }}>Save as song key</button>}
-                  <button className={issues.length ? 'chip warn' : 'chip ok'} type="button" onClick={() => issues[0] && setEditor(selectChord(editor, issues[0].id))}>
-                    {issues.length ? `${issues.length} to check` : 'All chords valid'}
-                  </button>
-                </div>
+                {transposed && (
+                  <div className="transport-status">
+                    <span className="chip">From {formatKey(editor.song.originalKey)}</span>
+                    <button className="text-button" type="button" onClick={() => { setEditor(saveConcertAsSongKey(editor)); announce(`Saved in ${formatKey(editor.concert)}`) }}>Save as song key</button>
+                  </div>
+                )}
               </div>
               <PhoneDetails phone={phone}>
               <div className="properties">
@@ -549,12 +570,20 @@ export function App() {
                 <DetailField label="Original key" value={formatKey(editor.song.originalKey)} onCommit={(text) => { try { setEditor(setSongDetails(editor, { originalKey: parseKey(text) })) } catch { announce(`‘${text}’ isn't a key`) } }} />
               </div>
               </PhoneDetails>
-              <div className="chips" aria-label="Arrangement">
+              <div className="arrangement" role="group" aria-label="Arrangement">
+                <span className="transport-label">Order</span>
                 {editor.song.arrangement.map((item, index) => {
                   const section = editor.song.sections.find((candidate) => candidate.id === item.sectionId)
                   if (!section) return null
                   const times = item.repeat ?? 1
-                  return <button key={`${item.sectionId}-${index}`} className="chip" type="button" onClick={() => setEditor(repeatArrangementOf(editor, index, times >= 4 ? 1 : times + 1))}>{section.label}{times > 1 ? ` ×${times}` : ''}</button>
+                  return (
+                    <Fragment key={`${item.sectionId}-${index}`}>
+                      {index > 0 && <span className="arrangement-sep" aria-hidden="true">·</span>}
+                      <button className="arrangement-item" type="button" title="Click to repeat" onClick={() => setEditor(repeatArrangementOf(editor, index, times >= 4 ? 1 : times + 1))}>
+                        {section.label}{times > 1 ? ` ×${times}` : ''}
+                      </button>
+                    </Fragment>
+                  )
                 })}
               </div>
               {editor.capo > 0 && <p className="capo-banner">Capo {editor.capo} · showing {formatKey(shapeKey).replace(/m$/, '')} shapes · sounds in {formatKey(editor.concert)}</p>}
@@ -564,7 +593,7 @@ export function App() {
                 numbers={editor.nashville}
                 selectedIds={editor.selectedIds}
                 readOnly={false}
-                onSelect={(id, shift) => setEditor(selectChord(editor, id, shift))}
+                onSelect={(id, shift) => setEditor((state) => state && selectChord(state, id, shift))}
                 onAdd={(lineId, index) => {
                   const next = addAt(editor, lineId, index)
                   setEditor(next)
@@ -574,12 +603,17 @@ export function App() {
                 onCheck={(lineId) => setEditor(checkLine(editor, lineId))}
                 onRename={(sectionId, label) => setEditor(renameSectionOf(editor, sectionId, label))}
                 onDuplicate={(sectionId) => setEditor(duplicateSectionOf(editor, sectionId))}
-                onDeleteSection={(sectionId) => setEditor(deleteSectionOf(editor, sectionId))}
+                onDeleteSection={(sectionId) => {
+                  const label = editor.song.sections.find((section) => section.id === sectionId)?.label
+                  setEditor(deleteSectionOf(editor, sectionId))
+                  announce(label ? `Deleted ${label}` : 'Deleted section')
+                }}
                 onMoveSection={(sectionId, direction) => setEditor(moveSectionOf(editor, sectionId, direction))}
                 onPlaceSection={(sectionId, index) => setEditor(placeSectionOf(editor, sectionId, index))}
                 onAddSection={(kind, label) => setEditor(addSectionOf(editor, kind, label))}
-                onComment={(sectionId, text) => setEditor(addCommentOf(editor, sectionId, text))}
-                onBars={(sectionId, text) => setEditor(addBarsOf(editor, sectionId, text))}
+                onAddNote={(sectionId, text) => setEditor((state) => state && addCommentOf(state, sectionId, text))}
+                onEditNote={(lineId, text) => setEditor((state) => state && editNoteOf(state, lineId, text))}
+                onRemoveLine={(lineId) => { setEditor((state) => state && removeLineOf(state, lineId)); announce('Note removed') }}
                 onAddBar={(sectionId, lineId) => { setEditor(addBarChordOf(editor, sectionId, lineId)); announce('Chord added') }}
                 onNudge={(how) => { setEditor(nudge(editor, how)); announce('Chord moved') }}
                 onMove={(id, lineId, index) => {
@@ -608,11 +642,11 @@ export function App() {
         </main>
       )}
       {place === 'import' && <main className="editor"><ImportScreen phone={phone} shared={sharedPaste} onCancel={() => { setSharedPaste(null); setPlace(phone ? 'songs' : 'editor') }} onSave={(song) => { setSharedPaste(null); void library.current.saveSong(song); setSongs((current) => [song, ...current.filter((item) => item.id !== song.id)]); const opened = openEditor(song); setEditor({ ...opened, prefs: settings.prefs }); setPlace('editor') }} /></main>}
-      {place === 'sets' && <main className="editor"><SetlistScreen songs={songs} setlists={setlists} onCreate={() => { const setlist: Setlist = { id: crypto.randomUUID(), name: 'Sunday', date: new Date().toISOString().slice(0, 10), entries: [] }; setSetlists((current) => [...current, setlist]); void library.current.saveSetlist(setlist) }} onChange={(setlist) => { setSetlists((current) => current.map((item) => item.id === setlist.id ? setlist : item)); void library.current.saveSetlist(setlist) }} onDelete={(id) => { setSetlists((current) => current.filter((item) => item.id !== id)); void library.current.deleteSetlist(id) }} onExport={(setlist) => setSetlistExport(setlist)} onStage={(setlist) => { const ordered = setlist.entries.flatMap((entry) => { const song = songs.find((item) => item.id === entry.songId); return song ? [{ song, concert: entry.key ?? song.originalKey, capo: entry.capo ?? 0 }] : [] }); if (ordered.length > 0) setPerformance({ mode: 'stage', entries: ordered, nashville: false }) }} /></main>}
+      {place === 'sets' && <main className="editor"><SetlistScreen songs={songs} setlists={setlists} onCreate={() => { const setlist: Setlist = { id: crypto.randomUUID(), name: '', date: '', entries: [] }; setSetlists((current) => [...current, setlist]); void library.current.saveSetlist(setlist) }} onChange={(setlist) => { setSetlists((current) => current.map((item) => item.id === setlist.id ? setlist : item)); void library.current.saveSetlist(setlist) }} onDelete={(id) => { setSetlists((current) => current.filter((item) => item.id !== id)); void library.current.deleteSetlist(id) }} onExport={(setlist) => { setSetlistPrefs(settings.prefs); setSetlistExport(setlist) }} onStage={(setlist) => { const ordered = setlist.entries.flatMap((entry) => { const song = songs.find((item) => item.id === entry.songId); return song ? [{ song, concert: entry.key ?? song.originalKey, capo: entry.capo ?? 0 }] : [] }); if (ordered.length > 0) setPerformance({ mode: 'stage', entries: ordered, nashville: false }) }} /></main>}
       {place === 'settings' && <main className="editor"><SettingsScreen settings={settings} onChange={(next) => { setSettings(next); void library.current.saveSettings(next); document.documentElement.dataset.theme = next.theme === 'system' ? '' : next.theme; document.documentElement.dataset.size = next.textSize; try { localStorage.setItem('csm-theme', next.theme) } catch { /* ignore */ } setEditor((state) => state && { ...state, prefs: next.prefs, concert: keyFromPitch(notePitch(state.concert.tonic), state.concert.mode, next.prefs) }) }} onBackup={() => { const backup: BackupFile = { version: 1, songs, setlists, settings }; const blob = new Blob([JSON.stringify(backup, null, 2)], { type: 'application/json' }); const url = URL.createObjectURL(blob); const link = document.createElement('a'); link.href = url; link.download = 'chord-sheet-backup.json'; link.click(); URL.revokeObjectURL(url) }} onRestore={(file) => void restoreBackup(file)} /></main>}
-      {place === 'editor' && layout && <PreviewPane layout={layout} onExport={() => setExportOpen(true)} onBack={phone ? () => setShowPreview(false) : undefined} />}
-      {exportOpen && layout && <ExportDialog layout={layout} choices={pdfChoices} onChange={setPdfChoices} onClose={() => setExportOpen(false)} onDownload={() => void exportPdf()} />}
-      {setlistExport && setlistLayout && <SetlistExportDialog fileName={`${setlistExport.name} - ${setlistExport.date}.pdf`} layout={setlistLayout} choices={pdfChoices} rightHand={rightHand} onChange={setPdfChoices} onRightHand={setRightHand} onClose={() => setSetlistExport(null)} onDownload={() => void exportSetlist()} />}
+      {place === 'editor' && layout && <PreviewPane layout={layout} />}
+      {exportOpen && layout && <ExportDialog layout={layout} choices={pdfChoices} accidentals={accidentalBias(editor?.prefs ?? settings.prefs)} issueCount={issues.length} onChange={setPdfChoices} onAccidentals={(bias) => applyPrefs(prefsForBias(bias))} onClose={() => setExportOpen(false)} onDownload={() => void exportPdf()} />}
+      {setlistExport && setlistLayout && <SetlistExportDialog fileName={setlistFileName(setlistExport)} layout={setlistLayout} choices={pdfChoices} accidentals={accidentalBias(setlistPrefs)} onChange={setPdfChoices} onAccidentals={(bias) => setSetlistPrefs(prefsForBias(bias))} onClose={() => setSetlistExport(null)} onDownload={() => void exportSetlist()} />}
       {performance?.mode === 'stage' && <StageView entries={performance.entries} nashville={performance.nashville} prefs={settings.prefs} onExit={() => setPerformance(null)} />}
       {performance?.mode === 'projector' && performance.songs[0] && <ProjectorView song={performance.songs[0]} onExit={() => setPerformance(null)} />}
       <div className="phone-tabs">
@@ -629,6 +663,10 @@ export function App() {
       )}
     </div>
   )
+}
+
+function setlistFileName(setlist: Setlist): string {
+  return `${[setlistName(setlist), setlist.date].filter(Boolean).join(' - ')}.pdf`
 }
 
 function downloadCho(song: Song) {

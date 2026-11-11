@@ -296,7 +296,22 @@ function drawBlock(
     }
     return y - height
   }
-  if (block.kind === 'comment' || block.kind === 'pointer') {
+  if (block.kind === 'comment') {
+    const size = 9.5
+    const boxHeight = 17
+    const boxWidth = fonts.sansBold.widthOfTextAtSize(block.text, size) + 14
+    page.drawRectangle({
+      x: left,
+      y: y - 3 - boxHeight,
+      width: boxWidth,
+      height: boxHeight,
+      borderColor: ink,
+      borderWidth: 0.8,
+    })
+    page.drawText(block.text, { x: left + 7, y: y - 3 - boxHeight + 5.5, size, font: fonts.sansBold, color: ink })
+    return y - height
+  }
+  if (block.kind === 'pointer') {
     page.drawText(block.text, {
       x: left,
       y: y - Math.min(10, height - 1),
