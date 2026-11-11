@@ -46,7 +46,10 @@ button { cursor: pointer; }
 .song-row strong { display: block; font-weight: 500; font-size: 13.5px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .song-row.active, .nav-button[aria-pressed='true'], .text-button[aria-pressed='true'] { background: var(--bg-active); }
 @media (hover: hover) {
-  .song-row:hover, .nav-button:hover, .icon-button:hover, .text-button:hover, .setlist-pick:hover { background: var(--bg-hover); }
+  .song-row:hover, .nav-button:hover, .icon-button:hover, .text-button:hover, .setlist-pick:hover, .section-grip:hover, .section-menu-button:hover { background: var(--bg-hover); }
+  .section-menu-button:hover { color: var(--text); }
+  .arrangement-item:hover { color: var(--text); text-decoration: underline; text-underline-offset: 3px; }
+  .check-mark.warn:hover { background: var(--danger-soft); }
   .menu button:hover { background: var(--bg-hover); }
 }
 .song-row.view { padding-left: 22px; }
@@ -68,6 +71,18 @@ button { cursor: pointer; }
 .transport-main { min-width: 0; max-width: 100%; }
 .transport-status { margin-left: auto; max-width: 100%; }
 .transport-mode { display: inline-flex; align-items: center; gap: 6px; }
+.check-mark { display: inline-flex; align-items: center; gap: 4px; height: 28px; padding: 0 4px; border: 0; border-radius: 6px; background: transparent; font-size: 13px; font-weight: 600; font-variant-numeric: tabular-nums; }
+.check-mark.ok { color: var(--success); }
+.check-mark.warn { color: var(--danger); }
+.arrangement { display: flex; flex-wrap: wrap; align-items: baseline; gap: 2px 6px; margin: 10px 0 2px; font-size: 13px; color: var(--text-muted); }
+.arrangement .transport-label { margin-right: 4px; }
+.arrangement-item { border: 0; background: transparent; padding: 0; color: inherit; border-radius: 3px; }
+.arrangement-sep { color: var(--text-faint); }
+.editor-bar .meta { white-space: nowrap; flex: none; }
+.bar-perform { display: inline-flex; align-items: center; gap: 6px; white-space: nowrap; }
+@media (min-width: 1200px) { .preview-toggle { display: none; } }
+.editor-bar .primary { white-space: nowrap; flex: none; }
+@media (max-width: 1199px) { .bar-perform-label { display: none; } }
 .transport-label { font-size: 11px; font-weight: 600; letter-spacing: .06em; text-transform: uppercase; color: var(--text-muted); }
 .pill { display: inline-flex; align-items: stretch; min-height: 36px; border: 1px solid var(--border-strong); border-radius: 999px; background: var(--bg-subtle); overflow: hidden; }
 .pill-btn, .pill-select { border: 0; background: transparent; color: inherit; min-height: 36px; padding: 0 12px; border-radius: 0; }
@@ -96,8 +111,19 @@ button { cursor: pointer; }
 .properties { display: grid; grid-template-columns: 120px 1fr; gap: 6px 12px; margin: 16px 0; font-size: 14px; }
 .capo-banner { background: var(--accent-soft); color: var(--accent-text); border-radius: 6px; padding: 8px 10px; margin-bottom: 12px; }
 .section { margin-top: 18px; }
-.section-head { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
+.section-head { position: relative; display: flex; gap: 2px; align-items: center; }
 .section-label { font-size: 14px; font-weight: 600; }
+.section-head .section-label { width: auto; flex: 0 1 auto; min-width: 4ch; field-sizing: content; padding: 2px 4px; border-radius: 4px; }
+.section-head .section-label:hover:not(:disabled), .section-head .section-label:focus { background: var(--bg-hover); }
+.section-grip, .section-menu-button { display: inline-grid; place-items: center; width: 28px; height: 28px; padding: 0; border: 0; border-radius: 6px; background: transparent; color: var(--text-faint); }
+.section-grip { position: absolute; left: -30px; cursor: grab; opacity: 0; touch-action: none; }
+.section:hover .section-grip, .section-grip:focus-visible { opacity: 1; }
+.section-menu-button[aria-expanded='true'] { background: var(--bg-active); color: var(--text); }
+.section-menu { position: relative; display: inline-flex; }
+.section-menu-list { top: 32px; min-width: 176px; }
+.menu button { display: flex; align-items: center; gap: 8px; }
+.menu button:disabled { color: var(--text-faint); cursor: default; }
+.menu button.danger { color: var(--danger); }
 .lyric-block { position: relative; padding: 2px 0 8px; }
 .chord-row { position: relative; height: 21px; font-family: var(--mono); font-size: var(--fs-lyric); }
 .chord { position: absolute; top: 0; border: 0; background: transparent; font-weight: 700; font-family: var(--mono); font-size: var(--fs-lyric); padding: 0 2px; border-radius: 4px; white-space: nowrap; }
@@ -113,7 +139,7 @@ button { cursor: pointer; }
 .menu button { text-align: left; border: 0; background: transparent; padding: 6px 8px; border-radius: 6px; }
 .editor-bar-phone { position: relative; display: flex; gap: 8px; align-items: center; }
 .editor-menu { right: 0; left: auto; top: 36px; }
-.section-actions { display: flex; flex-wrap: wrap; gap: 2px; }
+.section-actions { display: inline-flex; }
 .editor-body { display: grid; grid-template-columns: minmax(0, 1fr); min-height: 0; flex: 1; }
 .editor-body:has(.inspector) { grid-template-columns: minmax(0, 1fr) 280px; }
 .editor-body.chordpro-mode { grid-template-columns: minmax(260px, 340px) minmax(0, 1fr); }
@@ -180,6 +206,8 @@ button { cursor: pointer; }
 }
 .pdf-export-grid { display: grid; grid-template-columns: minmax(260px, 340px) minmax(0, 1fr); gap: 16px; align-items: start; }
 .pdf-export-preview { background: var(--bg-canvas); border-radius: 8px; padding: 8px 0; }
+.export-chord-warning { display: flex; align-items: center; gap: 6px; margin: 10px 0 0; color: var(--danger); font-size: 12.5px; }
+.export-chord-warning svg { flex: none; }
 .setlist-right-hand { display: flex; align-items: center; gap: 8px; margin: 4px 0 8px; }
 .choice-slider { display: flex; align-items: center; gap: 8px; }
 .choice-slider input[type="range"] { flex: 1; min-width: 0; }
@@ -191,6 +219,8 @@ button { cursor: pointer; }
 .stage-chrome { position: relative; z-index: 3; flex: none; display: flex; flex-direction: column; gap: 10px; padding: 10px 58px 14px 14px; background: #242424; border-bottom: 1px solid rgba(255,255,255,.16); }
 .stage-chrome.is-collapsed { gap: 0; min-height: 52px; padding: 8px 14px; background: transparent; border-bottom: 0; }
 .stage-chrome-row { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+.stage-chrome-row .outline:disabled { opacity: .4; cursor: default; }
+.stage-body { touch-action: pan-y; }
 .stage-eye { position: absolute; top: 10px; right: 14px; z-index: 1; display: inline-flex; align-items: center; justify-content: center; width: 36px; height: 36px; padding: 0; border: 1px solid rgba(255,255,255,.28); border-radius: 8px; background: #242424; color: #f2f2f0; }
 .stage-eye:hover { background: #333; }
 .stage-eye[aria-pressed='true'] { color: #f0b429; }
@@ -274,7 +304,8 @@ button { cursor: pointer; }
 .setlist-song-title { min-width: 0; }
 .setlist-song-title strong { display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .setlist-key { width: 4.75rem; max-width: 100%; }
-.setlist-song-extra, .setlist-add { width: 100%; max-width: 100%; min-width: 0; }
+.setlist-song-extra { width: 100%; max-width: 100%; min-width: 0; }
+.setlist-add { width: auto; min-width: min(14rem, 100%); max-width: min(16rem, 100%); }
 .setlist-song-extra { grid-column: 1 / -1; }
 .setlist-add { margin-top: 12px; }
 .setlists .icon-button, .setlists .menu button, .setlists .menu-check, .file-button, .import-footer .primary, .import-footer .text-button { min-height: 40px; }
@@ -336,7 +367,7 @@ button { cursor: pointer; }
 .review-title { grid-column: 1 / -1; font-weight: 600; }
 .review-key { display: grid; gap: 2px; min-width: 0; }
 .import-screen .section-head { display: flex; align-items: center; gap: 8px; }
-.import-screen .section-label { flex: 1; min-width: 0; }
+.import-screen .section-label { flex: 1; min-width: 0; width: 100%; }
 .import-screen .section-actions { flex: none; }
 .review-chord { flex: none; display: flex; gap: 8px; padding: 8px 16px; border-top: 1px solid var(--border); background: var(--bg); }
 .review-chord .field { flex: 1; min-width: 0; font-family: var(--mono); font-size: 16px; }
@@ -348,3 +379,5 @@ button { cursor: pointer; }
 .import-body.reviewing .import-panes { display: block; margin-top: 8px; }
 .import-body.reviewing .import-panes .source { height: 30vh; margin-bottom: 12px; }
 .import-body.reviewing .import-panes .result { overflow: visible; padding: 0; background: transparent; min-height: 0; }
+
+@media (hover: none) { .section-grip { display: none; } }

@@ -17,7 +17,7 @@ export function PreviewPane({
   onBack,
 }: {
   layout: PdfDocument
-  onExport: () => void
+  onExport?: () => void
   onBack?: () => void
 }) {
   const scrollRef = useRef<HTMLDivElement>(null)
@@ -33,9 +33,11 @@ export function PreviewPane({
         )}
         <span className="meta">{layoutStatus(layout)}</span>
         <span className="grow" />
-        <button className="primary" type="button" onClick={onExport}>
-          Export PDF
-        </button>
+        {onExport && (
+          <button className="primary" type="button" onClick={onExport}>
+            Export PDF
+          </button>
+        )}
       </div>
       {layout.fitWarning && <p className="fit-warning">{layout.fitWarning}</p>}
       <div className="preview-scroll" ref={scrollRef}>

@@ -187,13 +187,14 @@ The PDF must be readable at a distance on a music stand, with pages laid side by
 - Concert key or capo shapes; letters or Nashville numbers; full chart, chords only, or lyrics only.
 - Single song or a whole setlist as one PDF. For a setlist, each song starts on a new page (option: start each song on a right-hand page for two-up stands).
 - File name: `Song Title - Key.pdf` (with `- Capo 4` when relevant); setlist: `Setlist Name - Date.pdf`.
+- Export options include **Accidentals** (Follow the key, Flats, Sharps). For a song it is the same setting as the editor's ♭/♯ toggle; for a setlist it applies to that export only. The export dialog warns, under the options, when any chord isn't recognised.
 - The PDF is generated identically on phone and laptop (same layout engine, same fonts).
 
 ---
 
 ## 7. Other views (secondary)
 
-- **Stage view:** Quiet Chart reading mode — large text, dark mode, solid header (Exit / key / Speed / Autoscroll / Next section / Next song + transpose/Capo/accidentals/Nashville) that stays open until the eye hides it. The eye stays on screen; a closed eye leaves only that icon. The header sits above the title. In-flow section headings, chords over lyrics with wrap, screen wake lock; autoscroll default 0.8 in 0.1 steps; session-local controls (no save-back); uses the setlist order.
+- **Stage view:** Quiet Chart reading mode — large text, dark mode, solid header (Exit / key / Speed / Autoscroll / Next section / Previous song / Next song (swipe left or right on touch) + transpose/Capo/accidentals/Nashville) that stays open until the eye hides it. The eye stays on screen; a closed eye leaves only that icon. The header sits above the title. In-flow section headings, chords over lyrics with wrap, screen wake lock; autoscroll default 0.8 in 0.1 steps; session-local controls (no save-back); uses the setlist order.
 - **Projector view:** lyrics only, large, one section per screen, arrow keys to advance.
 - **Setlists:** name, date, ordered songs, key and capo per song, notes; export as one PDF; step through on stage.
 - **Phone start screen:** a phone opens on the all-songs list. A share link that adds a new song opens that song in the editor instead.

@@ -1,4 +1,6 @@
 import { useRef } from 'react'
+import { TriangleAlert } from 'lucide-react'
+import type { AccidentalBias } from '../domain/chord'
 import {
   DEFAULT_LINE_SPACING,
   HEADING_SIZE,
@@ -49,13 +51,19 @@ export const defaultPdfChoices = (): PdfChoices => ({
 export function ExportDialog({
   layout,
   choices,
+  accidentals,
+  issueCount,
   onChange,
+  onAccidentals,
   onClose,
   onDownload,
 }: {
   layout: PdfDocument
   choices: PdfChoices
+  accidentals: AccidentalBias
+  issueCount: number
   onChange: (choices: PdfChoices) => void
+  onAccidentals: (bias: AccidentalBias) => void
   onClose: () => void
   onDownload: () => void
 }) {
@@ -71,7 +79,15 @@ export function ExportDialog({
       >
         <h2 id="export-title">Export PDF</h2>
         <div className="pdf-export-grid">
-          <PdfChoiceFields choices={choices} onChange={onChange} />
+          <div>
+            <PdfChoiceFields choices={choices} accidentals={accidentals} onChange={onChange} onAccidentals={onAccidentals} />
+            {issueCount > 0 && (
+              <p className="export-chord-warning">
+                <TriangleAlert size={14} strokeWidth={2} aria-hidden="true" />
+                {issueCount === 1 ? "1 chord isn't recognised and will print as typed" : `${issueCount} chords aren't recognised and will print as typed`}
+              </p>
+            )}
+          </div>
           <div className="pdf-export-preview" ref={scrollRef}>
             {layout.pages.map((page, index) => (
               <PaperPage
@@ -107,8 +123,10 @@ export function SetlistExportDialog({
   fileName,
   layout,
   choices,
+  accidentals,
   rightHand,
   onChange,
+  onAccidentals,
   onRightHand,
   onClose,
   onDownload,
@@ -116,8 +134,10 @@ export function SetlistExportDialog({
   fileName: string
   layout: SetlistLayout
   choices: PdfChoices
+  accidentals: AccidentalBias
   rightHand: boolean
   onChange: (choices: PdfChoices) => void
+  onAccidentals: (bias: AccidentalBias) => void
   onClose: () => void
   onRightHand: (rightHand: boolean) => void
   onDownload: () => void
@@ -141,7 +161,7 @@ export function SetlistExportDialog({
         <h2 id="setlist-export-title">Export setlist PDF</h2>
         <div className="pdf-export-grid">
           <div>
-            <PdfChoiceFields choices={choices} onChange={onChange} />
+            <PdfChoiceFields choices={choices} accidentals={accidentals} onChange={onChange} onAccidentals={onAccidentals} />
             <label className="hint setlist-right-hand">
               <input
                 type="checkbox"
@@ -205,10 +225,14 @@ export function SetlistExportDialog({
 
 function PdfChoiceFields({
   choices,
+  accidentals,
   onChange,
+  onAccidentals,
 }: {
   choices: PdfChoices
+  accidentals: AccidentalBias
   onChange: (choices: PdfChoices) => void
+  onAccidentals: (bias: AccidentalBias) => void
 }) {
   return (
     <div className="properties">
@@ -239,6 +263,17 @@ function PdfChoiceFields({
         <option value="full">Full chart</option>
         <option value="chords">Chords only</option>
         <option value="lyrics">Lyrics only</option>
+      </select>
+      <span>Accidentals</span>
+      <select
+        className="select"
+        aria-label="Accidentals"
+        value={accidentals}
+        onChange={(event) => onAccidentals(event.target.value as AccidentalBias)}
+      >
+        <option value="default">Follow the key</option>
+        <option value="flats">Flats (♭)</option>
+        <option value="sharps">Sharps (♯)</option>
       </select>
       <span>Columns</span>
       <select

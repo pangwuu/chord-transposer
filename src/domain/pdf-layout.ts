@@ -216,16 +216,10 @@ function readDisplay(options: PdfOptions) {
 
 function headerMeta(song: Song, options: PdfOptions): string {
   const display = readDisplay(options)
-  const prefs = options.prefs ?? DEFAULT_PREFS
-  const keyName = formatKey(options.concert)
-  const shape = formatKey(shiftKey(options.concert, -options.capo, prefs))
   return [
-    display.showKey ? `Key ${keyName}` : null,
+    display.showKey ? `Key ${formatKey(options.concert)}` : null,
     display.showTime ? song.timeSignature : null,
     display.showKey && song.tempo ? `${song.tempo} bpm` : null,
-    display.showKey && options.numbers
-      ? `Numbers in ${options.capo > 0 ? shape : keyName}`
-      : null,
   ]
     .filter(Boolean)
     .join('    ')

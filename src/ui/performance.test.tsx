@@ -81,6 +81,63 @@ function renderStage(overrides: { nashville?: boolean } = {}) {
   )
 }
 
+function renderSetlistStage() {
+  const first = songWithChords()
+  const second = { ...songWithChords(), id: 'second', title: 'Second Song' }
+  return render(
+    <StageView
+      entries={[
+        { song: first, concert: first.originalKey, capo: 0 },
+        { song: second, concert: second.originalKey, capo: 0 },
+      ]}
+      nashville={false}
+      prefs={DEFAULT_PREFS}
+      onExit={() => {}}
+    />,
+  )
+}
+
+function swipe(dx: number, dy = 0) {
+  const body = document.querySelector('.stage-body') as HTMLElement
+  fireEvent.touchStart(body, { touches: [{ clientX: 200, clientY: 300 }] })
+  fireEvent.touchEnd(body, { changedTouches: [{ clientX: 200 + dx, clientY: 300 + dy }] })
+}
+
+const stageTitle = () => document.querySelector('.stage-title')?.textContent
+
+describe('StageView setlist songs', () => {
+  it('steps back to the previous song', () => {
+    renderSetlistStage()
+    const previous = screen.getByRole('button', { name: 'Previous song' }) as HTMLButtonElement
+    expect(previous.disabled).toBe(true)
+    fireEvent.click(screen.getByRole('button', { name: 'Next song' }))
+    expect(stageTitle()).toBe('Second Song')
+    expect((screen.getByRole('button', { name: 'Next song' }) as HTMLButtonElement).disabled).toBe(true)
+    fireEvent.click(screen.getByRole('button', { name: 'Previous song' }))
+    expect(stageTitle()).toBe('Keep Smiling')
+  })
+
+  it('swipes left for the next song and right for the previous one', () => {
+    renderSetlistStage()
+    swipe(-120)
+    expect(stageTitle()).toBe('Second Song')
+    swipe(120)
+    expect(stageTitle()).toBe('Keep Smiling')
+  })
+
+  it('ignores a mostly vertical drag so scrolling never changes song', () => {
+    renderSetlistStage()
+    swipe(-90, 200)
+    expect(stageTitle()).toBe('Keep Smiling')
+  })
+
+  it('has no song buttons for a single song', () => {
+    renderStage()
+    expect(screen.queryByRole('button', { name: 'Previous song' })).toBeNull()
+    expect(screen.queryByRole('button', { name: 'Next song' })).toBeNull()
+  })
+})
+
 describe('StageView quiet chart', () => {
   it('shows chords over lyrics with hideable transport, not song edit fields', () => {
     renderStage()

@@ -69,8 +69,8 @@ export function SetlistScreen({
                   aria-current={shown?.id === setlist.id ? 'true' : undefined}
                   onClick={() => { setExtra(null); setOpenedId(setlist.id) }}
                 >
-                  <strong>{setlist.name}</strong>
-                  <span className="meta">{setlist.date} · {songCount(setlist.entries.length)}</span>
+                  <strong>{setlistName(setlist)}</strong>
+                  <span className="meta">{[setlist.date, songCount(setlist.entries.length)].filter(Boolean).join(' · ')}</span>
                 </button>
               ))}
             </div>
@@ -128,7 +128,7 @@ function SetlistDetail({
     <article className="setlist-detail">
       {narrow && <button className="text-button setlist-back" type="button" onClick={onBack}>‹ Setlists</button>}
       <div className="setlist-detail-head">
-        <input className="field setlist-name" aria-label="Setlist name" value={setlist.name} onChange={(event) => onChange({ ...setlist, name: event.target.value })} />
+        <input className="field setlist-name" aria-label="Setlist name" placeholder="Setlist name" autoFocus={setlist.name === '' && setlist.entries.length === 0} value={setlist.name} onChange={(event) => onChange({ ...setlist, name: event.target.value })} />
         <input className="field setlist-date" aria-label="Setlist date" type="date" value={setlist.date} onChange={(event) => onChange({ ...setlist, date: event.target.value })} />
         <div className="setlist-actions">
           <button className="primary" type="button" onClick={() => onExport(setlist, rightHand)}>Export PDF</button>
@@ -142,7 +142,7 @@ function SetlistDetail({
               type="button"
               role="menuitem"
               onClick={() => {
-                if (!window.confirm(`Delete setlist “${setlist.name}”? This cannot be undone.`)) return
+                if (!window.confirm(`Delete setlist “${setlistName(setlist)}”? This cannot be undone.`)) return
                 onDelete(setlist.id)
               }}
             >
@@ -202,7 +202,7 @@ function SetlistDetail({
       })}
       <select
         className="select setlist-add"
-        aria-label={`Add a song to ${setlist.name}`}
+        aria-label="Add a song"
         value=""
         onChange={(event) => { if (event.target.value) onChange({ ...setlist, entries: [...setlist.entries, { songId: event.target.value }] }) }}
       >
@@ -265,6 +265,10 @@ function entrySummary(entry: SetlistEntry): string | null {
   if ((entry.capo ?? 0) > 0) parts.push(`Capo ${entry.capo}`)
   if (entry.notes?.trim()) parts.push(entry.notes.trim())
   return parts.length > 0 ? parts.join(' · ') : null
+}
+
+export function setlistName(setlist: Setlist): string {
+  return setlist.name.trim() || 'Untitled setlist'
 }
 
 function songCount(count: number): string {

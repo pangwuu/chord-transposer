@@ -449,6 +449,11 @@ describe('pdf', () => {
     expect(merged.getPageCount()).toBe(pages + (pages % 2) + pages)
   })
 
+  it('names the key once in Nashville mode instead of adding a Numbers line', () => {
+    const numbered = layoutPdf(firstLight, { ...pdfOptions(firstLight.originalKey), numbers: true })
+    expect(numbered.pages[0].meta).toBe('Key G    4/4    96 bpm')
+  })
+
   it('keeps artist, key, and time signature unless each one is hidden', () => {
     const shown = layoutPdf(firstLight, pdfOptions(firstLight.originalKey))
     expect(shown.pages[0].artist).toBe('Original demo')

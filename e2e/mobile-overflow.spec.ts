@@ -19,8 +19,8 @@ test('keeps setlists and settings inside the phone width', async ({ page }, test
   await page.goto('/')
   await page.locator('.phone-tabs').getByRole('button', { name: 'Setlists' }).click()
   await page.getByRole('button', { name: '+ New setlist' }).click()
-  await page.getByLabel(/Add a song to/).selectOption({ label: 'Amazing Grace' })
-  await page.getByLabel(/Add a song to/).selectOption({ label: 'First Light' })
+  await page.getByLabel('Add a song').selectOption({ label: 'Amazing Grace' })
+  await page.getByLabel('Add a song').selectOption({ label: 'First Light' })
 
   const setlists = await panelOverflows(page, '.setlists')
   expect(setlists.missing).toBe(false)

@@ -18,6 +18,7 @@ const DEFAULT_SPEED = 0.8
 const MIN_SPEED = 0.1
 const MAX_SPEED = 12
 const SPEED_STEP = 0.1
+const SWIPE_DISTANCE = 60
 const BASE_KEYS = ['C', 'Db', 'D', 'Eb', 'E', 'F', 'F#', 'G', 'Ab', 'A', 'Bb', 'B'] as const
 
 function keyOptions(prefs: SpellingPrefs): string[] {
@@ -60,6 +61,7 @@ export function StageView({
   const [speed, setSpeed] = useState(DEFAULT_SPEED)
   const [playing, setPlaying] = useState(false)
   const body = useRef<HTMLDivElement>(null)
+  const touchStart = useRef<{ x: number; y: number } | null>(null)
   const entry = entries[Math.min(songIndex, Math.max(0, entries.length - 1))]
 
   useEffect(() => {
@@ -113,6 +115,11 @@ export function StageView({
     setConcert((key) => keyFromPitch(notePitch(key.tonic), key.mode, next))
   }
 
+  const goSong = (direction: 1 | -1) => {
+    setSongIndex((value) => Math.min(entries.length - 1, Math.max(0, value + direction)))
+    body.current?.scrollTo?.({ top: 0 })
+  }
+
   const goSection = (direction: 1 | -1) => {
     setSection((value) => {
       const next = Math.min(played.length - 1, Math.max(0, value + direction))
@@ -139,16 +146,10 @@ export function StageView({
               <button className="primary" type="button" onClick={() => setPlaying((value) => !value)}>{playing ? 'Pause' : 'Autoscroll'}</button>
               <button className="outline" type="button" onClick={() => goSection(1)}>Next section</button>
               {entries.length > 1 && (
-                <button
-                  className="outline"
-                  type="button"
-                  onClick={() => {
-                    setSongIndex((value) => Math.min(entries.length - 1, value + 1))
-                    body.current?.scrollTo({ top: 0 })
-                  }}
-                >
-                  Next song
-                </button>
+                <>
+                  <button className="outline" type="button" disabled={songIndex === 0} onClick={() => goSong(-1)}>Previous song</button>
+                  <button className="outline" type="button" disabled={songIndex >= entries.length - 1} onClick={() => goSong(1)}>Next song</button>
+                </>
               )}
             </>
           )}
@@ -243,7 +244,24 @@ export function StageView({
           </div>
         </div>}
       </div>
-      <div className="stage-body" ref={body}>
+      <div
+        className="stage-body"
+        ref={body}
+        onTouchStart={(event) => {
+          const touch = event.touches[0]
+          touchStart.current = touch ? { x: touch.clientX, y: touch.clientY } : null
+        }}
+        onTouchEnd={(event) => {
+          const start = touchStart.current
+          const touch = event.changedTouches[0]
+          touchStart.current = null
+          if (!start || !touch || entries.length < 2) return
+          const dx = touch.clientX - start.x
+          const dy = touch.clientY - start.y
+          if (Math.abs(dx) < SWIPE_DISTANCE || Math.abs(dx) < Math.abs(dy) * 1.5) return
+          goSong(dx < 0 ? 1 : -1)
+        }}
+      >
         <header className="stage-head">
           <strong className="stage-title">{song.title}</strong>
           {song.artist && <p className="stage-artist">{song.artist}</p>}
