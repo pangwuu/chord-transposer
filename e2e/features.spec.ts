@@ -243,6 +243,38 @@ test('changes the PDF paper and fit from the export dialog', async ({ page }, te
   }
 })
 
+test('pads the export Cancel and Download actions evenly', async ({ page }, testInfo) => {
+  await page.setViewportSize({ width: testInfo.project.name === 'mobile' ? 390 : 1280, height: 640 })
+  await openFirstSong(page)
+  if (mobile(testInfo.project.name)) await page.getByRole('button', { name: 'Preview' }).click()
+  await page.getByRole('button', { name: 'Export PDF' }).click()
+  const dialog = page.getByRole('dialog', { name: 'Export PDF' })
+  const actions = dialog.locator('.row-meta')
+  const cancel = dialog.getByRole('button', { name: 'Cancel' })
+  const download = dialog.getByRole('button', { name: 'Download' })
+  await dialog.evaluate((el) => {
+    el.scrollTop = el.scrollHeight
+  })
+  const dialogBox = await dialog.boundingBox()
+  const actionsBox = await actions.boundingBox()
+  const cancelBox = await cancel.boundingBox()
+  const downloadBox = await download.boundingBox()
+  expect(dialogBox).not.toBeNull()
+  expect(actionsBox).not.toBeNull()
+  expect(cancelBox).not.toBeNull()
+  expect(downloadBox).not.toBeNull()
+  const left = cancelBox!.x - dialogBox!.x
+  const right = dialogBox!.x + dialogBox!.width - (downloadBox!.x + downloadBox!.width)
+  const top = downloadBox!.y - actionsBox!.y
+  const bottom = dialogBox!.y + dialogBox!.height - (downloadBox!.y + downloadBox!.height)
+  expect(left).toBeGreaterThanOrEqual(14)
+  expect(right).toBeGreaterThanOrEqual(14)
+  expect(top).toBeGreaterThanOrEqual(14)
+  expect(bottom).toBeGreaterThanOrEqual(14)
+  expect(Math.abs(left - right)).toBeLessThan(4)
+  expect(Math.abs(top - bottom)).toBeLessThan(6)
+})
+
 test('steps a projector slide and leaves the stage', async ({ page }) => {
   await openFirstSong(page)
   await editorAction(page, 'Projector View')
@@ -285,6 +317,39 @@ test('switches theme and finds a song from the library', async ({ page }, testIn
     await page.getByRole('button', { name: '+ New song' }).click()
   }
   await expect(page.getByLabel('Title')).toHaveValue('Untitled song')
+})
+
+test('deletes the open song from the menu after confirmation', async ({ page }, testInfo) => {
+  await page.goto('/')
+  await songs(page, testInfo.project.name)
+  await page.getByRole('button', { name: '+ New song' }).click()
+  await expect(page.getByLabel('Title')).toHaveValue('Untitled song')
+  page.once('dialog', (dialog) => {
+    expect(dialog.message()).toMatch(/Delete song “Untitled song”/)
+    void dialog.accept()
+  })
+  await editorAction(page, 'Delete song')
+  await songs(page, testInfo.project.name)
+  await expect(page.getByRole('button', { name: /Untitled song/ })).toHaveCount(0)
+  await expect(page.getByLabel('Title')).not.toHaveValue('Untitled song')
+})
+
+test('keeps the setlist when delete confirmation is cancelled', async ({ page }, testInfo) => {
+  await page.goto('/')
+  const setlists =
+    testInfo.project.name === 'mobile'
+      ? page.locator('.phone-tabs').getByRole('button', { name: 'Setlists' })
+      : page.locator('.side-nav').getByRole('button', { name: 'Setlists' })
+  await setlists.click()
+  await page.getByRole('button', { name: '+ New setlist' }).click()
+  await expect(page.getByLabel('Setlist name')).toHaveValue('Sunday')
+  page.once('dialog', (dialog) => {
+    expect(dialog.message()).toMatch(/Delete setlist “Sunday”/)
+    void dialog.dismiss()
+  })
+  await page.getByRole('button', { name: 'Setlist actions' }).click()
+  await page.getByRole('menuitem', { name: 'Delete' }).click()
+  await expect(page.getByLabel('Setlist name')).toHaveValue('Sunday')
 })
 
 test('copies a share link and downloads a ChordPro file', async ({ page }) => {

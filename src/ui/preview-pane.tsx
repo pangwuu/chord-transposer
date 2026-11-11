@@ -110,14 +110,14 @@ export function PaperPage({
           ) : (
             <>
               <h2>{page.title}</h2>
-              {page.artist && <p>{page.artist}</p>}
+              {page.artist && <p className="paper-artist">{page.artist}</p>}
               {(page.meta || page.capoLabel) && (
-                <p>
+                <p className="paper-meta">
                   {page.meta}
                   {page.capoLabel ? ` ${page.capoLabel}` : ''}
                 </p>
               )}
-              {page.order && <p>{page.order}</p>}
+              {page.order && <p className="paper-order">{page.order}</p>}
             </>
           )}
           <div className="rule" />

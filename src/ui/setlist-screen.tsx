@@ -138,7 +138,16 @@ function SetlistDetail({
               <input type="checkbox" checked={rightHand} onChange={(event) => onRightHand(event.target.checked)} />
               Right-hand pages
             </label>
-            <button type="button" role="menuitem" onClick={() => onDelete(setlist.id)}>Delete</button>
+            <button
+              type="button"
+              role="menuitem"
+              onClick={() => {
+                if (!window.confirm(`Delete setlist “${setlist.name}”? This cannot be undone.`)) return
+                onDelete(setlist.id)
+              }}
+            >
+              Delete
+            </button>
           </Menu>
         </div>
       </div>

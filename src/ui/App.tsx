@@ -342,6 +342,36 @@ export function App() {
     setPlace('editor')
   }
 
+  async function deleteCurrentSong() {
+    const current = editor
+    if (!current) return
+    if (!window.confirm(`Delete song “${current.song.title}”? This cannot be undone.`)) return
+    const id = current.song.id
+    await library.current.deleteSong(id)
+    const remaining = songs.filter((song) => song.id !== id)
+    setSongs(remaining)
+    setSetlists((currentSetlists) =>
+      currentSetlists.map((setlist) => ({
+        ...setlist,
+        entries: setlist.entries.filter((entry) => entry.songId !== id),
+      })),
+    )
+    setMenuOpen(false)
+    if (remaining[0]) {
+      const opened = openEditor(remaining[0])
+      setEditor({
+        ...opened,
+        prefs: settings.prefs,
+        concert: keyFromPitch(notePitch(opened.concert.tonic), opened.concert.mode, settings.prefs),
+      })
+      setPlace('editor')
+    } else {
+      setEditor(null)
+      setPlace('songs')
+    }
+    setLive('Song deleted')
+  }
+
   function applyPrefs(prefs: SpellingPrefs) {
     const next = { ...settings, prefs }
     setSettings(next)
@@ -426,6 +456,7 @@ export function App() {
                     <button type="button" role="menuitem" onClick={() => { copyShare(editor.song, announce); setMenuOpen(false) }}>Copy Share Link</button>
                     <button type="button" role="menuitem" onClick={() => { if (editor) setPerformance({ mode: 'stage', entries: [{ song: editor.song, concert: editor.concert, capo: editor.capo }], nashville: editor.nashville }); setMenuOpen(false) }}>Performance View</button>
                     <button type="button" role="menuitem" onClick={() => { if (view) setPerformance({ mode: 'projector', songs: [view] }); setMenuOpen(false) }}>Projector View</button>
+                    <button type="button" role="menuitem" onClick={() => { void deleteCurrentSong() }}>Delete song</button>
                   </div>
                 )}
               </div>

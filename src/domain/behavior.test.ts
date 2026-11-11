@@ -370,7 +370,7 @@ describe('pdf', () => {
   })
 
   it('tightens spacing before it changes the lyric size', () => {
-    const layout = layoutPdf(verseOf(42), { ...pdfOptions(parseKey('C')), fit: 1, fontSize: 12 })
+    const layout = layoutPdf(verseOf(43), { ...pdfOptions(parseKey('C')), fit: 1, fontSize: 12 })
     expect(layout.fontSize).toBe(12)
     expect(layout.spacing).toBe(0.8)
     expect(layout.columns).toBe(1)
@@ -423,7 +423,7 @@ describe('pdf', () => {
   })
 
   it('uses a real second column before it changes the lyric size', () => {
-    const layout = layoutPdf(longSong(44), { ...pdfOptions(parseKey('C')), fit: 1, fontSize: 12, allowTwoColumns: true })
+    const layout = layoutPdf(longSong(45), { ...pdfOptions(parseKey('C')), fit: 1, fontSize: 12, allowTwoColumns: true })
     expect(layout.fontSize).toBe(12)
     expect(layout.columns).toBe(2)
     expect(layout.spacing).toBe(0.8)
@@ -608,6 +608,21 @@ describe('share and library', () => {
     expect(replaced.map((song) => song.title)).toEqual(['Replacement'])
     const both = applyRestore([firstLight], [{ ...amazingGrace, id: firstLight.id }], { [firstLight.id]: 'keep' })
     expect(both).toHaveLength(2)
+  })
+
+  it('deletes a song and drops it from every setlist', async () => {
+    const library = memoryLibrary()
+    await library.saveSong(firstLight)
+    await library.saveSetlist({
+      id: 'set-1',
+      name: 'Sunday',
+      date: '2026-03-01',
+      entries: [{ songId: firstLight.id }, { songId: amazingGrace.id }],
+    })
+    await library.deleteSong(firstLight.id)
+    const snapshot = await library.load()
+    expect(snapshot.songs.map((song) => song.id)).toEqual([])
+    expect(snapshot.setlists[0]?.entries).toEqual([{ songId: amazingGrace.id }])
   })
 })
 
