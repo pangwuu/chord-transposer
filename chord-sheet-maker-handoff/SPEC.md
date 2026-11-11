@@ -177,6 +177,7 @@ The PDF must be readable at a distance on a music stand, with pages laid side by
 - If a section is longer than a page, split it only between lines, never between a chord line and its lyric.
 - Avoid a page that holds just one short section at the end: try fitting, in order, by reducing spacing, then by switching to two columns (if the user allowed it), then by reducing font size (never below 10 pt).
 - A "Fit to N pages" option (1, 2, auto) that applies these rules.
+- **Line spacing:** the room below each lyric and bar line defaults to 2.5× and can be set from 1× to 4× in the export options. A chord stays tight to its lyric. Fit to 1 or 2 pages gives up this room first.
 - **Two-column mode:** sections flow down column 1 then column 2. A section never splits across columns.
 - **Side-by-side layout check:** pages are designed to be laid left to right, so an arrangement should be readable without flipping back. Repeated sections are printed where they occur in the arrangement by default (option: print once with "Chorus ×2" or a "Repeat Chorus" pointer instead).
 
@@ -193,6 +194,7 @@ The PDF must be readable at a distance on a music stand, with pages laid side by
 - **Stage view:** Quiet Chart reading mode — large text, dark mode, solid header (Exit / key / Speed / Autoscroll / Next section / Next song + transpose/Capo/accidentals/Nashville) that stays open until the eye hides it. The eye stays on screen; a closed eye leaves only that icon. The header sits above the title. In-flow section headings, chords over lyrics with wrap, screen wake lock; autoscroll default 0.8 in 0.1 steps; session-local controls (no save-back); uses the setlist order.
 - **Projector view:** lyrics only, large, one section per screen, arrow keys to advance.
 - **Setlists:** name, date, ordered songs, key and capo per song, notes; export as one PDF; step through on stage.
+- **Phone start screen:** a phone opens on the all-songs list. A share link that adds a new song opens that song in the editor instead.
 - **Sharing:** export a song or setlist as a file, and a share link that encodes the song in the URL (compressed). Opening the link imports an editable local copy into the recipient's library (no account). For view-only handoff, export a PDF instead.
 
 ---

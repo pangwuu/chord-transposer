@@ -3,6 +3,8 @@ import {
   blockHeight,
   HEADING_SIZE,
   layoutStatus,
+  lineGapBelow,
+  SECTION_LEAD_IN,
   type PdfBlock,
   type PdfDocument,
   type PdfMeasure,
@@ -125,7 +127,7 @@ export function PaperPage({
             fontSize={layout.fontSize}
             spacing={layout.spacing}
             measure={{
-              chordLyricSpacing: layout.chordLyricSpacing,
+              lineSpacing: layout.lineSpacing,
               sectionLeadIn: layout.sectionLeadIn,
               headingSize: layout.headingSize,
             }}
@@ -250,7 +252,11 @@ function PreviewBlock({
     return (
       <div
         className={showSectionDivider ? 'section-rule' : 'section-rule plain'}
-        style={{ height, fontSize: measure.headingSize ?? HEADING_SIZE }}
+        style={{
+          height,
+          fontSize: measure.headingSize ?? HEADING_SIZE,
+          paddingTop: (measure.sectionLeadIn ?? SECTION_LEAD_IN) * spacing,
+        }}
       >
         {block.label}
       </div>
@@ -276,7 +282,10 @@ function PreviewBlock({
         {block.text}
       </p>
     )
-  const chordGap = block.chords.length ? Math.max(0, height - fontSize * 2) : 0
+  const lineGap = lineGapBelow(block, fontSize, spacing, measure)
+  const chordGap = block.chords.length
+    ? Math.max(0, height - lineGap - fontSize * 2)
+    : 0
   return (
     <div
       style={{

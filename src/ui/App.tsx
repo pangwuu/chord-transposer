@@ -67,7 +67,7 @@ export function App() {
   const editorRef = useRef<EditorState | null>(null)
   const searchRef = useRef<HTMLInputElement>(null)
   const phone = usePhone()
-  const [place, setPlace] = useState<'songs' | 'editor' | 'sets' | 'settings' | 'import'>('editor')
+  const [place, setPlace] = useState<'songs' | 'editor' | 'sets' | 'settings' | 'import'>(() => (phone ? 'songs' : 'editor'))
   const [showPreview, setShowPreview] = useState(false)
   const [mode, setMode] = useState<'visual' | 'chordpro'>('visual')
   const [menuOpen, setMenuOpen] = useState(false)
@@ -109,6 +109,7 @@ export function App() {
             if (!list.some((song) => song.id === shared.id)) {
               list = [shared, ...list]
               await library.current.saveSong(shared)
+              if (!cancel) setPlace('editor')
             }
             history.replaceState(null, '', location.pathname)
           } catch { /* ignore a bad share link */ }

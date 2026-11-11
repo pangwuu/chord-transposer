@@ -9,7 +9,7 @@ import { chordTextFromPdfItems, importText } from './import-text'
 import { padCollisions } from './line-layout'
 import { memoryLibrary } from './memory-library'
 import { formatLyric, fromChordPro, toChordPro } from './chordpro'
-import { blockHeight, charsPerLine, layoutPdf, layoutSetlist, pageSize, SECTION_LEAD_IN } from './pdf-layout'
+import { blockHeight, charsPerLine, layoutPdf, layoutSetlist, lineGapBelow, pageSize, SECTION_LEAD_IN } from './pdf-layout'
 import { renderPdf, rightHandParts, mergePdfs } from './pdf-render'
 import { decodeShare, encodeShare } from './share'
 import { addBarChord, emptySong, idSequence, performance, type Song } from './song'
@@ -331,7 +331,7 @@ describe('pdf', () => {
 
   it('keeps a section that fits on one page together and numbers every page', () => {
     const song = longSong(36)
-    const layout = layoutPdf(song, pdfOptions(song.originalKey))
+    const layout = layoutPdf(song, { ...pdfOptions(song.originalKey), lineSpacing: 1 })
     expect(layout.pages.length).toBeGreaterThan(1)
     const chorusPages = layout.pages.filter((page) => page.blocks.some((block) => block.kind === 'section' && block.label.startsWith('CHORUS')))
     expect(chorusPages).toHaveLength(1)
@@ -483,16 +483,43 @@ describe('pdf', () => {
     expect(closed.pages[1].runningHeader).toContain('(cont.)')
   })
 
-  it('scales the gap between chords and lyrics and the gap before the next section', () => {
+  it('leaves room below each line by default, and only below lyric and bar lines', () => {
     const chorded = { kind: 'lyric' as const, text: 'Hello', chords: [{ label: 'G', index: 0, invalid: false }] }
     const plain = { kind: 'lyric' as const, text: 'Hello', chords: [] }
+    const bars = { kind: 'bars' as const, text: '| G | D |' }
     const section = { kind: 'section' as const, label: 'VERSE', continued: false }
-    const height = (block: typeof chorded | typeof plain | typeof section, chordLyricSpacing = 1, sectionLeadIn = SECTION_LEAD_IN) =>
-      blockHeight(block, 12, 1, { chordLyricSpacing, sectionLeadIn })
-    expect(height(chorded, 2)).toBeGreaterThan(height(chorded, 1))
-    expect(height(plain, 2)).toBe(height(plain, 1))
-    expect(height(section, 1, 24)).toBeGreaterThan(height(section, 1, 12))
-    expect(height(chorded, 1, 24)).toBe(height(chorded, 1, 12))
+    const comment = { kind: 'comment' as const, text: 'Softly' }
+    expect(blockHeight(chorded, 12, 1, { lineSpacing: 1 })).toBe(27)
+    expect(blockHeight(chorded, 12, 1)).toBeCloseTo(31.8)
+    expect(blockHeight(chorded, 12, 1) - lineGapBelow(chorded, 12, 1)).toBeCloseTo(27)
+    expect(blockHeight(plain, 12, 1, { lineSpacing: 1 })).toBe(17)
+    expect(blockHeight(plain, 12, 1)).toBeCloseTo(21.8)
+    expect(blockHeight(bars, 12, 1)).toBeCloseTo(25.8)
+    expect(blockHeight(section, 12, 1)).toBe(42)
+    expect(blockHeight(comment, 12, 1)).toBe(16)
+  })
+
+  it('puts fewer lines on a page by default, and lets the room go first when fitting', () => {
+    const roomy = layoutPdf(verseOf(42), pdfOptions(parseKey('C')))
+    const tight = layoutPdf(verseOf(42), { ...pdfOptions(parseKey('C')), lineSpacing: 1 })
+    expect(roomy.lineSpacing).toBe(2.5)
+    expect(tight.lineSpacing).toBe(1)
+    expect(roomy.pages[0].blocks.length).toBeLessThan(tight.pages[0].blocks.length)
+
+    const justFits = layoutPdf(verseOf(36), { ...pdfOptions(parseKey('C')), fit: 1 })
+    expect(justFits.pages).toHaveLength(1)
+    expect(justFits.spacing).toBe(1)
+    expect(justFits.fontSize).toBe(12)
+    expect(justFits.lineSpacing).toBeLessThan(2.5)
+  })
+
+  it('scales the gap before the next section without moving lyric lines', () => {
+    const chorded = { kind: 'lyric' as const, text: 'Hello', chords: [{ label: 'G', index: 0, invalid: false }] }
+    const section = { kind: 'section' as const, label: 'VERSE', continued: false }
+    const height = (block: typeof chorded | typeof section, sectionLeadIn = SECTION_LEAD_IN) =>
+      blockHeight(block, 12, 1, { sectionLeadIn })
+    expect(height(section, 24)).toBeGreaterThan(height(section, 12))
+    expect(height(chorded, 24)).toBe(height(chorded, 12))
     expect(height(chorded)).toBe(blockHeight(chorded, 12, 1))
     expect(height(section)).toBe(blockHeight(section, 12, 1))
   })

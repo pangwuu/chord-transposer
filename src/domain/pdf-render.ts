@@ -3,6 +3,7 @@ import { PDFDocument, rgb, type PDFFont, type PDFPage } from 'pdf-lib'
 import {
   blockHeight,
   columnBounds,
+  lineGapBelow,
   type PdfBlock,
   type PdfDocument,
   type PdfPage,
@@ -35,7 +36,7 @@ export async function renderPdf(
       {
         fontSize: layout.fontSize,
         spacing: layout.spacing,
-        chordLyricSpacing: layout.chordLyricSpacing,
+        lineSpacing: layout.lineSpacing,
         sectionLeadIn: layout.sectionLeadIn,
         showColumnDivider: layout.showColumnDivider,
         showSectionDivider: layout.showSectionDivider,
@@ -81,7 +82,7 @@ export async function mergePdfs(parts: Uint8Array[]): Promise<Uint8Array> {
 type DrawStyle = {
   fontSize: number
   spacing: number
-  chordLyricSpacing: number
+  lineSpacing: number
   sectionLeadIn: number
   showColumnDivider: boolean
   showSectionDivider: boolean
@@ -264,11 +265,12 @@ function drawBlock(
   hair: ReturnType<typeof rgb>,
 ): number {
   const { fontSize, spacing } = style
-  const height = blockHeight(block, fontSize, spacing, {
-    chordLyricSpacing: style.chordLyricSpacing,
+  const measure = {
+    lineSpacing: style.lineSpacing,
     sectionLeadIn: style.sectionLeadIn,
     headingSize: style.headingSize,
-  })
+  }
+  const height = blockHeight(block, fontSize, spacing, measure)
   if (block.kind === 'section') {
     const lead = style.sectionLeadIn * spacing
     const headingSize = style.headingSize
@@ -327,7 +329,11 @@ function drawBlock(
     }
     page.drawText(block.text, {
       x: left,
-      y: y - height + fontSize * 0.2,
+      y:
+        y -
+        height +
+        lineGapBelow(block, fontSize, spacing, measure) +
+        fontSize * 0.2,
       size: fontSize,
       font: fonts.mono,
       color: ink,

@@ -1,5 +1,6 @@
 import { useRef } from 'react'
 import {
+  DEFAULT_LINE_SPACING,
   HEADING_SIZE,
   SECTION_LEAD_IN,
   layoutStatus,
@@ -21,7 +22,7 @@ export type PdfChoices = {
   showArtist: boolean
   showKey: boolean
   showTime: boolean
-  chordLyricSpacing: number
+  lineSpacing: number
   sectionLeadIn: number
   showColumnDivider: boolean
   showSectionDivider: boolean
@@ -38,7 +39,7 @@ export const defaultPdfChoices = (): PdfChoices => ({
   showArtist: true,
   showKey: true,
   showTime: true,
-  chordLyricSpacing: 1,
+  lineSpacing: DEFAULT_LINE_SPACING,
   sectionLeadIn: SECTION_LEAD_IN,
   showColumnDivider: true,
   showSectionDivider: true,
@@ -342,23 +343,20 @@ function PdfChoiceFields({
           onChange({ ...choices, showTime: event.target.checked })
         }
       />
-      <span>Chord spacing</span>
+      <span>Line spacing</span>
       <label className="choice-slider">
         <input
-          aria-label="Chord and lyric spacing"
+          aria-label="Space between lines"
           type="range"
-          min={0.5}
-          max={2}
+          min={1}
+          max={4}
           step={0.1}
-          value={choices.chordLyricSpacing}
+          value={choices.lineSpacing}
           onChange={(event) =>
-            onChange({
-              ...choices,
-              chordLyricSpacing: Number(event.target.value),
-            })
+            onChange({ ...choices, lineSpacing: Number(event.target.value) })
           }
         />
-        <span>{choices.chordLyricSpacing.toFixed(1)}×</span>
+        <span>{choices.lineSpacing.toFixed(1)}×</span>
       </label>
       <span>Section gap</span>
       <label className="choice-slider">

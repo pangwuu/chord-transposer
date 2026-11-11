@@ -1,7 +1,8 @@
 import { expect, test } from '@playwright/test'
+import { openFirstSong } from './helpers'
 
 test('nudges, adds, edits, deletes, and replaces chords', async ({ page }) => {
-  await page.goto('/')
+  await openFirstSong(page)
   await expect(page.getByLabel('Title')).toHaveValue('Amazing Grace')
   const chord = page.getByRole('button', { name: /^Chord / }).first()
   await chord.click()
@@ -28,7 +29,7 @@ test('nudges, adds, edits, deletes, and replaces chords', async ({ page }) => {
 })
 
 test('shows ChordPro beside the chart and opens import review', async ({ page }, testInfo) => {
-  await page.goto('/')
+  await openFirstSong(page)
   await page.getByRole('button', { name: 'More actions' }).click()
   await page.getByRole('menuitem', { name: 'Use ChordPro Editor', exact: true }).click()
   await expect(page.getByLabel('ChordPro source')).toBeVisible()
@@ -42,7 +43,7 @@ test('shows ChordPro beside the chart and opens import review', async ({ page },
 })
 
 test('walks a setlist on stage', async ({ page }, testInfo) => {
-  await page.goto('/')
+  await openFirstSong(page)
   const setlists = testInfo.project.name === 'mobile' ? page.locator('.phone-tabs').getByRole('button', { name: 'Setlists' }) : page.locator('.side-nav').getByRole('button', { name: 'Setlists' })
   await setlists.click()
   await page.getByRole('button', { name: '+ New setlist' }).click()
@@ -57,6 +58,6 @@ test('walks a setlist on stage', async ({ page }, testInfo) => {
 
 test('registers a service worker in the installed app', async ({ page }) => {
   test.skip(process.env.E2E_PREVIEW !== '1', 'The dev server does not install the offline worker')
-  await page.goto('/')
+  await openFirstSong(page)
   await page.waitForFunction(() => navigator.serviceWorker.getRegistrations().then((regs) => regs.length > 0))
 })

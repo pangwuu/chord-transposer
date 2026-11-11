@@ -1,4 +1,5 @@
 import { expect, type Page, test } from '@playwright/test'
+import { openFirstSong } from './helpers'
 
 function mobile(name: string) {
   return name === 'mobile'
@@ -14,7 +15,7 @@ async function editorAction(page: Page, name: string) {
 }
 
 test('transposes, shows capo shapes, and numbers the chords', async ({ page }) => {
-  await page.goto('/')
+  await openFirstSong(page)
   await expect(page.getByLabel('Title')).toHaveValue('Amazing Grace')
   await page.getByRole('button', { name: 'Key up a semitone' }).click()
   await expect(page.getByRole('combobox', { name: 'Key' })).toHaveValue('Ab')
@@ -30,7 +31,7 @@ test('transposes, shows capo shapes, and numbers the chords', async ({ page }) =
 })
 
 test('nudges from the touch toolbar, then undo puts the chord back', async ({ page }) => {
-  await page.goto('/')
+  await openFirstSong(page)
   await page.getByRole('button', { name: 'Chord G over "Amazing"' }).click()
   await page.getByRole('button', { name: 'Move right one letter' }).click()
   await expect(page.getByRole('status')).toContainText('Chord moved')
@@ -41,7 +42,7 @@ test('nudges from the touch toolbar, then undo puts the chord back', async ({ pa
 
 test('drags a chord along the lyric on a wide screen', async ({ page }, testInfo) => {
   test.skip(mobile(testInfo.project.name), 'A finger drag is covered by the toolbar nudge on a phone')
-  await page.goto('/')
+  await openFirstSong(page)
   const chord = page.getByRole('button', { name: 'Chord G over "Amazing"' })
   await chord.dragTo(page.getByRole('button', { name: 'Add a chord on z' }).first())
   await expect(page.getByRole('status')).toContainText('Chord moved')
@@ -49,7 +50,7 @@ test('drags a chord along the lyric on a wide screen', async ({ page }, testInfo
 })
 
 test('keeps bar-line chords on the bar line', async ({ page }, testInfo) => {
-  await page.goto('/')
+  await openFirstSong(page)
   await songs(page, testInfo.project.name)
   await page.getByRole('button', { name: 'First Light' }).click()
   const bars = page.locator('.section', { has: page.getByLabel('Intro name') }).locator('.bars')
@@ -67,7 +68,7 @@ test('keeps bar-line chords on the bar line', async ({ page }, testInfo) => {
 })
 
 test('adds a comment, a bar line, and an arrangement repeat', async ({ page }) => {
-  await page.goto('/')
+  await openFirstSong(page)
   const comment = page.getByRole('button', { name: 'Comment' }).first()
   await comment.click()
   await expect(page.getByLabel('Comment')).toBeVisible()
@@ -86,7 +87,7 @@ test('adds a comment, a bar line, and an arrangement repeat', async ({ page }) =
 })
 
 test('keeps a ChordPro edit and the chart in sync', async ({ page }) => {
-  await page.goto('/')
+  await openFirstSong(page)
   await editorAction(page, 'Use ChordPro Editor')
   const source = page.getByLabel('ChordPro source')
   await expect(source).toBeVisible()
@@ -99,7 +100,7 @@ test('keeps a ChordPro edit and the chart in sync', async ({ page }) => {
 })
 
 test('adds a chord to an imported instrumental and saves it', async ({ page }, testInfo) => {
-  await page.goto('/')
+  await openFirstSong(page)
   await songs(page, testInfo.project.name)
   await page.getByRole('button', { name: 'Import' }).click()
   await page.getByLabel('Source text').fill('Intro\nG    D    Em    C\n')
@@ -112,7 +113,7 @@ test('adds a chord to an imported instrumental and saves it', async ({ page }, t
 })
 
 test('reviews an import and saves it into the library', async ({ page }, testInfo) => {
-  await page.goto('/')
+  await openFirstSong(page)
   await songs(page, testInfo.project.name)
   await page.getByRole('button', { name: 'Import' }).click()
   await page.getByLabel('Source text').fill('Verse 1\nC            G\nMorning light falls\n')
@@ -123,7 +124,7 @@ test('reviews an import and saves it into the library', async ({ page }, testInf
 
 test('reviews a song beside its source with save kept in reach', async ({ page }, testInfo) => {
   await page.setViewportSize({ width: mobile(testInfo.project.name) ? 390 : 1280, height: 800 })
-  await page.goto('/')
+  await openFirstSong(page)
   await songs(page, testInfo.project.name)
   await page.getByRole('button', { name: 'Import' }).click()
   await page.getByLabel('Source text').fill('{title: Kitchen}\n{key: G}\n[G]Morning [D]light\n')
@@ -159,7 +160,7 @@ test('reviews a song beside its source with save kept in reach', async ({ page }
 
 test('scrolls a setlist export when the pages run past the window', async ({ page }, testInfo) => {
   await page.setViewportSize({ width: testInfo.project.name === 'mobile' ? 390 : 1280, height: 640 })
-  await page.goto('/')
+  await openFirstSong(page)
   const setlists =
     testInfo.project.name === 'mobile'
       ? page.locator('.phone-tabs').getByRole('button', { name: 'Setlists' })
@@ -183,7 +184,7 @@ test('scrolls a setlist export when the pages run past the window', async ({ pag
 
 test('previews a song PDF beside the export settings and scrolls it', async ({ page }, testInfo) => {
   await page.setViewportSize({ width: testInfo.project.name === 'mobile' ? 390 : 1280, height: 640 })
-  await page.goto('/')
+  await openFirstSong(page)
   if (mobile(testInfo.project.name)) await page.getByRole('button', { name: 'Preview' }).click()
   await page.getByRole('button', { name: 'Export PDF' }).click()
   const dialog = page.getByRole('dialog', { name: 'Export PDF' })
@@ -206,8 +207,21 @@ test('previews a song PDF beside the export settings and scrolls it', async ({ p
   await expect.poll(async () => dialog.evaluate((el) => el.scrollTop), { message: `parked ${parked}` }).toBeGreaterThan(parked + 40)
 })
 
+test('leaves room between a section heading and its first line in the preview', async ({ page }, testInfo) => {
+  test.skip(mobile(testInfo.project.name), 'The preview opens beside the editor on a wide screen')
+  await openFirstSong(page)
+  const heading = page.locator('.paper .section-rule').nth(0)
+  await expect(heading).toBeVisible()
+  const gap = await heading.evaluate((node) => {
+    const label = document.createRange()
+    label.selectNodeContents(node)
+    return node.nextElementSibling!.getBoundingClientRect().top - label.getBoundingClientRect().bottom
+  })
+  expect(gap).toBeGreaterThan(8)
+})
+
 test('changes the PDF paper and fit from the export dialog', async ({ page }, testInfo) => {
-  await page.goto('/')
+  await openFirstSong(page)
   if (mobile(testInfo.project.name)) {
     await page.getByRole('button', { name: 'Preview' }).click()
     await expect(page.getByRole('button', { name: 'Back' })).toBeVisible()
@@ -227,7 +241,7 @@ test('changes the PDF paper and fit from the export dialog', async ({ page }, te
 })
 
 test('steps a projector slide and leaves the stage', async ({ page }) => {
-  await page.goto('/')
+  await openFirstSong(page)
   await editorAction(page, 'Projector View')
   await expect(page.locator('.projector')).toContainText('Amazing grace')
   await page.keyboard.press('ArrowRight')
@@ -242,7 +256,7 @@ test('steps a projector slide and leaves the stage', async ({ page }) => {
 })
 
 test('switches theme and finds a song from the library', async ({ page }, testInfo) => {
-  await page.goto('/')
+  await openFirstSong(page)
   await songs(page, testInfo.project.name)
   const settings = mobile(testInfo.project.name)
     ? page.locator('.phone-tabs').getByRole('button', { name: 'Settings' })
@@ -271,7 +285,7 @@ test('switches theme and finds a song from the library', async ({ page }, testIn
 })
 
 test('copies a share link and downloads a ChordPro file', async ({ page }) => {
-  await page.goto('/')
+  await openFirstSong(page)
   await page.context().grantPermissions(['clipboard-read', 'clipboard-write'])
   await editorAction(page, 'Copy Share Link')
   await expect(page.getByRole('status')).toContainText('Share link copied')
@@ -283,7 +297,7 @@ test('copies a share link and downloads a ChordPro file', async ({ page }) => {
 })
 
 test('does not show capo chips or per-line Edit lyric', async ({ page }) => {
-  await page.goto('/')
+  await openFirstSong(page)
   await expect(page.getByRole('button', { name: /Capo \d+ ·/ })).toHaveCount(0)
   await expect(page.getByRole('button', { name: 'Edit lyric' })).toHaveCount(0)
 })

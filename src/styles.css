@@ -147,8 +147,9 @@ button { cursor: pointer; }
 .paper h2, .paper p, .paper .run { font-family: Inter, sans-serif; color: black; }
 .paper h2 { font-size: 21px; margin: 0 0 6px; }
 .paper .rule { border-top: 1px solid black; margin: 8px 0; }
-.paper .section-rule { font-family: Inter, sans-serif; font-weight: 700; font-size: 11px; letter-spacing: .06em; border-bottom: 1px solid #999; margin: 0; display: flex; align-items: flex-end; }
-.paper .section-rule.plain { border-bottom-color: transparent; }
+.paper .section-rule { box-sizing: border-box; font-family: Inter, sans-serif; font-weight: 700; font-size: 11px; line-height: 1; letter-spacing: .06em; margin: 0; display: flex; align-items: flex-start; gap: 8px; }
+.paper .section-rule::after { content: ''; flex: 1; margin-top: .73em; border-top: 1px solid #999; }
+.paper .section-rule.plain::after { border-top-color: transparent; }
 .paper .columns { display: flex; gap: 18px; align-items: flex-start; }
 .paper .columns > div { flex: 1; min-width: 0; }
 .paper .columns > div + div { border-left: 1px solid #999; padding-left: 8px; }

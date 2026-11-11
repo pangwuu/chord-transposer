@@ -30,7 +30,7 @@ export type PdfOptions = {
   showArtist?: boolean
   showKey?: boolean
   showTime?: boolean
-  chordLyricSpacing?: number
+  lineSpacing?: number
   sectionLeadIn?: number
   showColumnDivider?: boolean
   showSectionDivider?: boolean
@@ -72,7 +72,7 @@ export type PdfDocument = {
   fontSize: number
   columns: 1 | 2
   spacing: number
-  chordLyricSpacing: number
+  lineSpacing: number
   sectionLeadIn: number
   showColumnDivider: boolean
   showSectionDivider: boolean
@@ -81,7 +81,7 @@ export type PdfDocument = {
 }
 
 export type PdfMeasure = {
-  chordLyricSpacing?: number
+  lineSpacing?: number
   sectionLeadIn?: number
   headingSize?: number
 }
@@ -110,6 +110,10 @@ export const SECTION_LEAD_IN = 12
 export const SECTION_HEADING = 30
 /** Section labels such as VERSE 1, in points. */
 export const HEADING_SIZE = 11
+/** How much of the natural room between lines to use. 1 adds nothing. */
+export const DEFAULT_LINE_SPACING = 2.5
+/** The room a line has before the next one with nothing added, per point of type. */
+const LINE_ROOM = 4 / 15
 
 export function pageSize(paper: Paper): { width: number; height: number } {
   return paper === 'letter'
@@ -159,7 +163,6 @@ export function blockHeight(
   spacing = 1,
   measure: PdfMeasure = {},
 ): number {
-  const chordLyricSpacing = measure.chordLyricSpacing ?? 1
   const sectionLeadIn = measure.sectionLeadIn ?? SECTION_LEAD_IN
   const headingSize = measure.headingSize ?? HEADING_SIZE
   let raw: number
@@ -169,9 +172,7 @@ export function blockHeight(
   else if (block.kind === 'bars') raw = Math.ceil(fontSize * 1.7)
   else if (block.chords.length === 0) raw = Math.ceil(fontSize * 1.35)
   else {
-    const line = fontSize * 2
-    const base = Math.max(line, Math.ceil(fontSize * 2.2))
-    raw = line + (base - line) * chordLyricSpacing
+    raw = Math.max(fontSize * 2, Math.ceil(fontSize * 2.2))
   }
   const floor =
     block.kind === 'lyric' && block.chords.length > 0
@@ -181,7 +182,22 @@ export function blockHeight(
         : block.kind === 'section'
           ? 22
           : 10
-  return Math.max(floor, raw * spacing)
+  return (
+    Math.max(floor, raw * spacing) +
+    lineGapBelow(block, fontSize, spacing, measure)
+  )
+}
+
+/** The empty space a lyric or bar line leaves under itself, inside its height. */
+export function lineGapBelow(
+  block: UntaggedBlock,
+  fontSize: number,
+  spacing = 1,
+  measure: PdfMeasure = {},
+): number {
+  if (block.kind !== 'lyric' && block.kind !== 'bars') return 0
+  const lineSpacing = measure.lineSpacing ?? DEFAULT_LINE_SPACING
+  return fontSize * LINE_ROOM * (lineSpacing - 1) * spacing
 }
 
 function readDisplay(options: PdfOptions) {
@@ -189,7 +205,7 @@ function readDisplay(options: PdfOptions) {
     showArtist: options.showArtist !== false,
     showKey: options.showKey !== false,
     showTime: options.showTime !== false,
-    chordLyricSpacing: options.chordLyricSpacing ?? 1,
+    lineSpacing: options.lineSpacing ?? DEFAULT_LINE_SPACING,
     sectionLeadIn: options.sectionLeadIn ?? SECTION_LEAD_IN,
     showColumnDivider: options.showColumnDivider !== false,
     showSectionDivider: options.showSectionDivider !== false,
@@ -382,7 +398,7 @@ function layoutOnce(
   const display = readDisplay(options)
   const measure = (block: UntaggedBlock) =>
     blockHeight(block, fontSize, spacing, {
-      chordLyricSpacing: display.chordLyricSpacing,
+      lineSpacing: display.lineSpacing,
       sectionLeadIn: display.sectionLeadIn,
       headingSize: display.headingSize,
     })
@@ -576,19 +592,25 @@ export function layoutPdf(song: Song, options: PdfOptions): PdfDocument {
   let fontSize = options.fontSize
   let columns = options.columns
   let spacing = 1
-  let pages = layoutOnce(song, options, size, fontSize, columns, spacing)
+  let lineSpacing = readDisplay(options).lineSpacing
+  const place = () =>
+    layoutOnce(song, { ...options, lineSpacing }, size, fontSize, columns, spacing)
+  let pages = place()
   const wantsShrink = () =>
     options.fit === 'auto'
       ? tooWide(pages, fontSize, size.width, columns)
       : pages.length > options.fit
   while (wantsShrink()) {
-    if (spacing > 0.8) spacing = Math.round((spacing - 0.1) * 10) / 10
+    // Room between lines can't help a line that is too wide, so Auto keeps it.
+    if (options.fit !== 'auto' && lineSpacing > 1)
+      lineSpacing = Math.max(1, lineSpacing - 0.5)
+    else if (spacing > 0.8) spacing = Math.round((spacing - 0.1) * 10) / 10
     else if (columns === 1 && options.allowTwoColumns) columns = 2
     else if (fontSize > 10) fontSize -= 1
     else break
-    pages = layoutOnce(song, options, size, fontSize, columns, spacing)
+    pages = place()
   }
-  return stamp(pages, song, options, size, fontSize, columns, spacing)
+  return stamp(pages, song, { ...options, lineSpacing }, size, fontSize, columns, spacing)
 }
 
 function fitWarning(fit: 1 | 2, count: number, fontSize: number): string {
@@ -633,7 +655,7 @@ function stamp(
     fontSize,
     columns,
     spacing,
-    chordLyricSpacing: display.chordLyricSpacing,
+    lineSpacing: display.lineSpacing,
     sectionLeadIn: display.sectionLeadIn,
     showColumnDivider: display.showColumnDivider,
     showSectionDivider: display.showSectionDivider,
