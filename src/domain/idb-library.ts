@@ -1,6 +1,6 @@
 import { openDB } from 'idb'
-import { defaultSettings, type LibraryRepository, type LibrarySnapshot } from './library-types'
-import type { Song } from './song'
+import type { LibraryRepository } from './library-types'
+import { memoryLibrary } from './memory-library'
 
 const DB = 'chord-sheet-maker'
 
@@ -13,20 +13,36 @@ export function idbLibrary(): LibraryRepository {
         database.createObjectStore('meta')
       },
     })
+  // The working copy, read once. Every write lands here first, so a snapshot never lags this device's own edits.
+  const working = (async () => {
+    const database = await db()
+    const [songs, setlists] = await Promise.all([database.getAll('songs'), database.getAll('setlists')])
+    return memoryLibrary({ songs, setlists })
+  })()
+  working.catch(() => {})
   return {
-    async load() {
-      const database = await db()
-      const [songs, setlists, settings] = await Promise.all([
-        database.getAll('songs'),
-        database.getAll('setlists'),
-        database.get('meta', 'settings'),
-      ])
-      return { songs, setlists, settings: settings ?? defaultSettings() } satisfies LibrarySnapshot
+    subscribe(onChange, onError) {
+      let stopped = false
+      let stop = () => {}
+      working.then(
+        (copy) => {
+          if (!stopped) stop = copy.subscribe(onChange)
+        },
+        (error) => {
+          if (!stopped) onError?.(error)
+        },
+      )
+      return () => {
+        stopped = true
+        stop()
+      }
     },
-    async saveSong(song: Song) {
+    async saveSong(song) {
+      await (await working).saveSong(song)
       await (await db()).put('songs', song)
     },
-    async deleteSong(id: string) {
+    async deleteSong(id) {
+      await (await working).deleteSong(id)
       const database = await db()
       await database.delete('songs', id)
       const setlists = await database.getAll('setlists')
@@ -36,13 +52,12 @@ export function idbLibrary(): LibraryRepository {
       }
     },
     async saveSetlist(setlist) {
+      await (await working).saveSetlist(setlist)
       await (await db()).put('setlists', setlist)
     },
     async deleteSetlist(id) {
+      await (await working).deleteSetlist(id)
       await (await db()).delete('setlists', id)
-    },
-    async saveSettings(settings) {
-      await (await db()).put('meta', settings, 'settings')
     },
   }
 }

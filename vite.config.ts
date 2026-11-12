@@ -1,6 +1,6 @@
 import react from '@vitejs/plugin-react'
 import { VitePWA } from 'vite-plugin-pwa'
-import { defineConfig } from 'vitest/config'
+import { configDefaults, defineConfig } from 'vitest/config'
 
 export default defineConfig({
   plugins: [
@@ -27,6 +27,8 @@ export default defineConfig({
   test: {
     environment: 'node',
     include: ['src/**/*.test.ts', 'src/**/*.test.tsx'],
+    // Emulator-backed tests need a backend: `npm run test:emulator`.
+    exclude: [...configDefaults.exclude, 'src/**/*.emulator.test.ts'],
     environmentMatchGlobs: [['src/**/*.test.tsx', 'jsdom']],
   },
 })

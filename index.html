@@ -7,9 +7,10 @@
     <title>Chord Sheet Maker</title>
     <script>
       try {
-        var theme = localStorage.getItem('csm-theme')
-        if (theme === 'light' || theme === 'dark') document.documentElement.dataset.theme = theme
-        document.documentElement.dataset.accent = localStorage.getItem('csm-accent') || 'ink'
+        var saved = JSON.parse(localStorage.getItem('csm-settings') || '{}')
+        if (saved.theme === 'light' || saved.theme === 'dark') document.documentElement.dataset.theme = saved.theme
+        document.documentElement.dataset.accent = saved.accent || 'ink'
+        if (saved.textSize) document.documentElement.dataset.size = saved.textSize
       } catch (error) {}
     </script>
   </head>

@@ -31,10 +31,10 @@ export type Settings = {
   allowTwoColumns: boolean
 }
 
+/** The shared part of a library. Per-device settings live in `SettingsStore`. */
 export type LibrarySnapshot = {
   songs: Song[]
   setlists: Setlist[]
-  settings: Settings
 }
 
 export const defaultSettings = (): Settings => ({
@@ -50,10 +50,15 @@ export const defaultSettings = (): Settings => ({
 })
 
 export type LibraryRepository = {
-  load(): Promise<LibrarySnapshot>
+  /**
+   * Delivers the whole library now, and again after every change to it, whoever made the change.
+   * A snapshot always includes this device's own writes made so far.
+   * `onError` is called if the library cannot be read. Returns the unsubscribe.
+   */
+  subscribe(onChange: (snapshot: LibrarySnapshot) => void, onError?: (error: unknown) => void): () => void
   saveSong(song: Song): Promise<void>
+  /** Also removes the song from every setlist. */
   deleteSong(id: string): Promise<void>
   saveSetlist(setlist: Setlist): Promise<void>
   deleteSetlist(id: string): Promise<void>
-  saveSettings(settings: Settings): Promise<void>
 }
