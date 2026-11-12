@@ -3,7 +3,7 @@
 **Owner:** Johnny Wu (GitHub `pangwuu`)  
 **Repo:** `pangwuu/chord-sheet-maker`  
 **Hosting:** Vercel (auto-deploy from `main`, preview deploys on PRs)  
-**Users:** Johnny plus his worship band/team, on laptop and phone. No accounts or cloud sync in v1.
+**Users:** Johnny plus his worship band/team, on laptop and phone. No accounts: each library is a band that syncs between its members' devices (`docs/adr/0001-band-sync-on-firestore.md`).
 
 ---
 
@@ -22,7 +22,7 @@ Everything else (setlists, stage view, projector view, imports) is secondary and
 
 - TypeScript (strict), React, Vite.
 - ChordPro as the storage/interchange format. Use **ChordSheetJS** for parsing/serialising where it helps, but the app's own chord model (section 3) is the source of truth for transposition and spelling, with its own tests.
-- Storage: IndexedDB (via a small wrapper such as `idb`), with export/import of a JSON backup and per-song `.cho` export.
+- Storage: songs and setlists in Cloud Firestore (free Spark plan), one band per library, with the SDK's offline cache so the app works without a connection. Per-device settings in `localStorage`. Export/import of a JSON backup and per-song `.cho` export.
 - PDF: generated client-side with a deterministic layout engine (recommended: `pdf-lib` or `@react-pdf/renderer` with an embedded monospace + sans font). **Do not rely on the browser's print dialog for the PDF**, because browser print pagination is inconsistent across devices. A print-CSS view may exist as a fallback.
 - Testing: Vitest for unit tests, Playwright for end-to-end and PDF snapshot tests.
 - Lint/format: ESLint + Prettier. CI on GitHub Actions: typecheck, lint, test, build.
@@ -198,7 +198,7 @@ The PDF must be readable at a distance on a music stand, with pages laid side by
 - **Projector view:** lyrics only, large, one section per screen, arrow keys to advance.
 - **Setlists:** name, date, ordered songs, key and capo per song, notes; export as one PDF; step through on stage.
 - **Phone start screen:** a phone opens on the all-songs list. A share link that adds a new song opens that song in the editor instead.
-- **Sharing:** export a song or setlist as a file, and a share link that encodes the song in the URL (compressed). Opening the link imports an editable local copy into the recipient's library (no account). For view-only handoff, export a PDF instead.
+- **Sharing:** export a song or setlist as a file, and a share link that encodes the song in the URL (compressed). Opening the link imports an editable copy into the recipient's band (no account); later edits on either side do not travel. For view-only handoff, export a PDF instead. Proposed compact and short links are in `SHARING.md`.
 
 ---
 
