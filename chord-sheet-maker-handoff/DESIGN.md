@@ -395,7 +395,7 @@ Options update the preview pane live behind the dialog. On phone the dialog beco
 
 ### 4.11 Setlists
 
-Two columns on laptop: a list of setlists (name, date, song count, `+ New setlist`; a new setlist starts with an empty name and date, never a made-up one) and the selected setlist. Each song row has a drag grip, number, title, notes ("Capo 4 for acoustic"), a key badge (click for the key popover), capo and shapes, and a ⋯ menu. Header actions: **Perform** (steps through the set on stage), **Export PDF** (one file; each song starts on a new page; footer `Song 2 of 4 · Page 1 of 2`; an Accidentals choice of Follow the key, Flats or Sharps applies to that export only). On phone the two columns stack.
+Two columns on laptop: a list of setlists (name, date, song count, `+ New setlist`; a new setlist starts with an empty name and date, never a made-up one) and the selected setlist. Each song row has a drag grip, number, title, notes ("Capo 4 for acoustic"), a key badge (click for the key popover), capo and shapes, and a ⋯ menu. Header actions: **Perform** (steps through the set on stage), **Export PDF** (one file; each song starts on a new page; footer `Song 2 of 4 · Page 1 of 2`; an Accidentals choice of Follow the key, Flats or Sharps applies to that export only). Song rows sit in one 12 px-radius card divided by hairlines, with a compact **Add song…** select as the card's last row. On phone the two columns stack.
 
 ### 4.12 Stage view
 
@@ -407,7 +407,7 @@ Black background, white Inter 600, centred, one section per slide (lyrics only, 
 
 ### 4.14 Settings
 
-Grouped cards, Notion-style rows (label and description on the left, control on the right):
+Grouped cards (uppercase group label above a 12 px-radius card), Notion-style rows divided by hairlines: label and one-line description on the left, control on the right. Below 520 px the control drops under the text. Accent sits under its text as a row of swatch chips (the chosen one uses `--selected`). Restore is a button, not a raw file input.
 - **Appearance:** Theme (System / Light / Dark), Accent (Ink / Teal / Plum / Clay / Graphite, with swatches; Ink is the default and older saved settings read as Ink), editor text size (S / M / L).
 - **Chords:** default chord style (Letters / Numbers), F# or Gb, Db or C#, chord names as written or normalised.
 - **PDF defaults:** paper, lyric size, allow two columns.

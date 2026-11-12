@@ -143,6 +143,7 @@ function SetlistDetail({
           </Menu>
         </div>
       </div>
+      <div className="setlist-songs">
       {setlist.entries.map((entry, index) => {
         const song = songs.find((item) => item.id === entry.songId)
         const title = song?.title ?? 'Missing song'
@@ -192,6 +193,7 @@ function SetlistDetail({
           </div>
         )
       })}
+      <div className="setlist-add-row">
       <select
         className="select setlist-add"
         aria-label="Add a song"
@@ -201,6 +203,8 @@ function SetlistDetail({
         <option value="">Add song…</option>
         {songs.map((song) => <option key={song.id} value={song.id}>{song.title}</option>)}
       </select>
+      </div>
+      </div>
     </article>
   )
 }

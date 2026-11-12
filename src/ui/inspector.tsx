@@ -126,8 +126,8 @@ export function Inspector({
       {phone && onNudge && (
         <div className="sheet-nudges" role="group" aria-label="Move chord">
           <button className="outline" type="button" aria-label="Previous word" onClick={() => onNudge('word-left')}>‹‹</button>
-          <button className="outline" type="button" aria-label="Previous letter" onClick={() => onNudge('left')}>‹</button>
-          <button className="outline" type="button" aria-label="Next letter" onClick={() => onNudge('right')}>›</button>
+          <button className="outline" type="button" aria-label="Move left one letter" onClick={() => onNudge('left')}>‹</button>
+          <button className="outline" type="button" aria-label="Move right one letter" onClick={() => onNudge('right')}>›</button>
           <button className="outline" type="button" aria-label="Next word" onClick={() => onNudge('word-right')}>››</button>
         </div>
       )}
