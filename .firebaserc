@@ -1,0 +1,7 @@
+{
+  "projects": {
+    "default": "transchordpose-preview",
+    "preview": "transchordpose-preview",
+    "production": "transchordpose"
+  }
+}
