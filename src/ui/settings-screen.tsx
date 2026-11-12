@@ -9,11 +9,14 @@ export function SettingsScreen({
   onChange,
   onBackup,
   onRestore,
+  band,
 }: {
   settings: Settings
   onChange: (settings: Settings) => void
   onBackup: () => void
   onRestore: (file: File) => void
+  /** The band's own rows. Settings below it are this device's only. */
+  band?: ReactNode
 }) {
   const bias = accidentalBias(settings.prefs)
 
@@ -24,6 +27,8 @@ export function SettingsScreen({
   return (
     <div className="settings">
       <h2>Settings</h2>
+
+      {band && <SettingsGroup title="Band">{band}</SettingsGroup>}
 
       <SettingsGroup title="Appearance">
         <SettingsRow label="Theme" description="Follow the device, or always light or dark.">
@@ -76,7 +81,7 @@ export function SettingsScreen({
       </SettingsGroup>
 
       <SettingsGroup title="Your data">
-        <SettingsRow label="Backup" description="Songs, setlists and settings as one .json file. Everything stays on this device otherwise.">
+        <SettingsRow label="Backup" description="A copy of this library's songs and setlists, and this device's settings, as one .json file. Restoring adds it to this library.">
           <div className="data-actions">
             <button className="outline" type="button" onClick={onBackup}>Export backup</button>
             <label className="outline file-pick">

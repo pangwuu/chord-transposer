@@ -32,4 +32,22 @@ describe('routes in the address bar', () => {
     expect(parseRoute('#/nowhere')).toBeNull()
     expect(parseRoute('#/song/%E0%A4%A')).toBeNull()
   })
+
+  it('gives an invite link its own address, carrying the band, its join code and its name', () => {
+    const invite = { bandId: 'AbC123', joinCode: 'q-W_e9rTy0uIoPa8sDfGh7jK', name: 'Sunday team / AM' }
+    const address = formatRoute({ place: 'join', invite })
+    expect(address).toBe('#/join/AbC123/q-W_e9rTy0uIoPa8sDfGh7jK/Sunday%20team%20%2F%20AM')
+    expect(parseRoute(address)).toEqual({ place: 'join', invite })
+  })
+
+  it('reads no invite from an address missing its band or code', () => {
+    expect(parseRoute('#/join')).toBeNull()
+    expect(parseRoute('#/join/AbC123')).toBeNull()
+    expect(parseRoute('#/join/AbC123//Band')).toBeNull()
+    expect(parseRoute('#/join/AbC123/code/Band/extra')).toBeNull()
+  })
+
+  it('reads an invite whose name was cut off', () => {
+    expect(parseRoute('#/join/AbC123/code')).toEqual({ place: 'join', invite: { bandId: 'AbC123', joinCode: 'code', name: '' } })
+  })
 })
