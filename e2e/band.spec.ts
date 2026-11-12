@@ -205,6 +205,8 @@ test('a first launch with no connection says so, and finishes setting up once co
     0,
   )
   await context.setOffline(false)
+  // Back online, the network serves the app again. A fetch still in flight must not outlive the test.
+  await page.unrouteAll({ behavior: 'ignoreErrors' })
   await expect(
     page.getByRole('heading', { name: 'Connect to the internet to set up' }),
   ).toBeHidden()
