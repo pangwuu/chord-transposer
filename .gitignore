@@ -6,6 +6,8 @@ dist-e2e/
 .env
 .env.*
 !.env.example
+!.env.production
+!.env.preview
 *.local
 *.tsbuildinfo
 playwright-report/
