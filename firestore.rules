@@ -1,10 +1,62 @@
 rules_version = '2';
 
-// Closed until band sync lands (GitHub issue #43): no document can be read or written.
+// A band's library is private to its members. See docs/adr/0001-band-sync-on-firestore.md.
+// Data layout: bands/{band}, and under it members/{uid}, songs/{song}, setlists/{setlist}.
 service cloud.firestore {
   match /databases/{database}/documents {
-    match /{document=**} {
-      allow read, write: if false;
+    function signedIn() {
+      return request.auth != null;
+    }
+    function bandPath(band) {
+      return /databases/$(database)/documents/bands/$(band);
+    }
+    function memberPath(band) {
+      return /databases/$(database)/documents/bands/$(band)/members/$(request.auth.uid);
+    }
+    function isMember(band) {
+      return signedIn() && exists(memberPath(band));
+    }
+    // After the write: lets one batch create a band, its first member and its demo songs together.
+    function willBeMember(band) {
+      return signedIn() && existsAfter(memberPath(band));
+    }
+    function goodName(name) {
+      return name is string && name.size() > 0 && name.size() <= 80;
+    }
+
+    match /bands/{band} {
+      allow read: if isMember(band);
+      // A create can never replace a band: writing over an existing one is an update, and only the name may change.
+      allow create: if signedIn()
+        && request.resource.data.keys().hasOnly(['name', 'owner', 'joinCode', 'createdAt'])
+        && request.resource.data.owner == request.auth.uid
+        && goodName(request.resource.data.name)
+        && request.resource.data.joinCode is string
+        && request.resource.data.joinCode.size() >= 20;
+      allow update: if isMember(band)
+        && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['name'])
+        && goodName(request.resource.data.name);
+
+      match /members/{uid} {
+        allow read: if isMember(band);
+        // Joining: only yourself, and only with the band's current join code, which the rule reads server-side.
+        allow create: if signedIn()
+          && uid == request.auth.uid
+          && request.resource.data.keys().hasOnly(['joinCode', 'joinedAt'])
+          && request.resource.data.joinCode == getAfter(bandPath(band)).data.joinCode;
+        // Leaving.
+        allow delete: if signedIn() && uid == request.auth.uid;
+      }
+
+      match /songs/{song} {
+        allow read: if isMember(band);
+        allow write: if willBeMember(band);
+      }
+
+      match /setlists/{setlist} {
+        allow read: if isMember(band);
+        allow write: if willBeMember(band);
+      }
     }
   }
 }
