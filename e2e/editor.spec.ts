@@ -1,7 +1,8 @@
 import { expect, test } from '@playwright/test'
 import { openFirstSong } from './helpers'
 
-test('nudges, adds, edits, deletes, and replaces chords', async ({ page }) => {
+test('nudges, adds, edits, deletes, and replaces chords', async ({ page }, testInfo) => {
+  const phone = testInfo.project.name === 'mobile'
   await openFirstSong(page)
   await expect(page.getByLabel('Title')).toHaveValue('Amazing Grace')
   const chord = page.getByRole('button', { name: /^Chord / }).first()
@@ -11,7 +12,9 @@ test('nudges, adds, edits, deletes, and replaces chords', async ({ page }) => {
   await page.getByRole('button', { name: 'Undo' }).last().click()
 
   await page.getByRole('button', { name: 'Chord G7 over "grace,"' }).click({ modifiers: ['Shift'] })
-  await expect(page.getByRole('button', { name: 'Edit chord' })).toHaveText('2 chords')
+  // Phones hide the floating toolbar (the chord sheet holds its tools) and keep Replace under Advanced.
+  if (phone) await page.getByRole('button', { name: 'Advanced' }).click()
+  else await expect(page.getByRole('button', { name: 'Edit chord' })).toHaveText('2 chords')
 
   await page.getByLabel('Replace every instance with').fill('G2')
   await page.getByRole('button', { name: /Replace every / }).click()

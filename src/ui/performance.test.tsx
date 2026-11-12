@@ -313,3 +313,41 @@ describe('playing the arrangement', () => {
     expect(screen.getByText(/1\/4/)).toBeTruthy()
   })
 })
+
+describe('StageView text size', () => {
+  const bodySize = () => (document.querySelector('.stage-body') as HTMLElement).style.fontSize
+
+  it('starts at 24px and steps up and down from the header', () => {
+    renderStage()
+    expect(bodySize()).toBe('24px')
+    fireEvent.click(screen.getByRole('button', { name: 'Larger text' }))
+    expect(bodySize()).toBe('28px')
+    fireEvent.click(screen.getByRole('button', { name: 'Smaller text' }))
+    fireEvent.click(screen.getByRole('button', { name: 'Smaller text' }))
+    expect(bodySize()).toBe('22px')
+  })
+
+  it('stops at the smallest and largest sizes', () => {
+    renderStage()
+    const smaller = screen.getByRole('button', { name: 'Smaller text' })
+    for (let i = 0; i < 10; i += 1) fireEvent.click(smaller)
+    expect(bodySize()).toBe('18px')
+    expect((smaller as HTMLButtonElement).disabled).toBe(true)
+    const larger = screen.getByRole('button', { name: 'Larger text' })
+    for (let i = 0; i < 20; i += 1) fireEvent.click(larger)
+    expect(bodySize()).toBe('40px')
+    expect((larger as HTMLButtonElement).disabled).toBe(true)
+  })
+})
+
+describe('StageView remembers text size', () => {
+  afterEach(() => localStorage.clear())
+
+  it('opens at the last size used on this device', () => {
+    localStorage.setItem('csm-stage-size', '32')
+    renderStage()
+    expect((document.querySelector('.stage-body') as HTMLElement).style.fontSize).toBe('32px')
+    fireEvent.click(screen.getByRole('button', { name: 'Smaller text' }))
+    expect(localStorage.getItem('csm-stage-size')).toBe('28')
+  })
+})
