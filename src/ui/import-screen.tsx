@@ -132,7 +132,7 @@ export function ImportScreen({
     <div className="import-screen">
       <div className={reviewVisible && phone ? 'import-body reviewing' : 'import-body'}>
         <h2>{phone && !reviewing ? 'Import a song' : 'Review import'}</h2>
-        {!reviewVisible || !phone ? <p className="hint">Copy a chart from any site, or a whole page, and paste it here. Copyrighted charts stay on this device.</p> : null}
+        {!reviewVisible || !phone ? <p className="hint">Copy a chart from any site, or a whole page, and paste it here.</p> : null}
         <div className="import-actions">
           {canPaste && (!phone || !reviewing) && <button className="primary" type="button" onClick={() => void pasteFromClipboard()}>Paste</button>}
           <label className="outline file-button">
