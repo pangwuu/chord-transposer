@@ -7,10 +7,17 @@
     "dev": "vite --host 0.0.0.0 --port 5173",
     "build": "tsc -b --pretty false && vite build",
     "test": "vitest run",
+    "emulators": "firebase emulators:start --only auth,firestore --project demo-chord-sheet-maker",
+    "test:emulator": "firebase emulators:exec --only auth,firestore --project demo-chord-sheet-maker \"vitest run --config vitest.emulator.config.ts\"",
     "test:e2e": "playwright test",
+    "dev:e2e": "vite --mode e2e --host 127.0.0.1 --port 5174 --strictPort",
+    "build:e2e": "vite build --mode e2e --outDir dist-e2e",
+    "preview:e2e": "vite preview --outDir dist-e2e --host 127.0.0.1 --port 4174 --strictPort",
     "typecheck": "tsc -b --pretty false",
     "lint": "eslint .",
-    "preview": "vite preview --host 127.0.0.1 --port 4173"
+    "preview": "vite preview --host 127.0.0.1 --port 4173",
+    "rules:deploy:preview": "firebase deploy --only firestore:rules --project preview",
+    "rules:deploy:production": "firebase deploy --only firestore:rules --project production"
   },
   "dependencies": {
     "@pdf-lib/fontkit": "^1.1.1",
@@ -24,6 +31,7 @@
   },
   "devDependencies": {
     "@eslint/js": "^10.0.1",
+    "@firebase/rules-unit-testing": "^6.0.0",
     "@playwright/test": "^1.65.0",
     "@testing-library/react": "^16.1.0",
     "@testing-library/user-event": "^14.5.2",
@@ -33,6 +41,8 @@
     "@vitejs/plugin-react": "^4.3.4",
     "eslint": "^10.14.0",
     "eslint-config-prettier": "^10.1.8",
+    "firebase": "^13.3.0",
+    "firebase-tools": "^15.36.0",
     "jsdom": "^25.0.1",
     "prettier": "^3.9.10",
     "typescript": "^5.7.2",

@@ -1,13 +1,18 @@
 .DS_Store
 node_modules/
 dist/
+dist-e2e/
 .vercel/
 .env
 .env.*
+!.env.example
+!.env.production
+!.env.preview
 *.local
 *.tsbuildinfo
 playwright-report/
 test-results/
+*-debug.log
 
 # Full copyrighted charts stay on this machine. Titles in the spec are fine.
 chord-sheet-maker-handoff/rebuild_lyrics.py

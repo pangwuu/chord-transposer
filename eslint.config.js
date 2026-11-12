@@ -3,7 +3,7 @@ import prettier from 'eslint-config-prettier'
 import tseslint from 'typescript-eslint'
 
 export default tseslint.config(
-  { ignores: ['dist', '.vercel', 'chord-sheet-maker-handoff', 'playwright-report', 'test-results', 'coverage'] },
+  { ignores: ['dist', 'dist-e2e', '.claude', '.vercel', 'chord-sheet-maker-handoff', 'playwright-report', 'test-results', 'coverage'] },
   js.configs.recommended,
   ...tseslint.configs.recommended,
   prettier,

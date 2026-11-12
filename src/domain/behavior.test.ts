@@ -7,7 +7,6 @@ import { addAt, addBarChordOf, addBarsOf, addCommentOf, editNoteOf, removeLineOf
 import { amazingGrace, firstLight } from '../fixtures/charts'
 import { chordTextFromPdfItems, importText } from './import-text'
 import { padCollisions } from './line-layout'
-import { memoryLibrary } from './memory-library'
 import { formatLyric, fromChordPro, toChordPro } from './chordpro'
 import { blockHeight, charsPerLine, layoutPdf, layoutSetlist, lineGapBelow, pageSize, SECTION_LEAD_IN } from './pdf-layout'
 import { renderPdf, rightHandParts, mergePdfs } from './pdf-render'
@@ -621,32 +620,13 @@ describe('share and library', () => {
     expect(encodeShare(firstLight, 8)).toEqual({ ok: false, reason: 'too-large' })
   })
 
-  it('starts empty and offers replace or keep when a backup id already exists', async () => {
-    const library = memoryLibrary()
-    expect((await library.load()).songs).toEqual([])
-    await library.saveSong(firstLight)
-    expect((await library.load()).songs.map((song) => song.id)).toEqual([firstLight.id])
+  it('offers replace or keep when a backup id already exists', () => {
     const plan = planRestore([firstLight], [firstLight, amazingGrace])
     expect(plan.conflicts).toEqual([firstLight.id])
     const replaced = applyRestore([firstLight], [{ ...amazingGrace, id: firstLight.id, title: 'Replacement' }], { [firstLight.id]: 'replace' })
     expect(replaced.map((song) => song.title)).toEqual(['Replacement'])
     const both = applyRestore([firstLight], [{ ...amazingGrace, id: firstLight.id }], { [firstLight.id]: 'keep' })
     expect(both).toHaveLength(2)
-  })
-
-  it('deletes a song and drops it from every setlist', async () => {
-    const library = memoryLibrary()
-    await library.saveSong(firstLight)
-    await library.saveSetlist({
-      id: 'set-1',
-      name: 'Sunday',
-      date: '2026-03-01',
-      entries: [{ songId: firstLight.id }, { songId: amazingGrace.id }],
-    })
-    await library.deleteSong(firstLight.id)
-    const snapshot = await library.load()
-    expect(snapshot.songs.map((song) => song.id)).toEqual([])
-    expect(snapshot.setlists[0]?.entries).toEqual([{ songId: amazingGrace.id }])
   })
 })
 
