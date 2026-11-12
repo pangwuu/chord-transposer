@@ -14,7 +14,7 @@
 |---|---|
 | Overall feel | Clean and minimal, like Notion |
 | Theme | Follows the device (light and dark), with a manual override |
-| Accent | Purple |
+| Accent | One muted accent, chosen in Settings: **Ink** (default), Teal, Plum or Graphite. No saturated violet, gradients or glows. |
 | Laptop layout | Three panes: song list, editor, live PDF preview |
 | Chords in the editor | Plain bold chord text, like the printed chart (no pills or boxes) |
 | Editing tools | Both: a floating toolbar on the selected chord **and** an inspector side panel |
@@ -30,8 +30,8 @@ Product priorities (from SPEC §0) also drive design trade-offs, in order: **1. 
 1. **The chart is the interface.** The editor looks like the printed chart: monospace lyrics, bold chord names above them. There are no boxes, pills or coloured chips around chords at rest. Colour shows up only for state (hover, selected, invalid).
 2. **Never lie about a chord.** Anything the app can't parse stays exactly as typed and is shown in **red with a wavy underline** everywhere it appears (editor, preview, PDF review). Nothing is silently fixed, respelled or dropped. Suggestions are offered as one-click buttons and never applied automatically.
 3. **What you see is what prints.** The editor and the PDF use the same layout rules (same chord-collision padding, same section order), so a chord over "grace" in the editor is over "grace" on paper. The live preview proves it at all times.
-4. **Transposing is a view, not an edit.** Changing key or capo never changes the stored song until the user presses **Save as song key**. A purple "From C" chip is always visible while you're looking at a transposed view.
-5. **One accent, used sparingly.** Purple marks the one thing that is active (selected chord, primary button, current tab). Everything else is greys.
+4. **Transposing is a view, not an edit.** Changing key or capo never changes the stored song until the user presses **Save as song key**. An accent "From C" chip is always visible while you're looking at a transposed view.
+5. **One accent, used sparingly.** The accent marks the one main thing on screen: the chord being edited, the primary button, the current phone tab. Any other chosen option (root, quality, pressed toggle) uses the neutral **selected** role. If two accent-filled things are visible at once, one of them is wrong.
 6. **Every edit is undoable and announced.** Destructive actions show a toast with **Undo**. There are no confirmation dialogs for single-chord edits.
 7. **Laptop-first precision, phone-first reach.** Mouse and keyboard get drag, arrow-key nudges and shortcuts. Touch gets large targets in a bottom sheet within thumb reach.
 
@@ -49,20 +49,24 @@ All tokens are CSS custom properties on `:root`. The dark theme overrides the sa
 
 `data-theme` is absent for **System** (the default), and `light` or `dark` when the user overrides it in Settings or with the sidebar theme button. Store the choice in `localStorage` and apply it before first paint (inline script in `<head>`) to avoid a flash of the wrong theme.
 
-### 2.1 Purple accent scale
+### 2.1 Token layers
 
-| Token | Hex | Use |
-|---|---|---|
-| `--p-50`  | `#F6F3FF` | Light: soft selected backgrounds, capo banner |
-| `--p-100` | `#EDE7FE` | Light: selected ring, hover on soft |
-| `--p-200` | `#DCD1FD` | Light: borders on soft surfaces |
-| `--p-300` | `#C2AEFB` | Dark: accent text, hover on accent; stage-view chords |
-| `--p-400` | `#A383F7` | **Dark accent** (buttons, selected chord) |
-| `--p-500` | `#8A5CF2` | Focus ring on preview pages |
-| `--p-600` | `#7540E6` | **Light accent** (buttons, selected chord) |
-| `--p-700` | `#6430C9` | Light: accent text, primary hover |
-| `--p-800` | `#5228A3` | Reserved (pressed) |
-| `--p-900` | `#432485` | Reserved |
+Colours have three layers, so a colour can only be used for its job:
+
+1. **Accent palettes** (`--acc-*`): raw values, a light and a dark one per accent. Components never read these.
+2. **Roles** (§2.2): `--accent`, `--selected`, `--text-muted` and so on. Components only read roles.
+3. **Themes:** light, dark and **stage** (§2.5). Each theme defines every role.
+
+The accent is a setting (`data-accent` on `<html>`, stored in `localStorage` as `csm-accent` and applied before first paint, like the theme).
+
+| Accent | Light `--accent` | Dark `--accent` | Contrast (light on white / dark on `#191919`) |
+|---|---|---|---|
+| **Ink** (default) | `#2F4A73` | `#8FB0E0` | ≥ 9:1 / ≥ 8:1 |
+| Teal | `#1F6B66` | `#6CC5BC` | ≥ 6:1 / ≥ 8:1 |
+| Plum | `#6B3A63` | `#D29CC6` | ≥ 9:1 / ≥ 7:1 |
+| Graphite | `#2B2B29` | `#E6E6E4` | ≥ 14:1 / ≥ 14:1 |
+
+Each accent also defines a hover (one step darker in light, lighter in dark), a soft background (about 6% tint in light, 14% alpha in dark) and an on-accent text colour. Any new accent must be muted (not a saturated violet or indigo) and pass 4.5:1 both ways.
 
 ### 2.2 Semantic colours
 
@@ -79,15 +83,18 @@ All tokens are CSS custom properties on `:root`. The dark theme overrides the sa
 | `--border-strong` | `#DCDCD8` | `#3A3A3A` | Inputs, outline buttons |
 | `--text` | `#37352F` | `#E6E6E4` | Body, lyrics, chords at rest |
 | `--text-muted` | `#6F6E69` | `#9B9B97` | Labels, metadata |
-| `--text-faint` | `#A5A5A1` | `#6B6B68` | Decorative only (grips, hyphen padding). **Never for content.** |
-| `--accent` | `#7540E6` (p-600) | `#A383F7` (p-400) | |
-| `--accent-hover` | `#6430C9` | `#C2AEFB` | |
-| `--accent-soft` | `#F6F3FF` | `rgba(163,131,247,.14)` | |
-| `--accent-text` | `#6430C9` | `#C2AEFB` | Purple text on soft purple |
-| `--text-on-accent` | `#FFFFFF` | `#1A1033` | Text on solid accent |
+| `--text-faint` | `#8A8985` | `#7D7D79` | Icons and grips only (≥ 3:1). **Never for text**, including placeholders and separators, which use `--text-muted`. |
+| `--selected` | `#EBEAE6` | `#333331` | Background of a chosen option that isn't the main thing: inspector root/quality tiles, pressed pill buttons, segmented controls |
+| `--on-selected` | `#1F1E1B` | `#FFFFFF` | Text on `--selected`, weight 700 for tiles |
+| `--selected-border` | `#8A8985` | `#6B6B68` | 1 px border on selected tiles, so selection doesn't rely on fill alone |
+| `--accent` | accent light | accent dark | From §2.1 |
+| `--accent-hover` | accent hover | accent hover | |
+| `--accent-soft` | accent soft | accent soft | Chord hover, capo banner |
+| `--accent-text` | accent hover | accent hover | Accent text on soft accent |
+| `--text-on-accent` | `#FFFFFF` | per accent | Text on solid accent |
 | `--danger` | `#D93A3A` | `#FF7B72` | Invalid chords, delete |
 | `--danger-soft` | `#FDECEC` | `rgba(255,123,114,.14)` | |
-| `--success` | `#0F7B6C` | `#4CC2AE` | "All chords valid" |
+| `--success` | `#0F7B6C` | `#4CC2AE` | Only for a change of state (e.g. a toast). At rest, "all valid" is quiet: `--text-muted` with a ✓. Colour is for problems. |
 | `--success-soft` | `#E6F4F1` | `rgba(76,194,174,.14)` | |
 
 PDF colours are fixed and **not themed**: paper `#FFFFFF`, ink `#000000`, secondary ink `#333333`, hairlines `#999999`. The preview page is always white, even in dark mode.
@@ -103,7 +110,7 @@ Both are OFL-licensed, so they can be **self-hosted and embedded in the PDF** (S
 
 | Token | Size / line height | Weight | Use |
 |---|---|---|---|
-| `--fs-title` | 30/36 (phone 24/30) | 700 | Song title in editor |
+| `--fs-title` | 34/39 (phone 24/30), serif | 700 | Song title in editor |
 | `--fs-h2` | 26/32 | 700 | Screen titles (Setlists, Settings) |
 | `--fs-h3` | 16/24 | 600 | Dialog titles |
 | `--fs-section` | 14/20 | 600 | Section labels in editor |
@@ -113,7 +120,7 @@ Both are OFL-licensed, so they can be **self-hosted and embedded in the PDF** (S
 | `--fs-label` | 11.5/16 | 600 | Inspector field labels |
 | `--fs-lyric` | **15** (phone 14) | 400 | Editor lyric row, line height 22 |
 | `--fs-chord` | **15** (phone 14) | 700 | Editor chord row, line height 21 |
-| Stage | 24 | 400/700 | Stage view lyric/chord |
+| Stage | 24 default, A−/A+ steps 18–40 (phone starts at 18) | 400/800 | Stage view lyric/chord |
 | Projector | clamp(28px, 4.2vw, 56px) | 600 | Lyrics-only slides |
 
 Editor text size is user-adjustable (S/M/L = 13/15/18) in Settings; chords always match the lyric size.
@@ -121,14 +128,29 @@ Editor text size is user-adjustable (S/M/L = 13/15/18) in Settings; chords alway
 ### 2.4 Spacing, radii, shadows
 
 - **Spacing scale (4 px grid):** 2, 4, 6, 8, 12, 16, 20, 24, 32, 40, 48, 64.
-- **Radii:** `--r-xs 4px` (chord highlight, key badge), `--r-sm 6px` (buttons, inputs), `--r-md 8px` (popovers, toolbar, cards inside panels), `--r-lg 12px` (dialogs, cards), sheet top corners `16px`, pills `999px`.
+- **Radii:** `--r-sm 6px` (buttons, inputs, tiles, chord highlight, popovers, toolbar), `--r-lg 12px` (dialogs, cards, sheet top corners), pills `999px`. Older 4/8/16 values should move to one of these when touched.
 - **Shadows:**
   - `--shadow-sm`: `0 1px 2px rgba(15,15,15,.06)` (pressed segmented button)
   - `--shadow-md`: `0 0 0 1px rgba(15,15,15,.05), 0 3px 6px rgba(15,15,15,.08), 0 9px 24px rgba(15,15,15,.12)` (floating toolbar, popovers)
   - `--shadow-lg`: `0 0 0 1px rgba(15,15,15,.05), 0 5px 10px rgba(15,15,15,.1), 0 15px 40px rgba(15,15,15,.2)` (dialogs, bottom sheet, toast)
   - Dark versions use stronger black alpha plus a 1 px white-6% ring (see the mockup CSS).
-- **Motion:** 120–220 ms, `cubic-bezier(.2,.8,.2,1)`. The sheet slides in 220 ms. Respect `prefers-reduced-motion` (no slides; fade only).
+- **Motion:** 120–220 ms, `cubic-bezier(.2,.8,.2,1)`. The sheet slides in 220 ms. Respect `prefers-reduced-motion`: one global rule cuts transitions and animations to ~0 and turns off smooth scrolling (stage autoscroll still steps).
 - **Icons:** 16 px line icons, 1.75 stroke, rounded caps (Lucide set). 20–22 px on phone.
+
+### 2.5 Stage theme
+
+Stage ignores light/dark and the accent. Its roles live in the same `:root` block, so it is tuned in one place.
+
+| Token | Value | Use |
+|---|---|---|
+| `--stage-bg` | `#111111` | Page. Not pure black: it reduces glare and halation in dark rooms |
+| `--stage-chrome` | `#222222` | Solid header |
+| `--stage-text` | `#E8E6E1` | Lyrics (≈ 15:1) |
+| `--stage-strong` | `#FFFFFF` | Title, section labels, key, Autoscroll button |
+| `--stage-muted` | `#A8A8A4` | Artist, order line (≈ 8:1) |
+| `--stage-cue` | `#B8B8B4` | Comments: italic with a grey left rule |
+| `--stage-chord` | `#F0B429` | **Chords and bar lines only.** Nothing else on stage is amber |
+| `--stage-line` / `--stage-control` | white 14% / 28% | Dividers / control borders |
 
 ---
 
@@ -219,10 +241,10 @@ Structure, top to bottom:
 |---|---|
 | Rest | `--text`, weight 700, no background |
 | Hover | `--accent` text on `--accent-soft`, radius 4, cursor `grab` |
-| Selected | `--text-on-accent` on solid `--accent`, plus a 2 px `--accent-soft-2` ring. The same chord gets a purple outline in the preview. |
-| Dragging | Selected style, `--shadow-md`, cursor `grabbing`; a 2 px purple **drop caret** sits in the lyric row at the target letter |
+| Selected | `--text-on-accent` on solid `--accent`, plus a 2 px `--accent-soft-2` ring. The same chord gets an accent outline in the preview. |
+| Dragging | Selected style, `--shadow-md`, cursor `grabbing`; a 2 px accent **drop caret** sits in the lyric row at the target letter |
 | Invalid | `--danger` text with a **wavy underline**; selected invalid = white on `--danger` |
-| Add ghost | Hovering a letter shows a dashed purple `+ chord` tag in the chord row above it |
+| Add ghost | Hovering a letter shows a dashed accent `+ chord` tag in the chord row above it |
 | Focus (keyboard) | 2 px `--accent` outline, 2 px offset |
 
 Hit area: each chord has an invisible padding of 6 px top, 4 px sides and bottom (≥ 32 px tall on touch).
@@ -243,7 +265,7 @@ What gift of grace is Jesus, my Redeemer
 |---|---|---|
 | « | Move to previous word start | ⌥← (Alt+←) |
 | ‹ | Move left one letter | ← |
-| **C** (chord name, purple mono) | Focus the inspector's chord field | ↵ or F2 |
+| **C** (chord name, accent mono) | Focus the inspector's chord field | ↵ or F2 |
 | › | Move right one letter | → |
 | » | Move to next word start (or end of line) | ⌥→ |
 | ⇄ | Replace every instance of this chord in the song… | |
@@ -303,7 +325,7 @@ Two modes.
 ```
 
 - **− / +** move the concert key by a semitone. Names come from the key list `C Db D Eb E F F# G Ab A Bb B` (F#/Gb and Db/C# are user toggles).
-- **Key popover:** a 6×2 grid of keys; the original key has a purple underline and the current key is solid purple. Below it are the two enharmonic toggles and a one-line explanation.
+- **Key popover:** a 6×2 grid of keys; the original key has an accent underline and the current key is solid accent. Below it are the two enharmonic toggles and a one-line explanation.
 - **Capo popover:** a 0–11 grid, then "Easy shapes for B": `Capo 2 · play A shapes`, `Capo 4 · play G shapes`, … (shapes in C, G, D, A, E only).
 - With a capo, the button shows `Capo 4 [G shapes]`, the editor shows a capo banner, and the PDF header gets a boxed `CAPO 4 · PLAY G SHAPES`.
 - **Spelling** follows SPEC §3.2: target-key scale degrees, so `F/A` in F becomes `E/G#` in E, and `F#sus` in B becomes `Dsus` with capo 4.
@@ -313,7 +335,7 @@ Two modes.
 
 - **Rename:** click the label (contenteditable), Enter or blur commits.
 - **Section menu:** one ⋯ button next to the label opens a small popover: Move up / Move down (⌥⇧↑/↓), Duplicate (⌘D), Add note, Delete (toast with Undo). A **note** ("Quiet, then build") is a small boxed line at the end of the section: edit it in place, remove it with ×. Notes print as a boxed line on the PDF and show as a boxed amber line on stage. Keeping these in one menu keeps the chart quiet, especially on a phone.
-- **Reorder:** drag the grip in the left gutter. A 2 px purple insertion line shows the drop point. Keyboard: ⌥⇧↑/↓.
+- **Reorder:** drag the grip in the left gutter. A 2 px accent insertion line shows the drop point. Keyboard: ⌥⇧↑/↓.
 - **Add section:** opens a kind menu (Intro, Verse n, Pre-Chorus, Chorus, Bridge, Tag, Instrumental, Interlude, Outro, Custom…). The new section gets one empty lyric line with placeholder text and its label is selected for typing.
 - **Arrangement row:** a plain muted line, `ORDER Verse 1 · Chorus ×2 · Verse 2`, no pills. Drag to reorder, click an item for `×2`, `Repeat`, `Remove`. `+ Add` lists sections. Reusing a section never copies its content (SPEC §4.3).
 - **Lyric text editing:** double-click a lyric row (or press ↵ with the caret in a line) to edit the text inline. Chord anchors follow their characters by diffing the old and new text; a chord whose character is deleted moves to the nearest surviving character and is briefly flashed. (Not in the mockup: the mockup edits text through ChordPro mode.)
@@ -349,7 +371,7 @@ Pasted text · chords-over-lyrics detected. Check it before it's saved.
 
 ### 4.10 PDF preview pane and export dialog
 
-**Preview pane:** header `Preview · A4 · 2 pages · key C` with **Export PDF** (primary) on phone; on wider screens Export PDF sits in the editor bar instead. Pages are rendered at true A4 proportions (595×842 pt) and scaled to the pane width, with a `Page n` label above each one, 18 px apart on `--bg-canvas`. The selected chord is outlined in purple on the page. Clicking a line on a page scrolls the editor to it.
+**Preview pane:** header `Preview · A4 · 2 pages · key C` with **Export PDF** (primary) on phone; on wider screens Export PDF sits in the editor bar instead. Pages are rendered at true A4 proportions (595×842 pt) and scaled to the pane width, with a `Page n` label above each one, 18 px apart on `--bg-canvas`. The selected chord is outlined in the accent on the page. Clicking a line on a page scrolls the editor to it.
 
 **Export dialog** (modal, 720 px):
 
@@ -376,7 +398,7 @@ Two columns on laptop: a list of setlists (name, date, song count, `+ New setlis
 
 ### 4.12 Stage view
 
-Full-screen Quiet Chart reading mode, always dark (`#050505`), regardless of theme. Solid header (`#242424`, not a fade): **Exit**, the transport pills (no Numbers label), Speed / **Autoscroll**, **Next section** (goes to the section after the one at the top of the screen, even if you scrolled there), and **Previous song** / **Next song** when staging a setlist (a horizontal swipe on the chart does the same on touch screens), all on one line that scrolls sideways on a phone. Under the artist: `Order: Verse 1 · Chorus · …`. An eye at the end of the header stays on screen. Open eye shows the header; closed eye hides it and leaves only the icon. The header does not auto-hide and sits above the title. Controls are session-local and do not write back to the editor on Exit. Body is continuous scroll: serif title + artist, in-flow section headings (not sticky), mono lyrics with warm chord labels above (`#f0b429`). Autoscroll defaults to **0.8** and nudges in **0.1** steps (range 0.1–12); speed is pixels per 40 ms, so 0.8 moves 20 px a second at any screen density, and slow speeds still move. Long lines wrap with a 2ch hanging indent (same rules as PDF). Screen Wake Lock is on while open. Escape exits; Space toggles autoscroll. Prototype variants (Focus Column, Spotlight) live on branch `cursor/quiet-chart-stage-a1fb`.
+Full-screen Quiet Chart reading mode in the stage theme (§2.5), regardless of light/dark or accent. Solid header (`--stage-chrome`, not a fade): **Exit**, the transport pills (no Numbers label; key shown in white, pressed pills neutral), **A− / A+** text size (session-local, 18–40 px, 24 default, 18 on phone), Speed / **Autoscroll** (white button), **Next section** (goes to the section after the one at the top of the screen, even if you scrolled there), and **Previous song** / **Next song** when staging a setlist (a horizontal swipe on the chart does the same on touch screens), all on one line that scrolls sideways on a phone. Under the artist: `Order: Verse 1 · Chorus · …`. An eye at the end of the header stays on screen. Open eye shows the header; closed eye hides it and leaves only the icon. The header does not auto-hide and sits above the title. Controls are session-local and do not write back to the editor on Exit. Body is continuous scroll: serif title + artist, in-flow section headings (not sticky; sized with the text, at least 14 px, with a faint rule between sections), mono lyrics with warm chord labels above (`--stage-chord`). Comments are italic grey cues, not amber boxes. Autoscroll defaults to **0.8** and nudges in **0.1** steps (range 0.1–12); speed is pixels per 40 ms, so 0.8 moves 20 px a second at any screen density, and slow speeds still move. Long lines wrap with a 2ch hanging indent (same rules as PDF). Screen Wake Lock is on while open. Escape exits; Space toggles autoscroll. Prototype variants (Focus Column, Spotlight) live on branch `cursor/quiet-chart-stage-a1fb`.
 
 ### 4.13 Projector view
 
@@ -385,7 +407,7 @@ Black background, white Inter 600, centred, one section per slide (lyrics only, 
 ### 4.14 Settings
 
 Grouped cards, Notion-style rows (label and description on the left, control on the right):
-- **Appearance:** Theme (System / Light / Dark), editor text size (S / M / L).
+- **Appearance:** Theme (System / Light / Dark), Accent (Ink / Teal / Plum / Graphite, with swatches; Ink is the default and older saved settings read as Ink), editor text size (S / M / L).
 - **Chords:** default chord style (Letters / Numbers), F# or Gb, Db or C#, chord names as written or normalised.
 - **PDF defaults:** paper, lyric size, allow two columns.
 - **Your data:** Export backup (.json), Restore (with a conflict review).
@@ -440,7 +462,7 @@ Songs tab                Editor (chord selected)       Preview toggle
 | **Floating toolbar** | — | shown, flipped below, disabled controls (bar chord) |
 | **Inspector** | Song panel, Chord panel | collapsed, open, pinned |
 | **Chord input** | — | default, focus (accent ring), invalid (danger ring and message) |
-| **Toggle tile** (root / quality) | mono, text | off, on (solid accent), hover, focus |
+| **Toggle tile** (root / quality) | mono, text | off, on (`--selected` + `--selected-border`, bold), hover, focus |
 | **Suggestion tile** | name + roman/count | default, hover, current (accent outline) |
 | **Popover** | key, capo, section menu | open/closed; closes on outside click and Esc |
 | **Dialog** | export, confirm (rare) | open; focus trapped; Esc closes |
@@ -448,7 +470,7 @@ Songs tab                Editor (chord selected)       Preview toggle
 | **Toast** | info, with Undo | enter, visible 3.5 s, exit; hovering pauses the timer |
 | **Check chip** | ok, warn | clickable when warn |
 | **Preview page** | first page, continuation page | default, highlighted chord |
-| **Tabs (phone)** | 3 tabs | current (purple), default |
+| **Tabs (phone)** | 3 tabs | current (accent), default |
 
 ---
 
@@ -468,7 +490,7 @@ Songs tab                Editor (chord selected)       Preview toggle
 | ← / → | One character (letter or space) |
 | ⌥/Alt + ← / → | Previous or next **word start**; → past the last word goes to the end of the line (for held chords like `peace   C`) |
 | Home / End | Start or end of the line |
-| Drag (mouse) | Snaps to character positions; purple drop caret shows the landing letter; moving < 4 px counts as a click |
+| Drag (mouse) | Snaps to character positions; accent drop caret shows the landing letter; moving < 4 px counts as a click |
 | Drag (touch) | Same, starting on the chord |
 | Toolbar or sheet buttons | Same as the keys |
 
@@ -512,7 +534,7 @@ On Windows and Linux, ⌘ means Ctrl and ⌥ means Alt. Shortcuts never fire whi
 
 ## 7. Accessibility
 
-- **Contrast (WCAG 2.2 AA):** text `#37352F` on white 12.3:1; muted `#6F6E69` on white 5.1:1 (4.9:1 on sidebar); accent `#7540E6` on white 5.8:1 and white on accent 5.8:1; danger `#D93A3A` on white 4.6:1. Dark: text 14.1:1, muted 6.3:1, accent `#A383F7` 6.0:1, danger `#FF7B72` 7.0:1. `--text-faint` (2.5:1) is decorative only.
+- **Contrast (WCAG 2.2 AA):** text `#37352F` on white 12.3:1; muted `#6F6E69` on white 5.1:1 (4.9:1 on sidebar); accent ≥ 6:1 on white and white on accent ≥ 6:1 for every accent (§2.1); danger `#D93A3A` on white 4.6:1. Dark: text 14.1:1, muted 6.3:1, accent `#A383F7` 6.0:1, danger `#FF7B72` 7.0:1. `--text-faint` (3.5:1 light, 4.2:1 dark) is for icons only. Stage: text ≈ 15:1, chords ≈ 10:1, muted ≈ 8:1.
 - **Not colour alone:** invalid chords also get a wavy underline and an icon in the check chip; selected chords also get a solid fill; the current tab also gets weight 600.
 - **Focus:** every interactive element shows a 2 px `--accent` focus ring with 2 px offset (`:focus-visible` only). Popovers, dialogs and the sheet trap focus and return it to the trigger on close.
 - **Editor semantics:** each line is a `group` labelled `Verse 1, line 2: There is no more for heaven now to give`. Chords are `button`s labelled `Chord C over "no", Verse 1 line 2`, with a roving tabindex so Tab moves between chords. Moves, adds and deletes are announced through an `aria-live="polite"` region ("C moved to 'more'").

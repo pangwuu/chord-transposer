@@ -42,6 +42,9 @@ export type StageEntry = {
   capo: number
 }
 
+const STAGE_SIZES = [18, 20, 22, 24, 28, 32, 36, 40]
+const STAGE_DEFAULT_SIZE = STAGE_SIZES.indexOf(24)
+
 /** Full-screen Quiet Chart reading view with hideable transport + autoscroll. */
 export function StageView({
   entries,
@@ -61,6 +64,7 @@ export function StageView({
   const [nashville, setNashville] = useState(initialNashville)
   const [prefs, setPrefs] = useState(initialPrefs)
   const [headerOpen, setHeaderOpen] = useState(true)
+  const [sizeIndex, setSizeIndex] = useState(() => (typeof matchMedia === 'function' && matchMedia('(max-width: 767px)').matches ? 0 : STAGE_DEFAULT_SIZE))
   const [speed, setSpeed] = useState(DEFAULT_SPEED)
   const [playing, setPlaying] = useState(false)
   const body = useRef<HTMLDivElement>(null)
@@ -252,6 +256,10 @@ export function StageView({
                 </div>
               </div>
               <span className="grow" />
+              <span className="stage-size" role="group" aria-label="Text size">
+                <button className="outline" type="button" aria-label="Smaller text" title="Smaller text" disabled={sizeIndex === 0} onClick={() => setSizeIndex((index) => Math.max(0, index - 1))}>A−</button>
+                <button className="outline stage-size-large" type="button" aria-label="Larger text" title="Larger text" disabled={sizeIndex === STAGE_SIZES.length - 1} onClick={() => setSizeIndex((index) => Math.min(STAGE_SIZES.length - 1, index + 1))}>A+</button>
+              </span>
               <span className="stage-speed">
                 <button className="outline" type="button" aria-label="Slower" onClick={() => setSpeed((value) => nudgeSpeed(value, -SPEED_STEP))}>−</button>
                 <span>Speed {speed.toFixed(1)}</span>
@@ -289,6 +297,7 @@ export function StageView({
       <div
         className="stage-body"
         ref={body}
+        style={{ fontSize: `${STAGE_SIZES[sizeIndex]}px` }}
         onScroll={() => {
           const inView = sectionInView()
           if (inView !== null) setSection(inView)

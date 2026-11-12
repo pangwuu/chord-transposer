@@ -16,8 +16,12 @@ export type Setlist = {
   entries: SetlistEntry[]
 }
 
+export const ACCENTS = ['ink', 'teal', 'plum', 'graphite'] as const
+export type Accent = (typeof ACCENTS)[number]
+
 export type Settings = {
   theme: 'system' | 'light' | 'dark'
+  accent: Accent
   textSize: 's' | 'm' | 'l'
   numbers: boolean
   prefs: { gb: boolean; csharp: boolean }
@@ -35,6 +39,7 @@ export type LibrarySnapshot = {
 
 export const defaultSettings = (): Settings => ({
   theme: 'system',
+  accent: 'ink',
   textSize: 'm',
   numbers: false,
   prefs: { gb: false, csharp: false },

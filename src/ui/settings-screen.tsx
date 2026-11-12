@@ -1,5 +1,7 @@
 import { accidentalBias, prefsForBias, type AccidentalBias } from '../domain/chord'
-import type { Settings } from '../domain/library-types'
+import { ACCENTS, type Accent, type Settings } from '../domain/library-types'
+
+const ACCENT_NAMES: Record<Accent, string> = { ink: 'Ink', teal: 'Teal', plum: 'Plum', graphite: 'Graphite' }
 
 export function SettingsScreen({
   settings,
@@ -28,6 +30,16 @@ export function SettingsScreen({
           <option value="light">Light</option>
           <option value="dark">Dark</option>
         </select>
+        <span>Accent</span>
+        <div className="accent-options" role="radiogroup" aria-label="Accent colour">
+          {ACCENTS.map((accent) => (
+            <label key={accent} className="accent-option">
+              <input type="radio" name="accent" checked={(settings.accent ?? 'ink') === accent} onChange={() => onChange({ ...settings, accent })} />
+              <span className="accent-swatch" data-swatch={accent} aria-hidden="true" />
+              {ACCENT_NAMES[accent]}
+            </label>
+          ))}
+        </div>
         <span>Text size</span>
         <select className="select" aria-label="Text size" value={settings.textSize} onChange={(event) => onChange({ ...settings, textSize: event.target.value as Settings['textSize'] })}>
           <option value="s">S</option>
