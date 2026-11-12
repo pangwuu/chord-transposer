@@ -15,9 +15,20 @@ export function SetlistScreen({
   onDelete,
   onExport,
   onStage,
+  onShare,
+  onDownload,
+  onImport,
+  openedId: givenId,
+  onOpen,
 }: {
   songs: Song[]
   setlists: Setlist[]
+  onShare: (setlist: Setlist) => void
+  onDownload: (setlist: Setlist) => void
+  onImport: (file: File) => void
+  /** With `onOpen`, the caller holds which setlist is open. Without it, the screen does. */
+  openedId?: string | null
+  onOpen?: (id: string | null) => void
   onCreate: () => void
   onChange: (setlist: Setlist) => void
   onDelete: (id: string) => void
@@ -26,7 +37,10 @@ export function SetlistScreen({
 }) {
   const rootRef = useRef<HTMLDivElement>(null)
   const narrow = useNarrowPane(rootRef, NARROW_PANE)
-  const [openedId, setOpenedId] = useState<string | null>(null)
+  const [localId, setLocalId] = useState<string | null>(null)
+  const openedId = onOpen ? (givenId ?? null) : localId
+  const setOpenedId = onOpen ?? setLocalId
+  const fileInput = useRef<HTMLInputElement>(null)
   const [extra, setExtra] = useState<{ index: number; field: 'capo' | 'notes' } | null>(null)
   const seen = useRef<Set<string> | null>(null)
 
@@ -43,8 +57,8 @@ export function SetlistScreen({
     const added = ids.find((id) => !seen.current?.has(id))
     seen.current = new Set(ids)
     if (added) setOpenedId(added)
-    else setOpenedId((current) => (current && ids.includes(current) ? current : null))
-  }, [setlists])
+    else if (openedId && !ids.includes(openedId)) setOpenedId(null)
+  }, [setlists, openedId])
 
   const opened = setlists.find((setlist) => setlist.id === openedId) ?? null
   const shown = narrow ? opened : (opened ?? setlists[0] ?? null)
@@ -57,6 +71,19 @@ export function SetlistScreen({
           <>
             <div className="screen-head">
               <h2>Setlists</h2>
+              <button className="outline" type="button" onClick={() => fileInput.current?.click()}>Import file</button>
+              <input
+                ref={fileInput}
+                hidden
+                aria-label="Import setlist file"
+                type="file"
+                accept="application/json,.json"
+                onChange={(event) => {
+                  const file = event.target.files?.[0]
+                  event.target.value = ''
+                  if (file) onImport(file)
+                }}
+              />
               <button className="primary" type="button" onClick={onCreate}>+ New setlist</button>
             </div>
             {setlists.length === 0 && <p className="empty">No setlists yet. A setlist is an ordered list of songs for one date.</p>}
@@ -87,6 +114,8 @@ export function SetlistScreen({
             onDelete={(id) => { setOpenedId(null); onDelete(id) }}
             onExport={onExport}
             onStage={onStage}
+            onShare={onShare}
+            onDownload={onDownload}
             onExtra={setExtra}
           />
         )}
@@ -105,8 +134,12 @@ function SetlistDetail({
   onDelete,
   onExport,
   onStage,
+  onShare,
+  onDownload,
   onExtra,
 }: {
+  onShare: (setlist: Setlist) => void
+  onDownload: (setlist: Setlist) => void
   setlist: Setlist
   songs: Song[]
   narrow: boolean
@@ -130,6 +163,8 @@ function SetlistDetail({
           </button>
           <button className="primary" type="button" onClick={() => onExport(setlist)}>Export PDF</button>
           <Menu label="Setlist actions">
+            <button type="button" role="menuitem" disabled={setlist.entries.length === 0} onClick={() => onShare(setlist)}>Copy share link</button>
+            <button type="button" role="menuitem" disabled={setlist.entries.length === 0} onClick={() => onDownload(setlist)}>Download file</button>
             <button
               type="button"
               role="menuitem"

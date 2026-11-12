@@ -50,6 +50,9 @@ function renderScreen(onDelete = vi.fn()) {
         onChange={() => {}}
         onDelete={onDelete}
         onExport={() => {}}
+        onShare={() => {}}
+        onDownload={() => {}}
+        onImport={() => {}}
         onStage={() => {}}
       />,
     ),

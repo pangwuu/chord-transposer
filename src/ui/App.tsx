@@ -37,9 +37,10 @@ import {
 import { applyRestore, planRestore, type BackupFile } from '../domain/backup'
 import { toChordPro } from '../domain/chordpro'
 import { idbLibrary } from '../domain/idb-library'
-import { defaultSettings, type Setlist, type Settings } from '../domain/library-types'
+import { defaultSettings, type LibraryRepository, type Setlist, type Settings } from '../domain/library-types'
 import { layoutPdf, layoutSetlist } from '../domain/pdf-layout'
-import { encodeShare, decodeShare } from '../domain/share'
+import { formatRoute, parseRoute, type Route } from '../domain/route'
+import { bundleSetlist, encodeBundle, encodeShare, mergeBundle, readShare, type ShareBundle } from '../domain/share'
 import { findPlacement, issuesIn, mapSymbols, type Song } from '../domain/song'
 import { amazingGrace, firstLight } from '../fixtures/charts'
 import { emptySong } from '../domain/song'
@@ -67,13 +68,15 @@ function keyOptions(prefs: SpellingPrefs): string[] {
 /** Read outside render: it clears the address bar, and strict mode renders twice. */
 const launchPaste = readSharedPaste()
 
+type Place = 'songs' | 'editor' | 'sets' | 'settings' | 'import'
+
 export function App() {
   const library = useRef(idbLibrary())
   const editorRef = useRef<EditorState | null>(null)
   const searchRef = useRef<HTMLInputElement>(null)
   const phone = usePhone()
   const [sharedPaste, setSharedPaste] = useState(launchPaste)
-  const [place, setPlace] = useState<'songs' | 'editor' | 'sets' | 'settings' | 'import'>(() => (sharedPaste ? 'import' : phone ? 'songs' : 'editor'))
+  const [place, setPlace] = useState<Place>(() => (sharedPaste ? 'import' : phone ? 'songs' : 'editor'))
   const [mode, setMode] = useState<'visual' | 'chordpro'>('visual')
   const [menuOpen, setMenuOpen] = useState(false)
   const [performance, setPerformance] = useState<
@@ -86,6 +89,7 @@ export function App() {
   const [setlistPrefs, setSetlistPrefs] = useState<SpellingPrefs>(() => defaultSettings().prefs)
   const [songs, setSongs] = useState<Song[]>([])
   const [setlists, setSetlists] = useState<Setlist[]>([])
+  const [openSetlistId, setOpenSetlistId] = useState<string | null>(null)
   const [settings, setSettings] = useState<Settings>(defaultSettings())
   const [previewPeek, setPreviewPeek] = useState(false)
   useEffect(() => {
@@ -108,34 +112,27 @@ export function App() {
   const [ready, setReady] = useState(false)
   editorRef.current = editor
 
+  const started = useRef<ReturnType<typeof startLibrary> | null>(null)
   useEffect(() => {
     let cancel = false
     ;(async () => {
       try {
-        const snapshot = await library.current.load()
-        let list = snapshot.songs
-        if (list.length === 0) {
-          list = [amazingGrace, firstLight]
-          await Promise.all(list.map((song) => library.current.saveSong(song)))
-        }
-        const hash = location.hash.replace(/^#/, '')
-        if (hash.startsWith('1.')) {
-          try {
-            const shared = decodeShare(hash)
-            if (!list.some((song) => song.id === shared.id)) {
-              list = [shared, ...list]
-              await library.current.saveSong(shared)
-              if (!cancel) setPlace('editor')
-            }
-            history.replaceState(null, '', location.pathname)
-          } catch { /* ignore a bad share link */ }
-        }
+        // One start per mount: a second effect run must not read the share link again.
+        started.current ??= startLibrary(library.current)
+        const { snapshot, list, held, first, landing, note, sharedSetlist } = await started.current
         if (cancel) return
+        const wanted = landing || sharedPaste ? null : parseRoute(location.hash)
+        const target = wanted ? resolveRoute(wanted, list, held, phone) : null
         setSongs(list)
-        setSetlists(snapshot.setlists)
+        setSetlists(held)
+        setOpenSetlistId(target ? target.setlistId : sharedSetlist)
+        if (target) setPlace(target.place)
+        else if (landing) setPlace(landing)
+        const said = note ?? target?.note
+        if (said) announce(said)
         setSettings(snapshot.settings)
         setPdfChoices((choices) => ({ ...choices, paper: snapshot.settings.paper, fontSize: snapshot.settings.lyricSize }))
-        setEditor(openEditor(list[0]))
+        setEditor(openEditor(target?.song ?? first))
         setReady(true)
       } catch {
         if (cancel) return
@@ -340,9 +337,91 @@ export function App() {
     const next = applyRestore(songs, backup.songs ?? [], choices)
     setSongs(next)
     await Promise.all(next.map((song) => library.current.saveSong(song)))
-    for (const setlist of backup.setlists ?? []) await library.current.saveSetlist(setlist)
-    if (backup.setlists) setSetlists(backup.setlists)
+    const restored = backup.setlists ?? []
+    for (const setlist of restored) await library.current.saveSetlist(setlist)
+    setSetlists((current) => [...current.filter((item) => !restored.some((setlist) => setlist.id === item.id)), ...restored])
     announce('Backup restored')
+  }
+
+  // The address bar mirrors where the app is. A change made here is a new history entry.
+  const address = ready ? formatRoute(routeOf(place, editor?.song.id ?? null, openSetlistId)) : null
+  const addressSynced = useRef(false)
+  useEffect(() => {
+    if (!address) return
+    if (location.hash !== address) {
+      if (addressSynced.current) history.pushState(null, '', address)
+      else history.replaceState(null, '', address)
+    }
+    addressSynced.current = true
+  }, [address])
+
+  const followAddress = useRef(() => {})
+  followAddress.current = () => {
+    if (ready) void readAddress()
+  }
+  useEffect(() => {
+    const onChange = () => followAddress.current()
+    window.addEventListener('popstate', onChange)
+    return () => window.removeEventListener('popstate', onChange)
+  }, [])
+
+  /** Back, forward, or an address typed into the open app. */
+  async function readAddress() {
+    const hash = location.hash.replace(/^#/, '')
+    if (/^[12]\./.test(hash)) {
+      try {
+        const taken = await takeShared(hash)
+        const song = taken.added[0] ?? taken.updated[0] ?? null
+        if (taken.setlist) return await show({ place: 'sets', song: null, setlistId: taken.setlist.id, note: null })
+        if (song) return await show({ place: 'editor', song, setlistId: null, note: null })
+      } catch {
+        announce('That share link could not be read')
+      }
+      if (address) history.replaceState(null, '', address)
+      return
+    }
+    const route = parseRoute(location.hash)
+    if (route) await show(resolveRoute(route, songs, setlists, phone))
+    else if (address) history.replaceState(null, '', address)
+  }
+
+  async function show(target: RouteTarget) {
+    const current = editorRef.current
+    const opening = target.song && target.song.id !== current?.song.id ? target.song : null
+    if (opening && current) await library.current.saveSong(current.song)
+    // Settle the address first, so the mirror above has nothing to push.
+    history.replaceState(null, '', formatRoute(routeOf(target.place, opening?.id ?? current?.song.id ?? null, target.setlistId)))
+    if (opening) {
+      const opened = openEditor(opening)
+      setEditor({ ...opened, prefs: settings.prefs, concert: keyFromPitch(notePitch(opened.concert.tonic), opened.concert.mode, settings.prefs) })
+    }
+    setPlace(target.place)
+    setOpenSetlistId(target.setlistId)
+    if (target.note) announce(target.note)
+  }
+
+  /** Takes a share link or shared file into the library. Throws when it cannot be read. */
+  async function takeShared(text: string) {
+    const current = editorRef.current
+    if (current) await library.current.saveSong(current.song)
+    const taken = await takeBundle(library.current, { songs, setlists }, readShare(text))
+    setSongs(taken.songs)
+    setSetlists(taken.setlists)
+    const reopened = current && taken.updated.find((song) => song.id === current.song.id)
+    if (reopened) {
+      const opened = openEditor(reopened)
+      setEditor({ ...opened, prefs: settings.prefs, concert: keyFromPitch(notePitch(opened.concert.tonic), opened.concert.mode, settings.prefs) })
+    }
+    announce(taken.message)
+    return taken
+  }
+
+  async function importShared(file: File) {
+    try {
+      await takeShared(await file.text())
+    } catch {
+      announce('That file is not a shared setlist')
+    }
   }
 
   async function createSong() {
@@ -661,7 +740,7 @@ export function App() {
         </main>
       )}
       {place === 'import' && <main className="editor"><ImportScreen phone={phone} shared={sharedPaste} onCancel={() => { setSharedPaste(null); setPlace(phone ? 'songs' : 'editor') }} onSave={(song) => { setSharedPaste(null); void library.current.saveSong(song); setSongs((current) => [song, ...current.filter((item) => item.id !== song.id)]); const opened = openEditor(song); setEditor({ ...opened, prefs: settings.prefs }); setPlace('editor') }} /></main>}
-      {place === 'sets' && <main className="editor"><SetlistScreen songs={songs} setlists={setlists} onCreate={() => { const setlist: Setlist = { id: crypto.randomUUID(), name: '', date: '', entries: [] }; setSetlists((current) => [...current, setlist]); void library.current.saveSetlist(setlist) }} onChange={(setlist) => { setSetlists((current) => current.map((item) => item.id === setlist.id ? setlist : item)); void library.current.saveSetlist(setlist) }} onDelete={(id) => { setSetlists((current) => current.filter((item) => item.id !== id)); void library.current.deleteSetlist(id) }} onExport={(setlist) => { setSetlistPrefs(settings.prefs); setSetlistExport(setlist) }} onStage={(setlist) => { const ordered = setlist.entries.flatMap((entry) => { const song = songs.find((item) => item.id === entry.songId); return song ? [{ song, concert: entry.key ?? song.originalKey, capo: entry.capo ?? 0 }] : [] }); if (ordered.length > 0) setPerformance({ mode: 'stage', entries: ordered, nashville: false }) }} /></main>}
+      {place === 'sets' && <main className="editor"><SetlistScreen songs={songs} setlists={setlists} openedId={openSetlistId} onOpen={setOpenSetlistId} onShare={(setlist) => copySetlistShare(setlist, songs, announce)} onDownload={(setlist) => downloadSetlistFile(setlist, songs)} onImport={(file) => void importShared(file)} onCreate={() => { const setlist: Setlist = { id: crypto.randomUUID(), name: '', date: '', entries: [] }; setSetlists((current) => [...current, setlist]); void library.current.saveSetlist(setlist) }} onChange={(setlist) => { setSetlists((current) => current.map((item) => item.id === setlist.id ? setlist : item)); void library.current.saveSetlist(setlist) }} onDelete={(id) => { setSetlists((current) => current.filter((item) => item.id !== id)); void library.current.deleteSetlist(id) }} onExport={(setlist) => { setSetlistPrefs(settings.prefs); setSetlistExport(setlist) }} onStage={(setlist) => { const ordered = setlist.entries.flatMap((entry) => { const song = songs.find((item) => item.id === entry.songId); return song ? [{ song, concert: entry.key ?? song.originalKey, capo: entry.capo ?? 0 }] : [] }); if (ordered.length > 0) setPerformance({ mode: 'stage', entries: ordered, nashville: false }) }} /></main>}
       {place === 'settings' && <main className="editor"><SettingsScreen settings={settings} onChange={(next) => { setSettings(next); void library.current.saveSettings(next); setEditor((state) => state && { ...state, prefs: next.prefs, concert: keyFromPitch(notePitch(state.concert.tonic), state.concert.mode, next.prefs) }) }} onBackup={() => { const backup: BackupFile = { version: 1, songs, setlists, settings }; const blob = new Blob([JSON.stringify(backup, null, 2)], { type: 'application/json' }); const url = URL.createObjectURL(blob); const link = document.createElement('a'); link.href = url; link.download = 'chord-sheet-backup.json'; link.click(); URL.revokeObjectURL(url) }} onRestore={(file) => void restoreBackup(file)} /></main>}
       {place === 'editor' && layout && previewVisible({ phone, inspectorOpen: mode === 'visual' && selectedId !== null, peek: previewPeek }) && <PreviewPane layout={layout} />}
       {exportOpen && layout && <ExportDialog layout={layout} choices={pdfChoices} accidentals={accidentalBias(editor?.prefs ?? settings.prefs)} issueCount={issues.length} onChange={setPdfChoices} onAccidentals={(bias) => applyPrefs(prefsForBias(bias))} onClose={() => setExportOpen(false)} onDownload={() => void exportPdf()} />}
@@ -706,6 +785,106 @@ function copyShare(song: Song, announce: (message: string) => void) {
   }
   void navigator.clipboard.writeText(`${location.origin}${location.pathname}#${encoded.hash}`)
   announce('Share link copied')
+}
+
+function copySetlistShare(setlist: Setlist, songs: Song[], announce: (message: string) => void) {
+  const encoded = encodeBundle(bundleSetlist(setlist, songs))
+  if (!encoded.ok) {
+    announce('This setlist is too large for a link. Download the file instead.')
+    return
+  }
+  void navigator.clipboard.writeText(`${location.origin}${location.pathname}#${encoded.hash}`)
+  announce('Share link copied')
+}
+
+function downloadSetlistFile(setlist: Setlist, songs: Song[]) {
+  const blob = new Blob([JSON.stringify(bundleSetlist(setlist, songs), null, 2)], { type: 'application/json' })
+  const url = URL.createObjectURL(blob)
+  const link = document.createElement('a')
+  link.href = url
+  link.download = `${setlistName(setlist)}.setlist.json`
+  link.click()
+  URL.revokeObjectURL(url)
+}
+
+type RouteTarget = { place: Place; song: Song | null; setlistId: string | null; note: string | null }
+
+function routeOf(place: Place, songId: string | null, setlistId: string | null): Route {
+  if (place === 'editor') return songId ? { place: 'song', id: songId } : { place: 'songs' }
+  if (place === 'sets') return setlistId ? { place: 'setlist', id: setlistId } : { place: 'setlists' }
+  return { place }
+}
+
+/** Where a route leads on this device. A song or setlist that is not here leads to the list, with a note saying so. */
+function resolveRoute(route: Route, songs: Song[], setlists: Setlist[], phone: boolean): RouteTarget {
+  const list: Place = phone ? 'songs' : 'editor'
+  if (route.place === 'song') {
+    const song = songs.find((item) => item.id === route.id) ?? null
+    return { place: song ? 'editor' : list, song, setlistId: null, note: song ? null : 'That song is not on this device' }
+  }
+  if (route.place === 'setlist') {
+    const here = setlists.some((item) => item.id === route.id)
+    return { place: 'sets', song: null, setlistId: here ? route.id : null, note: here ? null : 'That setlist is not on this device' }
+  }
+  if (route.place === 'songs') return { place: list, song: null, setlistId: null, note: null }
+  if (route.place === 'setlists') return { place: 'sets', song: null, setlistId: null, note: null }
+  return { place: route.place, song: null, setlistId: null, note: null }
+}
+
+/** Loads the library, seeds an empty one, and takes in a share link when the page was opened with one. */
+async function startLibrary(library: LibraryRepository) {
+  const snapshot = await library.load()
+  let list = snapshot.songs
+  if (list.length === 0) {
+    list = [amazingGrace, firstLight]
+    await Promise.all(list.map((song) => library.saveSong(song)))
+  }
+  let held = snapshot.setlists
+  let first = list[0]
+  let landing: 'editor' | 'sets' | null = null
+  let note: string | null = null
+  let sharedSetlist: string | null = null
+  const hash = location.hash.replace(/^#/, '')
+  if (/^[12]\./.test(hash)) {
+    try {
+      const taken = await takeBundle(library, { songs: list, setlists: held }, readShare(hash))
+      list = taken.songs
+      held = taken.setlists
+      first = taken.added[0] ?? taken.updated[0] ?? first
+      sharedSetlist = taken.setlist?.id ?? null
+      if (taken.setlist) landing = 'sets'
+      else if (taken.added.length + taken.updated.length > 0) landing = 'editor'
+      if (taken.setlist || taken.updated.length > 0) note = taken.message
+    } catch {
+      note = 'That share link could not be read'
+    }
+    history.replaceState(null, '', location.pathname)
+  }
+  return { snapshot, list, held, first, landing, note, sharedSetlist }
+}
+
+/** Saves what a bundle adds to the library. Asks before replacing a song or setlist already held. */
+async function takeBundle(library: LibraryRepository, have: { songs: Song[]; setlists: Setlist[] }, bundle: ShareBundle) {
+  const plan = mergeBundle(have, bundle)
+  const changed = plan.setlist?.status === 'changed' ? plan.setlist.value : null
+  const offered = [...plan.updated.map((song) => `“${song.title}”`), ...(changed ? [`setlist “${setlistName(changed)}”`] : [])]
+  const replace = offered.length > 0 && window.confirm(`Replace your copy of ${offered.join(', ')} with the shared one?`)
+  const updated = replace ? plan.updated : []
+  const setlist = plan.setlist && (plan.setlist.status === 'new' || replace) && plan.setlist.status !== 'same' ? plan.setlist.value : null
+  await Promise.all([...plan.added, ...updated].map((song) => library.saveSong(song)))
+  if (setlist) await library.saveSetlist(setlist)
+  const parts: string[] = []
+  if (plan.setlist?.status === 'new') parts.push(`setlist “${setlistName(plan.setlist.value)}”`)
+  if (plan.added.length > 0) parts.push(plan.added.length === 1 ? '1 song' : `${plan.added.length} songs`)
+  const did = [parts.length > 0 ? `Added ${parts.join(' and ')}` : '', replace ? `${parts.length > 0 ? 'updated' : 'Updated'} ${offered.join(', ')}` : ''].filter(Boolean)
+  return {
+    songs: [...plan.added, ...have.songs.map((song) => updated.find((item) => item.id === song.id) ?? song)],
+    setlists: setlist ? [...have.setlists.filter((item) => item.id !== setlist.id), setlist] : have.setlists,
+    added: plan.added,
+    updated,
+    setlist: plan.setlist?.value ?? null,
+    message: did.length > 0 ? did.join(', ') : 'Already in your library',
+  }
 }
 
 function meterLabel(song: Song): string | null {

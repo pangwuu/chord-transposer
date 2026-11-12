@@ -369,6 +369,8 @@ button { cursor: pointer; }
 .screen-head h2 { margin: 0; }
 .screen-head .primary, .setlist-actions .primary, .import-footer .primary { white-space: nowrap; flex: none; }
 .screen-head .primary { margin-left: auto; }
+.screen-head .outline { margin-left: auto; white-space: nowrap; flex: none; }
+.screen-head .outline ~ .primary { margin-left: 0; }
 .setlist-list { display: flex; flex-direction: column; gap: 2px; }
 .setlist-pick { display: flex; flex-direction: column; align-items: flex-start; gap: 2px; width: 100%; text-align: left; padding: 10px 12px; border: 0; border-radius: 8px; background: transparent; min-height: 40px; }
 .setlist-pick.active { background: var(--bg-active); }
