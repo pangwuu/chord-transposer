@@ -18,6 +18,8 @@ export function Inspector({
   onClose,
   phone = false,
   onNudge,
+  previewShown = false,
+  onTogglePreview,
 }: {
   song: Song
   shapeKey: Key
@@ -30,6 +32,8 @@ export function Inspector({
   onClose: () => void
   phone?: boolean
   onNudge?: (how: NudgeHow) => void
+  previewShown?: boolean
+  onTogglePreview?: () => void
 }) {
   const [advanced, setAdvanced] = useState(false)
   useEffect(() => setAdvanced(false), [selectedId])
@@ -112,6 +116,11 @@ export function Inspector({
         {phone && <button className="text-button danger" type="button" onClick={onDelete}>Delete</button>}
         <button className="text-button" type="button" aria-label="Close chord" onClick={onClose}>×</button>
       </div>
+      {!phone && onTogglePreview && (
+        <button className="text-button preview-toggle" type="button" aria-pressed={previewShown} onClick={onTogglePreview}>
+          {previewShown ? 'Hide PDF preview' : 'Show PDF preview'}
+        </button>
+      )}
       <p className="big-chord">{label}</p>
       <p className="meta">{nashville(selected, shapeKey)} in this key{concertLabel ? ` · sounds as ${concertLabel}` : ''}</p>
       {phone && onNudge && (

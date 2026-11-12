@@ -64,3 +64,24 @@ describe('Inspector as the phone sheet', () => {
     expect(screen.queryByRole('button', { name: 'Advanced' })).toBeNull()
   })
 })
+
+describe('Inspector preview toggle', () => {
+  it('offers Show PDF preview on laptop and reports the toggle', () => {
+    const onTogglePreview = vi.fn()
+    const value = song()
+    render(<Inspector song={value} shapeKey={parseKey('G')} selectedId="c1" concertLabel={null} focusSignal={0}
+      previewShown={false} onTogglePreview={onTogglePreview} onText={() => {}} onReplace={() => {}} onDelete={() => {}} onClose={() => {}} />)
+    fireEvent.click(screen.getByRole('button', { name: 'Show PDF preview' }))
+    expect(onTogglePreview).toHaveBeenCalled()
+  })
+
+  it('says Hide PDF preview while it is showing, and has no toggle on phone', () => {
+    const value = song()
+    const view = render(<Inspector song={value} shapeKey={parseKey('G')} selectedId="c1" concertLabel={null} focusSignal={0}
+      previewShown onTogglePreview={() => {}} onText={() => {}} onReplace={() => {}} onDelete={() => {}} onClose={() => {}} />)
+    expect(screen.getByRole('button', { name: 'Hide PDF preview' })).toBeTruthy()
+    view.unmount()
+    renderInspector({ phone: true })
+    expect(screen.queryByRole('button', { name: /PDF preview/ })).toBeNull()
+  })
+})

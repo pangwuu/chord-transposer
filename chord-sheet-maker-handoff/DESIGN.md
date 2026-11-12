@@ -170,7 +170,7 @@ Pane widths: library **240** (rail **56**), inspector **296**, preview **420** (
 
 **Docked column beside the editor, opened automatically when a chord is selected. While it is open the PDF preview closes, and it comes back when the chord is deselected.** The chart keeps its width instead of four columns squeezing it.
 
-Why the preview closes: with library, editor, inspector and preview all open, the editor (the chart, which *is* the interface) became the narrowest pane. The editor already follows the print layout rules, so it shows the result while you change a chord; the preview returns as soon as you deselect. Putting the inspector next to the editor also keeps the mouse travel short (chord → panel), and the song list is the least useful pane while you're fine-tuning one chord. Users can pin the inspector open (panel button in the editor bar) or close it (×, or Esc to deselect). `⌘K` focuses library search and expands the rail.
+Why the preview closes: with library, editor, inspector and preview all open, the editor (the chart, which *is* the interface) became the narrowest pane. The editor already follows the print layout rules, so it shows the result while you change a chord; the preview returns as soon as you deselect. To check the page without deselecting, **Show PDF preview** (a text button under the inspector header, laptop only) brings it back beside the inspector; it reads **Hide PDF preview** while showing, and resets when the chord is deselected. Putting the inspector next to the editor also keeps the mouse travel short (chord → panel), and the song list is the least useful pane while you're fine-tuning one chord. Users can pin the inspector open (panel button in the editor bar) or close it (×, or Esc to deselect). `⌘K` focuses library search and expands the rail.
 
 ```
 Laptop 1440, nothing selected                    Laptop 1440, chord selected
@@ -442,7 +442,7 @@ Songs tab                Editor (chord selected)       Preview toggle
   - On phone the floating chord toolbar (§4.4) is hidden; the sheet holds its controls.
   - **Shown by default:** grab handle; chord name (mono 28/700) and Nashville number; Delete; Close; four 48 px nudge buttons (Word ‹‹, Letter ‹, Letter ›, Word ››); **Type** (keyboard entry); **In the key** (diatonic I–vii°, 48 px buttons); **Used in this song**.
   - **Advanced** (one row at the bottom, collapsed): the full builder (root, accidental, quality grid, bass note); the out-of-key suggestions (slash chords such as `G/B`, sus chords, borrowed chords such as `♭VII`); replace all; the exact position readout.
-  - **Advanced always starts collapsed.** It does not remember being opened, so the sheet looks the same every time.
+  - Field labels (Chord, Bass) sit above their fields, never beside them. **Advanced always starts collapsed.** It does not remember being opened, so the sheet looks the same every time.
   - Swipe up expands the sheet; Advanced stays collapsed until tapped. Swipe down or × deselects. The editor scrolls so the selected chord sits above the sheet.
 - **Adding a chord on touch:** the first tap on a letter shows the `+ tap again` ghost; a second tap on the same letter adds the chord. This stops chords being added by accident while scrolling.
 - **Dragging on touch:** chords use `touch-action: none`, so a drag that starts on a chord moves the chord while a drag elsewhere scrolls. A long-press (300 ms) on a lyric letter starts a text selection for lyric editing.

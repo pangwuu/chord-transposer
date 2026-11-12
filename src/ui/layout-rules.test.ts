@@ -11,3 +11,9 @@ describe('previewVisible on laptop', () => {
     expect(previewVisible({ phone: true, inspectorOpen: true })).toBe(true)
   })
 })
+
+describe('Show PDF preview while editing a chord', () => {
+  it('brings the preview back beside the inspector when asked', () => {
+    expect(previewVisible({ phone: false, inspectorOpen: true, peek: true })).toBe(true)
+  })
+})
