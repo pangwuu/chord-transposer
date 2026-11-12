@@ -108,6 +108,7 @@ const stageTitle = () => document.querySelector('.stage-title')?.textContent
 describe('StageView header', () => {
   it('has no key badge beside Exit', () => {
     renderStage()
+    expect(screen.getByRole('button', { name: 'Exit' }).textContent).toBe('')
     expect(document.querySelector('.stage-key')).toBeNull()
     expect(screen.queryByText(/Original/)).toBeNull()
   })

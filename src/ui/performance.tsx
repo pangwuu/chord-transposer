@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
-import { ChevronsDown, Eye, EyeOff, RotateCcw, SkipBack, SkipForward } from 'lucide-react'
+import { ChevronsDown, Eye, EyeOff, RotateCcw, SkipBack, SkipForward, X } from 'lucide-react'
 import {
   accidentalBias,
   chooseAccidentalBias,
@@ -171,7 +171,9 @@ export function StageView({
         <div className="stage-chrome-row">
           {headerOpen && (
             <>
-              <button className="text-button" type="button" onClick={onExit}>Exit</button>
+              <button className="outline stage-icon" type="button" aria-label="Exit" title="Exit" onClick={onExit}>
+                <X size={16} aria-hidden="true" />
+              </button>
               <div className="stage-transport">
                 <div className="transport-main">
                   <div className="pill" role="group" aria-label="Transpose">
