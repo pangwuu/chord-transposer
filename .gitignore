@@ -5,6 +5,7 @@ dist-e2e/
 .vercel/
 .env
 .env.*
+!.env.example
 *.local
 *.tsbuildinfo
 playwright-report/
