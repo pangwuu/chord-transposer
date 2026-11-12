@@ -50,7 +50,6 @@ test('walks a setlist on stage', async ({ page }, testInfo) => {
   await page.getByLabel('Add a song').selectOption({ label: 'Amazing Grace' })
   await page.getByLabel('Add a song').selectOption({ label: 'First Light' })
   await page.getByRole('button', { name: 'Perform' }).click()
-  await expect(page.getByText('Original: G')).toBeVisible()
   await page.getByRole('button', { name: 'Next song' }).click()
   await expect(page.locator('.stage strong')).toHaveText('First Light')
   await page.getByRole('button', { name: 'Exit' }).click()

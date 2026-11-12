@@ -106,11 +106,11 @@ function swipe(dx: number, dy = 0) {
 const stageTitle = () => document.querySelector('.stage-title')?.textContent
 
 describe('StageView header', () => {
-  it('keeps the original key in the badge while transposing', () => {
+  it('has no key badge beside Exit', () => {
     renderStage()
-    expect(document.querySelector('.stage-key')?.textContent).toBe('Original: D')
-    fireEvent.click(screen.getByRole('button', { name: 'Key up a semitone' }))
-    expect(document.querySelector('.stage-key')?.textContent).toBe('Original: D')
+    expect(screen.getByRole('button', { name: 'Exit' }).textContent).toBe('')
+    expect(document.querySelector('.stage-key')).toBeNull()
+    expect(screen.queryByText(/Original/)).toBeNull()
   })
 
   it('shows the song order under the artist and no Numbers label', () => {

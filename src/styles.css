@@ -237,7 +237,6 @@ button { cursor: pointer; }
 @media (max-width: 767px) {
   .stage-chrome { padding-right: 56px; }
   .stage-speed > span, .stage-transport .pill-capo-label { display: none; }
-  .stage-key { font-size: 11px; padding: 2px 6px; }
 }
 .stage-transport .pill-btn { padding-left: 7px; padding-right: 7px; }
 .stage-speed { display: inline-flex; align-items: center; gap: 6px; white-space: nowrap; }
@@ -255,7 +254,6 @@ button { cursor: pointer; }
 .stage-transport .pill-capo-label, .stage-transport .transport-label, .stage-transport .pill-icon { color: #9b9b97; }
 .stage-transport .pill-select { color: #f2f2f0; background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%239b9b97' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpolyline points='6 9 12 15 18 9'/%3E%3C/svg%3E"); }
 .stage-transport .pill-divider { background: rgba(255,255,255,.16); }
-.stage-key { font-family: var(--mono); font-size: 12px; letter-spacing: .04em; color: #d4a017; border: 1px solid rgba(212,160,23,.35); border-radius: 999px; padding: 2px 8px; }
 .stage-body { position: relative; flex: 1; min-height: 0; font-family: var(--mono); font-size: 22px; line-height: 1.35; padding: 24px 28px 64px; overflow: auto; scroll-behavior: smooth; }
 .stage-head { margin: 0 0 36px; max-width: 42rem; }
 .stage-title { display: block; font-family: Georgia, 'Times New Roman', serif; font-size: clamp(2rem, 5vw, 2.75rem); font-weight: 400; line-height: 1.15; color: #fff; }

@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
-import { ChevronsDown, Eye, EyeOff, RotateCcw, SkipBack, SkipForward } from 'lucide-react'
+import { ChevronsDown, Eye, EyeOff, RotateCcw, SkipBack, SkipForward, X } from 'lucide-react'
 import {
   accidentalBias,
   chooseAccidentalBias,
@@ -19,6 +19,8 @@ const MIN_SPEED = 0.1
 const MAX_SPEED = 12
 const SPEED_STEP = 0.1
 const SWIPE_DISTANCE = 60
+/** Speed is pixels per 40 ms tick, so 0.8 reads as 20 px a second. */
+const SCROLL_TICKS_PER_SECOND = 25
 const SECTION_TOP_SLACK = 24
 const BASE_KEYS = ['C', 'Db', 'D', 'Eb', 'E', 'F', 'F#', 'G', 'Ab', 'A', 'Bb', 'B'] as const
 
@@ -73,9 +75,22 @@ export function StageView({
   }, [entry])
 
   useEffect(() => {
-    if (!playing) return
-    const timer = window.setInterval(() => body.current?.scrollBy({ top: speed }), 40)
-    return () => window.clearInterval(timer)
+    const node = body.current
+    if (!playing || !node) return
+    let position = node.scrollTop
+    let written = node.scrollTop
+    let last = performance.now()
+    let frame = requestAnimationFrame(function step(now) {
+      if (Math.abs(node.scrollTop - written) > 1) position = node.scrollTop
+      position += speed * SCROLL_TICKS_PER_SECOND * ((now - last) / 1000)
+      last = now
+      written = Math.round(position)
+      node.style.scrollBehavior = 'auto'
+      node.scrollTop = written
+      node.style.scrollBehavior = ''
+      frame = requestAnimationFrame(step)
+    })
+    return () => cancelAnimationFrame(frame)
   }, [playing, speed])
 
   useEffect(() => {
@@ -156,8 +171,9 @@ export function StageView({
         <div className="stage-chrome-row">
           {headerOpen && (
             <>
-              <button className="text-button" type="button" onClick={onExit}>Exit</button>
-              <span className="stage-key">Original: {formatKey(entry.song.originalKey)}</span>
+              <button className="outline stage-icon" type="button" aria-label="Exit" title="Exit" onClick={onExit}>
+                <X size={16} aria-hidden="true" />
+              </button>
               <div className="stage-transport">
                 <div className="transport-main">
                   <div className="pill" role="group" aria-label="Transpose">
