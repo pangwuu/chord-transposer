@@ -16,7 +16,7 @@ export type Setlist = {
   entries: SetlistEntry[]
 }
 
-export const ACCENTS = ['ink', 'teal', 'plum', 'graphite'] as const
+export const ACCENTS = ['ink', 'teal', 'plum', 'clay', 'graphite'] as const
 export type Accent = (typeof ACCENTS)[number]
 
 export type Settings = {

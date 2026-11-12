@@ -44,6 +44,15 @@ export type StageEntry = {
 
 const STAGE_SIZES = [18, 20, 22, 24, 28, 32, 36, 40]
 const STAGE_DEFAULT_SIZE = STAGE_SIZES.indexOf(24)
+const STAGE_SIZE_KEY = 'csm-stage-size'
+
+function initialStageSize(): number {
+  try {
+    const saved = STAGE_SIZES.indexOf(Number(localStorage.getItem(STAGE_SIZE_KEY)))
+    if (saved >= 0) return saved
+  } catch { /* storage can be blocked */ }
+  return typeof matchMedia === 'function' && matchMedia('(max-width: 767px)').matches ? 0 : STAGE_DEFAULT_SIZE
+}
 
 /** Full-screen Quiet Chart reading view with hideable transport + autoscroll. */
 export function StageView({
@@ -64,7 +73,10 @@ export function StageView({
   const [nashville, setNashville] = useState(initialNashville)
   const [prefs, setPrefs] = useState(initialPrefs)
   const [headerOpen, setHeaderOpen] = useState(true)
-  const [sizeIndex, setSizeIndex] = useState(() => (typeof matchMedia === 'function' && matchMedia('(max-width: 767px)').matches ? 0 : STAGE_DEFAULT_SIZE))
+  const [sizeIndex, setSizeIndex] = useState(initialStageSize)
+  useEffect(() => {
+    try { localStorage.setItem(STAGE_SIZE_KEY, String(STAGE_SIZES[sizeIndex])) } catch { /* storage can be blocked */ }
+  }, [sizeIndex])
   const [speed, setSpeed] = useState(DEFAULT_SPEED)
   const [playing, setPlaying] = useState(false)
   const body = useRef<HTMLDivElement>(null)

@@ -14,7 +14,7 @@
 |---|---|
 | Overall feel | Clean and minimal, like Notion |
 | Theme | Follows the device (light and dark), with a manual override |
-| Accent | One muted accent, chosen in Settings: **Ink** (default), Teal, Plum or Graphite. No saturated violet, gradients or glows. |
+| Accent | One muted accent, chosen in Settings: **Ink** (default), Teal, Plum, Clay or Graphite. No saturated violet, gradients or glows. |
 | Laptop layout | Three panes: song list, editor, live PDF preview |
 | Chords in the editor | Plain bold chord text, like the printed chart (no pills or boxes) |
 | Editing tools | Both: a floating toolbar on the selected chord **and** an inspector side panel |
@@ -64,6 +64,7 @@ The accent is a setting (`data-accent` on `<html>`, stored in `localStorage` as 
 | **Ink** (default) | `#2F4A73` | `#8FB0E0` | ≥ 9:1 / ≥ 8:1 |
 | Teal | `#1F6B66` | `#6CC5BC` | ≥ 6:1 / ≥ 8:1 |
 | Plum | `#6B3A63` | `#D29CC6` | ≥ 9:1 / ≥ 7:1 |
+| Clay (the warm option) | `#8A4A2C` | `#E0A585` | ≥ 7:1 / ≥ 8:1 |
 | Graphite | `#2B2B29` | `#E6E6E4` | ≥ 14:1 / ≥ 14:1 |
 
 Each accent also defines a hover (one step darker in light, lighter in dark), a soft background (about 6% tint in light, 14% alpha in dark) and an on-accent text colour. Any new accent must be muted (not a saturated violet or indigo) and pass 4.5:1 both ways.
@@ -167,16 +168,16 @@ Pane widths: library **240** (rail **56**), inspector **296**, preview **420** (
 
 ### 3.1 Decision: where the inspector lives on laptop
 
-**Docked column between the editor and the preview, opened automatically when a chord is selected; the library collapses to a rail while it's open below 1600 px.**
+**Docked column beside the editor, opened automatically when a chord is selected. While it is open the PDF preview closes, and it comes back when the chord is deselected.** The chart keeps its width instead of four columns squeezing it.
 
-Why not a tab in the preview pane: the moment you're changing a chord is exactly when you want to see the PDF update, which is priority 4. A tab would hide the preview at that moment. Putting the inspector next to the editor also keeps the mouse travel short (chord → panel), and the song list is the least useful pane while you're fine-tuning one chord. Users can pin the inspector open (panel button in the editor bar) or close it (×, or Esc to deselect). `⌘K` focuses library search and expands the rail.
+Why the preview closes: with library, editor, inspector and preview all open, the editor (the chart, which *is* the interface) became the narrowest pane. The editor already follows the print layout rules, so it shows the result while you change a chord; the preview returns as soon as you deselect. Putting the inspector next to the editor also keeps the mouse travel short (chord → panel), and the song list is the least useful pane while you're fine-tuning one chord. Users can pin the inspector open (panel button in the editor bar) or close it (×, or Esc to deselect). `⌘K` focuses library search and expands the rail.
 
 ```
 Laptop 1440, nothing selected                    Laptop 1440, chord selected
 ┌──────────┬───────────────────────┬──────────┐  ┌──┬──────────────────┬─────────┬──────────┐
-│ Library  │ Editor                │ Preview  │  │▤ │ Editor           │Inspector│ Preview  │
-│ 240      │ flex                  │ 420      │  │56│ flex             │ 296     │ 420      │
-└──────────┴───────────────────────┴──────────┘  └──┴──────────────────┴─────────┴──────────┘
+│ Library  │ Editor                │ Preview  │  │ Library  │ Editor                │Inspector│
+│ 240      │ flex                  │ 420      │  │ 240      │ flex                  │ 280     │
+└──────────┴───────────────────────┴──────────┘  └──────────┴───────────────────────┴─────────┘
 ```
 
 ---
@@ -241,7 +242,7 @@ Structure, top to bottom:
 |---|---|
 | Rest | `--text`, weight 700, no background |
 | Hover | `--accent` text on `--accent-soft`, radius 4, cursor `grab` |
-| Selected | `--text-on-accent` on solid `--accent`, plus a 2 px `--accent-soft-2` ring. The same chord gets an accent outline in the preview. |
+| Selected | `--text-on-accent` on solid `--accent`, plus a 2 px `--accent-soft-2` ring. (The preview is closed on laptop while a chord is selected (§3.1), and on phone it is a separate screen, so there is no outline in the preview. If the preview ever shows beside a selection again, outline the chord in `--accent`.) |
 | Dragging | Selected style, `--shadow-md`, cursor `grabbing`; a 2 px accent **drop caret** sits in the lyric row at the target letter |
 | Invalid | `--danger` text with a **wavy underline**; selected invalid = white on `--danger` |
 | Add ghost | Hovering a letter shows a dashed accent `+ chord` tag in the chord row above it |
@@ -398,7 +399,7 @@ Two columns on laptop: a list of setlists (name, date, song count, `+ New setlis
 
 ### 4.12 Stage view
 
-Full-screen Quiet Chart reading mode in the stage theme (§2.5), regardless of light/dark or accent. Solid header (`--stage-chrome`, not a fade): **Exit**, the transport pills (no Numbers label; key shown in white, pressed pills neutral), **A− / A+** text size (session-local, 18–40 px, 24 default, 18 on phone), Speed / **Autoscroll** (white button), **Next section** (goes to the section after the one at the top of the screen, even if you scrolled there), and **Previous song** / **Next song** when staging a setlist (a horizontal swipe on the chart does the same on touch screens), all on one line that scrolls sideways on a phone. Under the artist: `Order: Verse 1 · Chorus · …`. An eye at the end of the header stays on screen. Open eye shows the header; closed eye hides it and leaves only the icon. The header does not auto-hide and sits above the title. Controls are session-local and do not write back to the editor on Exit. Body is continuous scroll: serif title + artist, in-flow section headings (not sticky; sized with the text, at least 14 px, with a faint rule between sections), mono lyrics with warm chord labels above (`--stage-chord`). Comments are italic grey cues, not amber boxes. Autoscroll defaults to **0.8** and nudges in **0.1** steps (range 0.1–12); speed is pixels per 40 ms, so 0.8 moves 20 px a second at any screen density, and slow speeds still move. Long lines wrap with a 2ch hanging indent (same rules as PDF). Screen Wake Lock is on while open. Escape exits; Space toggles autoscroll. Prototype variants (Focus Column, Spotlight) live on branch `cursor/quiet-chart-stage-a1fb`.
+Full-screen Quiet Chart reading mode in the stage theme (§2.5), regardless of light/dark or accent. Solid header (`--stage-chrome`, not a fade): **Exit**, the transport pills (no Numbers label; key shown in white, pressed pills neutral), **A− / A+** text size (18–40 px; first use is 24 on laptop and 18 on phone, then the last size used is remembered on that device in `localStorage` as `csm-stage-size`), Speed / **Autoscroll** (white button), **Next section** (goes to the section after the one at the top of the screen, even if you scrolled there), and **Previous song** / **Next song** when staging a setlist (a horizontal swipe on the chart does the same on touch screens), all on one line that scrolls sideways on a phone. Under the artist: `Order: Verse 1 · Chorus · …`. An eye at the end of the header stays on screen. Open eye shows the header; closed eye hides it and leaves only the icon. The header does not auto-hide and sits above the title. Controls are session-local and do not write back to the editor on Exit. Body is continuous scroll: serif title + artist, in-flow section headings (not sticky; sized with the text, at least 14 px, with a faint rule between sections), mono lyrics with warm chord labels above (`--stage-chord`). Comments are italic grey cues, not amber boxes. Autoscroll defaults to **0.8** and nudges in **0.1** steps (range 0.1–12); speed is pixels per 40 ms, so 0.8 moves 20 px a second at any screen density, and slow speeds still move. Long lines wrap with a 2ch hanging indent (same rules as PDF). Screen Wake Lock is on while open. Escape exits; Space toggles autoscroll. Prototype variants (Focus Column, Spotlight) live on branch `cursor/quiet-chart-stage-a1fb`.
 
 ### 4.13 Projector view
 
@@ -407,7 +408,7 @@ Black background, white Inter 600, centred, one section per slide (lyrics only, 
 ### 4.14 Settings
 
 Grouped cards, Notion-style rows (label and description on the left, control on the right):
-- **Appearance:** Theme (System / Light / Dark), Accent (Ink / Teal / Plum / Graphite, with swatches; Ink is the default and older saved settings read as Ink), editor text size (S / M / L).
+- **Appearance:** Theme (System / Light / Dark), Accent (Ink / Teal / Plum / Clay / Graphite, with swatches; Ink is the default and older saved settings read as Ink), editor text size (S / M / L).
 - **Chords:** default chord style (Letters / Numbers), F# or Gb, Db or C#, chord names as written or normalised.
 - **PDF defaults:** paper, lyric size, allow two columns.
 - **Your data:** Export backup (.json), Restore (with a conflict review).
@@ -434,10 +435,15 @@ Songs tab                Editor (chord selected)       Preview toggle
 └──────────────────┘     └──────────────────────┘      └──────────────────────┘
 ```
 
-- **Bottom tabs:** Songs, Setlists, Settings. 22 px icons and 11 px labels; the active tab is purple. They're hidden inside the editor, where the top bar's ‹ goes back.
+- **Bottom tabs:** Songs, Setlists, Settings. 22 px icons and 11 px labels; the active tab uses the accent. They're hidden inside the editor, where the top bar's ‹ goes back.
 - **Editor top bar:** back, title (ellipsis), Undo, **Preview toggle** (▤; pressed = showing pages), Stage.
 - **Transport** scrolls horizontally if needed; 36 px tall controls.
-- **Bottom sheet** (chord tools): grab handle, chord name (mono 28/700), Nashville number, **Type** (keyboard entry), Delete, Close. Then four 48 px nudge buttons (Word ‹‹, Letter ‹, Letter ›, Word ››), a horizontally scrolling in-key suggestion row, and a quality grid. Swipe up expands to the full builder (root, accidental, bass, replace all). Swipe down or × deselects. The editor scrolls so the selected chord sits above the sheet.
+- **Bottom sheet** (chord tools). The laptop inspector (§4.5) shows every tool at once as a dense tool panel. The phone sheet has the same tools, but shows only the common ones and keeps the rest behind **Advanced**.
+  - On phone the floating chord toolbar (§4.4) is hidden; the sheet holds its controls.
+  - **Shown by default:** grab handle; chord name (mono 28/700) and Nashville number; Delete; Close; four 48 px nudge buttons (Word ‹‹, Letter ‹, Letter ›, Word ››); **Type** (keyboard entry); **In the key** (diatonic I–vii°, 48 px buttons); **Used in this song**.
+  - **Advanced** (one row at the bottom, collapsed): the full builder (root, accidental, quality grid, bass note); the out-of-key suggestions (slash chords such as `G/B`, sus chords, borrowed chords such as `♭VII`); replace all; the exact position readout.
+  - **Advanced always starts collapsed.** It does not remember being opened, so the sheet looks the same every time.
+  - Swipe up expands the sheet; Advanced stays collapsed until tapped. Swipe down or × deselects. The editor scrolls so the selected chord sits above the sheet.
 - **Adding a chord on touch:** the first tap on a letter shows the `+ tap again` ghost; a second tap on the same letter adds the chord. This stops chords being added by accident while scrolling.
 - **Dragging on touch:** chords use `touch-action: none`, so a drag that starts on a chord moves the chord while a drag elsewhere scrolls. A long-press (300 ms) on a lyric letter starts a text selection for lyric editing.
 
@@ -463,7 +469,7 @@ Songs tab                Editor (chord selected)       Preview toggle
 | **Inspector** | Song panel, Chord panel | collapsed, open, pinned |
 | **Chord input** | — | default, focus (accent ring), invalid (danger ring and message) |
 | **Toggle tile** (root / quality) | mono, text | off, on (`--selected` + `--selected-border`, bold), hover, focus |
-| **Suggestion tile** | name + roman/count | default, hover, current (accent outline) |
+| **Suggestion tile** (In this key, Used in this song) | name + roman/count | default, hover, current: the chord being edited, `--accent-soft` fill with a 2 px `--accent` outline. This links the panel to the selected chord in the editor. Builder tiles never use the accent. |
 | **Popover** | key, capo, section menu | open/closed; closes on outside click and Esc |
 | **Dialog** | export, confirm (rare) | open; focus trapped; Esc closes |
 | **Bottom sheet** | chord tools | hidden, peek (default), expanded |

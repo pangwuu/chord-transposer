@@ -1,7 +1,7 @@
 import { accidentalBias, prefsForBias, type AccidentalBias } from '../domain/chord'
 import { ACCENTS, type Accent, type Settings } from '../domain/library-types'
 
-const ACCENT_NAMES: Record<Accent, string> = { ink: 'Ink', teal: 'Teal', plum: 'Plum', graphite: 'Graphite' }
+const ACCENT_NAMES: Record<Accent, string> = { ink: 'Ink', teal: 'Teal', plum: 'Plum', clay: 'Clay', graphite: 'Graphite' }
 
 export function SettingsScreen({
   settings,

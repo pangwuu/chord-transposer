@@ -339,3 +339,15 @@ describe('StageView text size', () => {
     expect((larger as HTMLButtonElement).disabled).toBe(true)
   })
 })
+
+describe('StageView remembers text size', () => {
+  afterEach(() => localStorage.clear())
+
+  it('opens at the last size used on this device', () => {
+    localStorage.setItem('csm-stage-size', '32')
+    renderStage()
+    expect((document.querySelector('.stage-body') as HTMLElement).style.fontSize).toBe('32px')
+    fireEvent.click(screen.getByRole('button', { name: 'Smaller text' }))
+    expect(localStorage.getItem('csm-stage-size')).toBe('28')
+  })
+})
