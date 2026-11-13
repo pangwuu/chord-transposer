@@ -71,6 +71,6 @@ test('a share link pasted into the open app adds the song', async ({ page }) => 
 
 test('an address for a song that is not here says so', async ({ page }) => {
   await page.goto('/#/song/not-on-this-device')
-  await expect(page.getByRole('status')).toContainText('That song is not on this device')
+  await expect(page.getByRole('status')).toContainText('That song is not in this library')
   await expect(page).not.toHaveURL(/not-on-this-device/)
 })

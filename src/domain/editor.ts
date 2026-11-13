@@ -56,6 +56,14 @@ export function openEditor(song: Song): EditorState {
   }
 }
 
+/**
+ * Opens a bandmate's newer copy of the song already open here. The key and capo chosen here stay.
+ * Undo starts afresh, so it can never quietly put back what the bandmate changed.
+ */
+export function takeBandmateCopy(state: EditorState, song: Song): EditorState {
+  return { ...state, song, past: [], future: [], selectedIds: [] }
+}
+
 function commit(state: EditorState, song: Song): EditorState {
   return { ...state, song, past: [...state.past, state.song].slice(-LIMIT), future: [] }
 }

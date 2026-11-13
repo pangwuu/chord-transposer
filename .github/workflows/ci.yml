@@ -30,3 +30,6 @@ jobs:
         env:
           E2E_PREVIEW: '1'
           CI: '1'
+      - run: npm run test:e2e:emulator
+        env:
+          CI: '1'

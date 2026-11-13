@@ -3,7 +3,7 @@ import type { Song } from './song'
 
 type Listener = (snapshot: LibrarySnapshot) => void
 
-/** A library held in memory. Used by tests, and as the working copy inside other adapters. */
+/** A library held in memory: the contract's reference adapter, and the library of test mode's band. */
 export function memoryLibrary(initial?: Partial<LibrarySnapshot>): LibraryRepository {
   const snapshot: LibrarySnapshot = {
     songs: structuredClone(initial?.songs ?? []),

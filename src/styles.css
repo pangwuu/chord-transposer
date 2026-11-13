@@ -492,3 +492,15 @@ button { cursor: pointer; }
 .import-body.reviewing .import-panes .result { overflow: visible; padding: 0; background: transparent; min-height: 0; }
 
 @media (hover: none) { .section-grip { display: none; } }
+
+/* Band: setup screens before a library opens, and the join, leave and recovery dialogs. */
+.band-setup { min-height: 100vh; display: grid; place-content: center; justify-items: start; gap: 12px; padding: 24px 16px; max-width: 32rem; margin: 0 auto; }
+.band-setup h1 { font-size: 20px; margin: 0; }
+.band-setup p { margin: 0; color: var(--text-muted); }
+.band-dialog { width: min(480px, calc(100% - 32px)); display: grid; gap: 12px; }
+.band-dialog h2, .band-dialog p { margin: 0; }
+.band-dialog .row-meta { justify-content: flex-end; gap: 8px; margin-top: 4px; }
+.band-warning { color: var(--danger); }
+.band-confirm { display: grid; gap: 6px; }
+.primary.danger { background: var(--danger); }
+.primary:disabled { opacity: .5; cursor: not-allowed; }

@@ -3,7 +3,7 @@ import { describe, expect, it } from 'vitest'
 import { PDFDocument } from 'pdf-lib'
 import { formatKey, formatSymbol, parseChord, parseKey } from './chord'
 import { applyRestore, planRestore } from './backup'
-import { addAt, addBarChordOf, addBarsOf, addCommentOf, editNoteOf, removeLineOf, addSectionOf, applyChordProOf, changeLyric, checkLine, deleteSectionOf, duplicateSectionOf, moveSectionOf, nudge, openEditor, placeSectionOf, removeSelected, renameSectionOf, repeatArrangementOf, resetView, saveConcertAsSongKey, setChordText, setSongDetails, stepConcert, undo, viewSong, chooseCapo } from './editor'
+import { addAt, addBarChordOf, addBarsOf, addCommentOf, editNoteOf, removeLineOf, addSectionOf, applyChordProOf, changeLyric, checkLine, deleteSectionOf, duplicateSectionOf, moveSectionOf, nudge, openEditor, placeSectionOf, removeSelected, renameSectionOf, repeatArrangementOf, resetView, saveConcertAsSongKey, setChordText, setSongDetails, stepConcert, undo, viewSong, chooseCapo, takeBandmateCopy } from './editor'
 import { amazingGrace, firstLight } from '../fixtures/charts'
 import { chordTextFromPdfItems, importText } from './import-text'
 import { padCollisions } from './line-layout'
@@ -711,3 +711,18 @@ function pdfOptions(concert: Song['originalKey']) {
 
 void stepConcert
 void parseChord
+
+describe('a bandmate’s edit to the open song', () => {
+  it('replaces the song, keeps the key and capo chosen here, and starts undo afresh', () => {
+    const edited = setSongDetails(openEditor(amazingGrace), { title: 'Mine' })
+    const viewing = chooseCapo({ ...edited, selectedIds: ['x'] }, 2)
+    const theirs = { ...amazingGrace, title: 'Theirs' }
+    const next = takeBandmateCopy(viewing, theirs)
+    expect(next.song).toBe(theirs)
+    expect(next.capo).toBe(viewing.capo)
+    expect(next.concert).toEqual(viewing.concert)
+    expect(next.past).toEqual([])
+    expect(next.future).toEqual([])
+    expect(next.selectedIds).toEqual([])
+  })
+})

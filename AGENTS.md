@@ -2,7 +2,7 @@ Chord Sheet Maker is a local-first React app for editing, transposing, and print
 
 Behavior is specified in `chord-sheet-maker-handoff/SPEC.md`. The screen to match is `chord-sheet-maker-handoff/mockup/`.
 
-Use npm.
+Use npm. `npm run dev` talks to the Firebase emulators: start them first with `npm run emulators`. Tests that need them are named `*.emulator.test.ts` and `*.emulator.spec.ts`; run them with `npm run test:emulator` and `npm run test:e2e:emulator`.
 
 Public-domain hymns and original demo charts are the only charts in git and in the bundled app.
 
