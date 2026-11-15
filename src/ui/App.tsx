@@ -1,4 +1,4 @@
-import { Fragment, useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
+import { Fragment, useEffect, useMemo, useRef, useState, type CSSProperties, type ReactNode } from 'react'
 import { Check, Guitar, RotateCcw, TriangleAlert } from 'lucide-react'
 import { accidentalBias, chooseAccidentalBias, formatKey, prefsForBias, formatSymbol, keyFromPitch, normaliseSymbol, notePitch, parseChord, parseKey, shiftKey, type SpellingPrefs } from '../domain/chord'
 import {
@@ -38,7 +38,7 @@ import {
 import { applyRestore, planRestore, type BackupFile } from '../domain/backup'
 import { toChordPro } from '../domain/chordpro'
 import { followOrder, sameValue } from '../domain/follow-library'
-import { defaultSettings, type LibraryRepository, type LibrarySnapshot, type Setlist, type Settings } from '../domain/library-types'
+import { defaultSettings, type LibraryRepository, type LibrarySnapshot, type PaneWidths, type Setlist, type Settings } from '../domain/library-types'
 import { settingsFrom, type SettingsStore } from '../domain/settings-store'
 import { layoutPdf, layoutSetlist } from '../domain/pdf-layout'
 import { formatRoute, parseRoute, type Route } from '../domain/route'
@@ -52,7 +52,8 @@ import { defaultPdfChoices, ExportDialog, SetlistExportDialog, type PdfChoices }
 import { ImportScreen, readSharedPaste } from './import-screen'
 import { Inspector } from './inspector'
 import { PreviewPane } from './preview-pane'
-import { previewVisible } from './layout-rules'
+import { fitPanes, previewVisible } from './layout-rules'
+import { PaneDivider } from './pane-divider'
 import { ProjectorView, StageView, type StageEntry } from './performance'
 import { SetlistScreen, setlistName } from './setlist-screen'
 import { SettingsScreen } from './settings-screen'
@@ -78,6 +79,7 @@ export function App({ library, settingsStore, band }: { library: LibraryReposito
   const editorRef = useRef<EditorState | null>(null)
   const searchRef = useRef<HTMLInputElement>(null)
   const phone = usePhone()
+  const viewport = useViewportWidth()
   const [sharedPaste, setSharedPaste] = useState(launchPaste)
   const [place, setPlace] = useState<Place>(() => (sharedPaste ? 'import' : phone ? 'songs' : 'editor'))
   const [mode, setMode] = useState<'visual' | 'chordpro'>('visual')
@@ -560,14 +562,30 @@ export function App({ library, settingsStore, band }: { library: LibraryReposito
   }, [selectedId])
   const concertLabel = editor && view && selectedId && editor.capo > 0 ? concertName(editor, selectedId) : null
 
+  const inspectorOpen = mode === 'visual' && selectedId !== null
+  const panes = fitPanes(settings.panes, { viewport, inspectorOpen })
+  /** Keeps a dragged pane width for this device. `null` puts the pane back to its default. */
+  function resizePane(pane: keyof PaneWidths, width: number | null) {
+    const wanted = { ...settings.panes, [pane]: width ?? defaultSettings().panes[pane] }
+    const next = { ...settings, panes: { ...settings.panes, [pane]: fitPanes(wanted, { viewport, inspectorOpen })[pane] } }
+    setSettings(next)
+    settingsStore.write(next)
+  }
+  const paneStyle = phone ? undefined : {
+    '--library-w': `${panes.library}px`,
+    '--inspector-w': `${panes.inspector}px`,
+    ...(panes.preview === null ? {} : { '--preview-w': `${panes.preview}px`, '--editor-min': '0px' }),
+  } as CSSProperties
+
   const phoneScreen = place === 'songs' ? 'songs' : place
   const phonePerformance = performance ? `phone-${performance.mode}` : ''
   const songsTabActive = place === 'songs' || place === 'editor' || place === 'import'
 
 
   return (
-    <div className={['app', phone ? `phone-${phoneScreen}` : '', phonePerformance].filter(Boolean).join(' ')}>
+    <div className={['app', phone ? `phone-${phoneScreen}` : '', phonePerformance].filter(Boolean).join(' ')} style={paneStyle}>
       <aside className="library">
+        {!phone && <PaneDivider label="Resize song list" edge="right" width={panes.library} onResize={(width) => resizePane('library', width)} onReset={() => resizePane('library', null)} />}
         <div className="brand"><span>Chord Sheet Maker</span></div>
         <input ref={searchRef} className="search" aria-label="Search songs" placeholder="Search songs" value={query} onChange={(event) => setQuery(event.target.value)} />
         {phone && <button className="primary import-cta" type="button" onClick={() => setPlace('import')}>Paste a chart</button>}
@@ -779,6 +797,7 @@ export function App({ library, settingsStore, band }: { library: LibraryReposito
                 onDelete={() => removeChord(editor)}
               />
             </div>
+            {!phone && inspectorOpen && <PaneDivider className="for-inspector" label="Resize chord inspector" edge="left" width={panes.inspector} onResize={(width) => resizePane('inspector', width)} onReset={() => resizePane('inspector', null)} />}
             {mode === 'visual' && <Inspector
               song={view}
               shapeKey={shapeKey}
@@ -801,7 +820,7 @@ export function App({ library, settingsStore, band }: { library: LibraryReposito
       {place === 'sets' && <main className="editor"><SetlistScreen songs={songs} setlists={setlists} openedId={openSetlistId} onOpen={setOpenSetlistId} onShare={(setlist) => copySetlistShare(setlist, songs, announce)} onDownload={(setlist) => downloadSetlistFile(setlist, songs)} onImport={(file) => void importShared(file)} onCreate={() => { const setlist: Setlist = { id: crypto.randomUUID(), name: '', date: '', entries: [] }; setSetlists((current) => [...current, setlist]); void library.saveSetlist(setlist) }} onChange={(setlist) => { setSetlists((current) => current.map((item) => item.id === setlist.id ? setlist : item)); void library.saveSetlist(setlist) }} onDelete={(id) => { setSetlists((current) => current.filter((item) => item.id !== id)); void library.deleteSetlist(id) }} onExport={(setlist) => { setSetlistPrefs(settings.prefs); setSetlistExport(setlist) }} onStage={(setlist) => { const ordered = setlist.entries.flatMap((entry) => { const song = songs.find((item) => item.id === entry.songId); return song ? [{ song, concert: entry.key ?? song.originalKey, capo: entry.capo ?? 0 }] : [] }); if (ordered.length > 0) setPerformance({ mode: 'stage', entries: ordered, nashville: false }) }} /></main>}
       {place === 'settings' && <main className="editor"><SettingsScreen settings={settings} onChange={changeSettings} onBackup={downloadBackup} onRestore={(file) => void restoreBackup(file)} band={band && <BandSettings info={band.info} onRename={band.rename} onLeave={() => setLeaving(true)} />} /></main>}
       {leaving && band?.info && <LeaveBandDialog info={band.info} songCount={songs.length} setlistCount={setlists.length} onBackup={downloadBackup} onCancel={() => setLeaving(false)} onLeave={() => void band.leave().finally(() => setLeaving(false))} />}
-      {place === 'editor' && layout && previewVisible({ phone, inspectorOpen: mode === 'visual' && selectedId !== null, peek: previewPeek }) && <PreviewPane layout={layout} />}
+      {place === 'editor' && layout && previewVisible({ phone, inspectorOpen, peek: previewPeek }) && <PreviewPane layout={layout} divider={!phone && <PaneDivider label="Resize PDF preview" edge="left" onResize={(width) => resizePane('preview', width)} onReset={() => resizePane('preview', null)} />} />}
       {exportOpen && layout && <ExportDialog layout={layout} choices={pdfChoices} accidentals={accidentalBias(editor?.prefs ?? settings.prefs)} issueCount={issues.length} onChange={setPdfChoices} onAccidentals={(bias) => applyPrefs(prefsForBias(bias))} onClose={() => setExportOpen(false)} onDownload={() => void exportPdf()} />}
       {setlistExport && setlistLayout && <SetlistExportDialog fileName={setlistFileName(setlistExport)} layout={setlistLayout} choices={pdfChoices} accidentals={accidentalBias(setlistPrefs)} onChange={setPdfChoices} onAccidentals={(bias) => setSetlistPrefs(prefsForBias(bias))} onClose={() => setSetlistExport(null)} onDownload={() => void exportSetlist()} />}
       {performance?.mode === 'stage' && <StageView entries={performance.entries} nashville={performance.nashville} prefs={settings.prefs} onExit={() => setPerformance(null)} />}
@@ -1001,6 +1020,16 @@ function nudgeHow(event: KeyboardEvent): NudgeHow | null {
   if (event.key === 'Home') return 'start'
   if (event.key === 'End') return 'end'
   return null
+}
+
+function useViewportWidth(): number {
+  const [width, setWidth] = useState(() => window.innerWidth)
+  useEffect(() => {
+    const update = () => setWidth(window.innerWidth)
+    window.addEventListener('resize', update)
+    return () => window.removeEventListener('resize', update)
+  }, [])
+  return width
 }
 
 function usePhone(): boolean {

@@ -17,6 +17,8 @@ export function settingsFrom(value: unknown): Settings {
   const prefs = (typeof raw.prefs === 'object' && raw.prefs !== null ? raw.prefs : {}) as Record<string, unknown>
   const oneOf = <T extends string>(candidate: unknown, allowed: readonly T[], fallback: T): T =>
     allowed.includes(candidate as T) ? (candidate as T) : fallback
+  const panes = (typeof raw.panes === 'object' && raw.panes !== null ? raw.panes : {}) as Record<string, unknown>
+  const width = <T,>(candidate: unknown, fallback: T) => (typeof candidate === 'number' && Number.isFinite(candidate) ? candidate : fallback)
   const flag = (candidate: unknown, fallback: boolean) => (typeof candidate === 'boolean' ? candidate : fallback)
   return {
     theme: oneOf(raw.theme, ['system', 'light', 'dark'], defaults.theme),
@@ -28,6 +30,11 @@ export function settingsFrom(value: unknown): Settings {
     paper: oneOf(raw.paper, ['a4', 'letter'], defaults.paper),
     lyricSize: typeof raw.lyricSize === 'number' && Number.isFinite(raw.lyricSize) ? raw.lyricSize : defaults.lyricSize,
     allowTwoColumns: flag(raw.allowTwoColumns, defaults.allowTwoColumns),
+    panes: {
+      library: width(panes.library, defaults.panes.library),
+      inspector: width(panes.inspector, defaults.panes.inspector),
+      preview: width(panes.preview, defaults.panes.preview),
+    },
   }
 }
 

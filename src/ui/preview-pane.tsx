@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState, type RefObject } from 'react'
+import { useEffect, useRef, useState, type ReactNode, type RefObject } from 'react'
 import {
   blockHeight,
   HEADING_SIZE,
@@ -13,14 +13,18 @@ import {
 
 export function PreviewPane({
   layout,
+  divider,
 }: {
   layout: PdfDocument
+  /** The draggable edge that resizes this pane, on desktop. */
+  divider?: ReactNode
 }) {
   const scrollRef = useRef<HTMLDivElement>(null)
   const paneWidth = usePaneWidth(scrollRef)
 
   return (
     <aside className="preview">
+      {divider}
       <div className="preview-bar">
         <span className="meta">{layoutStatus(layout)}</span>
       </div>

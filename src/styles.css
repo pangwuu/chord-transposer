@@ -43,11 +43,11 @@ body { margin: 0; }
 button, input, textarea, select { font: inherit; color: inherit; }
 button { cursor: pointer; }
 :focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
-.app { display: grid; grid-template-columns: 240px minmax(620px, 1fr) minmax(400px, 1fr); height: 100vh; overflow: hidden; }
+.app { display: grid; grid-template-columns: var(--library-w, 240px) minmax(var(--editor-min, 620px), 1fr) var(--preview-w, minmax(400px, 1fr)); height: 100vh; overflow: hidden; }
 .app.with-inspector { grid-template-columns: 56px minmax(0, 1fr) 296px 420px; }
 .app.wide.with-inspector { grid-template-columns: 240px minmax(0, 1fr) 296px 480px; }
 .library, .editor, .inspector, .preview { min-width: 0; min-height: 0; }
-.library { background: var(--bg-sidebar); border-right: 1px solid var(--border); display: flex; flex-direction: column; }
+.library { position: relative; background: var(--bg-sidebar); border-right: 1px solid var(--border); display: flex; flex-direction: column; }
 .library-scroll, .editor-scroll, .inspector, .preview-scroll { overflow: auto; }
 .brand { display: flex; gap: 8px; align-items: center; padding: 14px 12px 8px; font-weight: 700; }
 .brand span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
@@ -159,8 +159,8 @@ button { cursor: pointer; }
 .editor-bar-phone { position: relative; display: flex; gap: 8px; align-items: center; }
 .editor-menu { right: 0; left: auto; top: 36px; }
 .section-actions { display: inline-flex; }
-.editor-body { display: grid; grid-template-columns: minmax(0, 1fr); min-height: 0; flex: 1; }
-.editor-body:has(.inspector) { grid-template-columns: minmax(0, 1fr) 280px; }
+.editor-body { position: relative; display: grid; grid-template-columns: minmax(0, 1fr); min-height: 0; flex: 1; }
+.editor-body:has(.inspector) { grid-template-columns: minmax(0, 1fr) var(--inspector-w, 280px); }
 .editor-body.chordpro-mode { grid-template-columns: minmax(260px, 340px) minmax(0, 1fr); }
 .editor-body.chordpro-mode .source { height: 100%; min-height: 0; box-sizing: border-box; resize: none; }
 .editor-body .inspector { overflow: auto; }
@@ -203,7 +203,14 @@ button { cursor: pointer; }
 .sheet-advanced::after { content: '▸'; }
 .sheet-advanced[aria-expanded='true']::after { content: '▾'; }
 .inspector.is-sheet .tile { min-height: 44px; min-width: 48px; }
-.preview { background: var(--bg-canvas); border-left: 1px solid var(--border); display: flex; flex-direction: column; }
+.pane-divider { position: absolute; top: 0; bottom: 0; z-index: 4; width: 9px; cursor: col-resize; touch-action: none; }
+.pane-divider::after { content: ''; position: absolute; top: 0; bottom: 0; left: 4px; width: 2px; margin-left: -1px; background: transparent; transition: background-color .12s; }
+.pane-divider:hover::after, .pane-divider:active::after, .pane-divider:focus-visible::after { background: var(--accent); }
+.pane-divider:focus-visible { outline: none; }
+.pane-divider.on-right { right: -5px; }
+.pane-divider.on-left { left: -5px; }
+.pane-divider.for-inspector { left: auto; right: calc(var(--inspector-w, 280px) - 4px); }
+.preview { position: relative; background: var(--bg-canvas); border-left: 1px solid var(--border); display: flex; flex-direction: column; }
 .paper { background: white; color: black; margin: 0 auto 18px; box-shadow: var(--shadow-md); transform-origin: top center; overflow: clip; }
 .paper-inner { position: relative; padding: 42px; font-family: var(--mono); }
 .paper-foot { position: absolute; left: 42px; right: 42px; bottom: 16px; display: flex; justify-content: space-between; align-items: baseline; gap: 12px; }
@@ -329,7 +336,7 @@ button { cursor: pointer; }
 .empty { margin: 24px 12px; padding: 16px; border: 1px solid var(--border); border-radius: 12px; background: var(--bg); }
 .field.invalid { border-color: var(--danger); }
 @media (max-width: 1199px) {
-  .app, .app.with-inspector, .app.wide.with-inspector { grid-template-columns: 240px minmax(0, 1fr); }
+  .app, .app.with-inspector, .app.wide.with-inspector { grid-template-columns: var(--library-w, 240px) minmax(0, 1fr); }
   .preview { display: none; }
   .app.show-preview { grid-template-columns: minmax(0, 1fr) minmax(320px, 440px); }
   .app.show-preview .library { display: none; }
