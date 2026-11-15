@@ -292,6 +292,26 @@ describe('editing', () => {
     expect(state.song.timeSignature).toBe('4/4')
   })
 
+  it('relabels a wrongly keyed paste without moving the chords on screen, and undo puts the label back', () => {
+    const pasted = fromChordPro('{key: A}\n[G]Hello [C]there [D]friend\n', idSequence('relabel'))
+    let state = setSongDetails(openEditor(pasted), { originalKey: parseKey('G') })
+    expect(formatKey(state.song.originalKey)).toBe('G')
+    expect(formatKey(state.concert)).toBe('G')
+    expect(shownChords(state)).toEqual(['G', 'C', 'D'])
+    state = undo(state)
+    expect(formatKey(state.song.originalKey)).toBe('A')
+    expect(shownChords(state)).toEqual(['G', 'C', 'D'])
+  })
+
+  it('relabels while a transposed view is open and keeps showing the same chords', () => {
+    const pasted = fromChordPro('{key: A}\n[G]Hello [C]there\n', idSequence('relabel-up'))
+    const viewed = stepConcert(openEditor(pasted), 2)
+    expect(shownChords(viewed)).toEqual(['A', 'D'])
+    const state = setSongDetails(viewed, { originalKey: parseKey('G') })
+    expect(formatKey(state.concert)).toBe('A')
+    expect(shownChords(state)).toEqual(['A', 'D'])
+  })
+
   it('repeats a section in the arrangement without copying its lines', () => {
     const song = fromChordPro('{title: Demo}\n{key: C}\n{start_of_chorus: Chorus}\nHello\n{end_of_chorus}', idSequence('repeat'))
     const id = song.sections[0].id
@@ -726,3 +746,7 @@ describe('a bandmate’s edit to the open song', () => {
     expect(next.selectedIds).toEqual([])
   })
 })
+
+function shownChords(state: ReturnType<typeof openEditor>): string[] {
+  return viewSong(state).sections.flatMap((section) => section.lines.flatMap((line) => (line.type === 'lyric' ? line.chords.map((chord) => formatSymbol(chord.symbol)) : [])))
+}
