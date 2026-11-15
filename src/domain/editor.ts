@@ -245,7 +245,6 @@ export function applyChordProOf(state: EditorState, text: string): EditorState {
     const song: Song = {
       ...parsed,
       id: state.song.id,
-      views: state.song.views,
       notes: state.song.notes,
       updatedAt: new Date().toISOString(),
     }

@@ -213,7 +213,6 @@ Each screen below lists purpose, layout and key states. Wireframes are approxima
 ```
 
 - **Song rows:** title (13.5/500, one line, ellipsis), then artist and a **key badge** (mono 11/600 on `--bg-active`). The current row uses `--bg-active`.
-- **Saved views** (e.g. Jerusalem capo 4, This I Believe in E) are nested under their song with `↳`, and their badge shows the concert key. Opening one sets the editor's key and capo; it never duplicates the song's content. A view is created from the key or capo popover ("Save this view").
 - **Search** filters titles, artists and lyrics as you type. `⌘K`/`Ctrl+K` focuses it.
 - **Bottom nav:** Songs, Setlists, Import, Settings, theme cycle (System → Light → Dark).
 - **Rail mode (56 px):** logo, expand button and nav icons only, each with a tooltip.
@@ -395,7 +394,7 @@ Options update the preview pane live behind the dialog. On phone the dialog beco
 
 ### 4.11 Setlists
 
-Two columns on laptop: a list of setlists (name, date, song count, `+ New setlist`; a new setlist starts with an empty name and date, never a made-up one) and the selected setlist. Each song row has a drag grip, number, title, notes ("Capo 4 for acoustic"), a key badge (click for the key popover), capo and shapes, and a ⋯ menu. Header actions: **Perform** (steps through the set on stage), **Export PDF** (one file; each song starts on a new page; footer `Song 2 of 4 · Page 1 of 2`; an Accidentals choice of Follow the key, Flats or Sharps applies to that export only). Song rows sit in one 12 px-radius card divided by hairlines, with a compact **Add song…** select as the card's last row. On phone the two columns stack.
+Two columns on laptop: a list of setlists (name, date, song count, `+ New setlist`; a new setlist starts with an empty name and date, never a made-up one) and the selected setlist. Each song row has a drag grip, number, title, notes ("Capo 4 for acoustic"), a key badge (click for the key popover), capo and shapes, and a ⋯ menu. Header actions: **Perform** (steps through the set on stage), **Export PDF** (one file; each song starts on a new page; footer `Song 2 of 4 · Page 1 of 2`; an Accidentals choice of Follow the key, Flats or Sharps applies to that export only). Song rows sit in one 12 px-radius card divided by hairlines, with a compact **Add song…** search box as the card's last row: typing filters by title, artist or lyrics, ↑/↓ and Enter pick, and the box clears for the next song. On phone the two columns stack.
 
 ### 4.12 Stage view
 
@@ -459,7 +458,7 @@ Songs tab                Editor (chord selected)       Preview toggle
 | **Key control** | − / key / + | default, popover open, transposed (chip appears) |
 | **Chip** | neutral, accent, ok, warn | static or clickable (hover darkens) |
 | **Key badge** | mono 11/600 | — |
-| **Song row** | song, saved view (nested) | default, hover, active, focus, search-match highlight |
+| **Song row** | song | default, hover, active, focus, search-match highlight |
 | **Section header** | — | default, hover (grip and actions appear), editing label, dragging, drop target |
 | **Lyric line** | with chords, without chords | default, hover (subtle bg), add-ghost, wrapped (hanging indent) |
 | **Chord** | lyric chord, bar chord | rest, hover, selected, dragging, invalid, invalid+selected, focus |

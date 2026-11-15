@@ -5,7 +5,7 @@ A tool for writing, transposing and printing chord charts, and carrying them to 
 ## Language
 
 **Song**:
-One chart: its title, key, sections, lyrics and chords, and its named views.
+One chart: its title, key, sections, lyrics and chords.
 _Avoid_: Chart file, track
 
 **Setlist**:

@@ -70,14 +70,6 @@ export type ArrangementItem = {
   repeat?: number
 }
 
-export type NamedView = {
-  id: string
-  name: string
-  key: Key
-  capo: number
-  nashville: boolean
-}
-
 export type Song = {
   id: string
   title: string
@@ -90,7 +82,6 @@ export type Song = {
   notes?: string
   sections: Section[]
   arrangement: ArrangementItem[]
-  views: NamedView[]
   updatedAt: string
 }
 
@@ -140,7 +131,6 @@ export function emptySong(partial: Partial<Song> & { title?: string } = {}, ids:
       },
     ],
     arrangement: partial.arrangement ?? [],
-    views: partial.views ?? [],
     updatedAt: partial.updatedAt ?? new Date(0).toISOString(),
   }
   if (song.arrangement.length === 0) song.arrangement = song.sections.map((section) => ({ sectionId: section.id }))

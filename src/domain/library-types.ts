@@ -3,7 +3,6 @@ import type { Song } from './song'
 
 export type SetlistEntry = {
   songId: string
-  viewId?: string
   key?: Key
   capo?: number
   notes?: string

@@ -44,9 +44,9 @@ export function readSharedPaste(): SharedPaste | null {
   return onlyLink ? { text: '', notice: 'Only a link was shared. Copy the chart text on that page, then tap Paste.' } : { text, notice: '' }
 }
 
-function reviewState(song: Song): EditorState {
-  const capo = song.views[0]?.capo ?? 0
-  return capo ? chooseCapo(openEditor(song), capo) : openEditor(song)
+function reviewState(result: ChartPasteResult): EditorState {
+  const opened = openEditor(result.song)
+  return result.capo ? chooseCapo(opened, result.capo) : opened
 }
 
 export function ImportScreen({
@@ -63,7 +63,7 @@ export function ImportScreen({
   const [source, setSource] = useState(shared?.text ?? '')
   const [notice, setNotice] = useState(shared?.notice ?? '')
   const [result, setResult] = useState<ChartPasteResult | null>(() => (shared?.text ? importChartPaste(shared.text) : null))
-  const [editor, setEditor] = useState<EditorState | null>(() => (result ? reviewState(result.song) : null))
+  const [editor, setEditor] = useState<EditorState | null>(() => (result ? reviewState(result) : null))
   const [reviewing, setReviewing] = useState(Boolean(shared?.text))
   const [showSource, setShowSource] = useState(false)
   const [editingId, setEditingId] = useState<string | null>(null)
@@ -79,7 +79,7 @@ export function ImportScreen({
     }
     const next = importChartPaste(text)
     setResult(next)
-    setEditor(reviewState(next.song))
+    setEditor(reviewState(next))
     if (advance) setReviewing(true)
   }
 

@@ -48,7 +48,7 @@ describe('real pages', () => {
     expect(result.song.artist).toBe('Misc Praise Songs/John Newton')
     expect(formatKey(result.song.originalKey)).toBe('G')
     expect(result.keyGuessed).toBe(false)
-    expect(result.song.views).toEqual([])
+    expect(result.capo).toBeUndefined()
     expect(result.issues).toEqual([])
     expect(chart(result.song).slice(0, UG_CHART.length)).toEqual(UG_CHART)
     expect(order(result.song)).toEqual(['Refrain', 'Verse 1', 'Verse 2', 'Refrain'])
@@ -231,11 +231,11 @@ describe('key', () => {
 describe('capo', () => {
   const page = (key: string) => `Ultimate Guitar\nDemo Song\nby First Light Band\nKey: ${key}\nCapo: 2nd fret\n\nVerse 1\nG                D\nMorning on the kitchen table\nEm               C\nCoffee in a quiet cup\n`
 
-  it('stores the sounding key and keeps a view of the shapes that were pasted', () => {
+  it('stores the sounding key and reports the capo the shapes were pasted for', () => {
     const result = paste(page('G'))
     expect(formatKey(result.song.originalKey)).toBe('A')
     expect(chart(result.song)).toContain('[A]Morning on the ki[E]tchen table')
-    expect(result.song.views).toEqual([expect.objectContaining({ name: 'Capo 2', capo: 2, key: result.song.originalKey })])
+    expect(result.capo).toBe(2)
     expect(result.notices).toContain('Capo 2: sounds in A, shown as G shapes')
   })
 
