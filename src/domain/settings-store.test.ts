@@ -42,6 +42,15 @@ describe('settings on this device', () => {
     })
   })
 
+  it('remembers dragged pane widths, and falls back pane by pane when one is not a number', () => {
+    const storage = fakeStorage()
+    localSettings(() => storage).write({ ...defaultSettings(), panes: { library: 310, inspector: 300, preview: 512 } })
+    expect(localSettings(() => storage).read().panes).toEqual({ library: 310, inspector: 300, preview: 512 })
+
+    const stored = JSON.stringify({ panes: { library: 'wide', inspector: 333, preview: 'half' } })
+    expect(localSettings(() => fakeStorage({ [SETTINGS_KEY]: stored })).read().panes).toEqual({ library: 240, inspector: 333, preview: null })
+  })
+
   it('reads the defaults and drops writes when storage is blocked', () => {
     const blocked = localSettings(() => {
       throw new Error('SecurityError')

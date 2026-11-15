@@ -29,7 +29,11 @@ export type Settings = {
   paper: 'a4' | 'letter'
   lyricSize: number
   allowTwoColumns: boolean
+  panes: PaneWidths
 }
+
+/** Desktop pane widths in px, as the user dragged them. A `null` preview shares the space evenly with the editor. */
+export type PaneWidths = { library: number; inspector: number; preview: number | null }
 
 /** The shared part of a library. Per-device settings live in `SettingsStore`. */
 export type LibrarySnapshot = {
@@ -47,6 +51,7 @@ export const defaultSettings = (): Settings => ({
   paper: 'a4',
   lyricSize: 12,
   allowTwoColumns: true,
+  panes: { library: 240, inspector: 280, preview: null },
 })
 
 export type LibraryRepository = {
