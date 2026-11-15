@@ -1,4 +1,4 @@
-import { parseChord, shiftKey, type Key, type SpellingPrefs, DEFAULT_PREFS } from './chord'
+import { formatKey, parseChord, shiftKey, signedInterval, type Key, type SpellingPrefs, DEFAULT_PREFS } from './chord'
 import { fromChordPro } from './chordpro'
 import {
   addBarChord,
@@ -75,13 +75,18 @@ export function viewSong(state: EditorState): Song {
 export function undo(state: EditorState): EditorState {
   const previous = state.past[state.past.length - 1]
   if (!previous) return state
-  return { ...state, song: previous, past: state.past.slice(0, -1), future: [state.song, ...state.future] }
+  return { ...state, song: previous, concert: followRelabel(state, previous), past: state.past.slice(0, -1), future: [state.song, ...state.future] }
 }
 
 export function redo(state: EditorState): EditorState {
   const next = state.future[0]
   if (!next) return state
-  return { ...state, song: next, future: state.future.slice(1), past: [...state.past, state.song].slice(-LIMIT) }
+  return { ...state, song: next, concert: followRelabel(state, next), future: state.future.slice(1), past: [...state.past, state.song].slice(-LIMIT) }
+}
+
+function followRelabel(state: EditorState, next: Song): Key {
+  if (next.sections !== state.song.sections || formatKey(next.originalKey) === formatKey(state.song.originalKey)) return state.concert
+  return shiftKey(next.originalKey, signedInterval(state.song.originalKey, state.concert), state.prefs)
 }
 
 export function selectChord(state: EditorState, id: string | null, shift = false): EditorState {
@@ -257,7 +262,7 @@ export function setSongDetails(
   const song: Song = { ...state.song, ...details, updatedAt: new Date().toISOString() }
   const same = (Object.keys(details) as (keyof typeof details)[]).every((key) => state.song[key] === details[key])
   if (same) return state
-  return commit(state, song)
+  return { ...commit(state, song), concert: followRelabel(state, song) }
 }
 
 export function saveConcertAsSongKey(state: EditorState): EditorState {
