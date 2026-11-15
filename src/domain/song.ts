@@ -571,3 +571,18 @@ export function searchText(song: Song): string {
     .join('\n')
   return `${song.title}\n${song.artist ?? ''}\n${lyrics}`.toLowerCase()
 }
+
+const byTitle = new Intl.Collator(undefined, { sensitivity: 'base', numeric: true })
+
+/** Songs whose title, artist or lyrics hold every word of the query: title matches first, each group A to Z. */
+export function findSongs<T extends Song>(songs: T[], query: string): T[] {
+  const words = query.toLowerCase().split(/\s+/).filter(Boolean)
+  const sorted = [...songs].sort((a, b) => byTitle.compare(a.title, b.title))
+  if (words.length === 0) return sorted
+  const matches = sorted.filter((song) => {
+    const haystack = searchText(song)
+    return words.every((word) => haystack.includes(word))
+  })
+  const inTitle = (song: Song) => words.every((word) => song.title.toLowerCase().includes(word))
+  return [...matches.filter(inTitle), ...matches.filter((song) => !inTitle(song))]
+}

@@ -1,3 +1,4 @@
+import { addToSetlist } from './helpers'
 import { expect, type Page, test } from '@playwright/test'
 
 /** True when a panel's content is wider than the panel (horizontal overflow). */
@@ -19,8 +20,8 @@ test('keeps setlists and settings inside the phone width', async ({ page }, test
   await page.goto('/')
   await page.locator('.phone-tabs').getByRole('button', { name: 'Setlists' }).click()
   await page.getByRole('button', { name: '+ New setlist' }).click()
-  await page.getByLabel('Add a song').selectOption({ label: 'Amazing Grace' })
-  await page.getByLabel('Add a song').selectOption({ label: 'First Light' })
+  await addToSetlist(page, 'Amazing Grace')
+  await addToSetlist(page, 'First Light')
 
   const setlists = await panelOverflows(page, '.setlists')
   expect(setlists.missing).toBe(false)

@@ -1,5 +1,5 @@
 import { expect, type Page, test } from '@playwright/test'
-import { openFirstSong } from './helpers'
+import { openFirstSong, addToSetlist } from './helpers'
 
 function mobile(name: string) {
   return name === 'mobile'
@@ -200,8 +200,8 @@ test('scrolls a setlist export when the pages run past the window', async ({ pag
       : page.locator('.side-nav').getByRole('button', { name: 'Setlists' })
   await setlists.click()
   await page.getByRole('button', { name: '+ New setlist' }).click()
-  await page.getByLabel('Add a song').selectOption({ label: 'Amazing Grace' })
-  await page.getByLabel('Add a song').selectOption({ label: 'First Light' })
+  await addToSetlist(page, 'Amazing Grace')
+  await addToSetlist(page, 'First Light')
   await page.getByRole('button', { name: 'Export PDF' }).click()
   const dialog = page.getByRole('dialog', { name: 'Export setlist PDF' })
   await expect(dialog).toBeVisible()
@@ -326,12 +326,12 @@ test('switches theme and finds a song from the library', async ({ page }, testIn
   else await page.getByRole('button', { name: /Amazing Grace/ }).click()
   const search = page.getByLabel('Search songs')
   if (mobile(testInfo.project.name)) {
-    await search.fill('First')
+    await search.fill('First Light')
     await expect(page.getByRole('button', { name: /First Light/ })).toBeVisible()
     await expect(page.getByRole('button', { name: /Amazing Grace/ })).toHaveCount(0)
     await page.getByRole('button', { name: '+ New song' }).click()
   } else {
-    await search.fill('First')
+    await search.fill('First Light')
     await expect(page.getByRole('button', { name: /First Light/ })).toBeVisible()
     await expect(page.getByRole('button', { name: /Amazing Grace/ })).toHaveCount(0)
     await search.fill('')
@@ -487,7 +487,7 @@ test('picks flats or sharps for a setlist PDF', async ({ page }, testInfo) => {
     : page.locator('.side-nav').getByRole('button', { name: 'Setlists' })
   await setlists.click()
   await page.getByRole('button', { name: '+ New setlist' }).click()
-  await page.getByLabel('Add a song').selectOption({ label: 'Amazing Grace' })
+  await addToSetlist(page, 'Amazing Grace')
   await page.getByLabel('Key for Amazing Grace').selectOption('Db')
   await page.getByRole('button', { name: 'Export PDF' }).click()
   const dialog = page.getByRole('dialog', { name: 'Export setlist PDF' })
@@ -544,4 +544,29 @@ test('deletes an imported section from its icon after confirming', async ({ page
   page.once('dialog', (dialog) => void dialog.accept())
   await page.getByRole('button', { name: 'Delete Chorus' }).click()
   await expect(page.getByLabel('Chorus name')).toHaveCount(0)
+})
+
+test('finds a song by a line of its lyrics', async ({ page }) => {
+  await page.goto('/')
+  await page.getByLabel('Search songs').fill('taught my heart')
+  await expect(page.locator('.song-row')).toHaveCount(1)
+  await expect(page.locator('.song-row')).toContainText('Amazing Grace')
+})
+
+test('adds the open song to a setlist in the key it is showing', async ({ page }, testInfo) => {
+  await openFirstSong(page)
+  await page.getByRole('button', { name: 'Key up a semitone' }).click()
+  await editorAction(page, 'Add to Setlist…')
+  await page.getByRole('menuitem', { name: '+ New setlist' }).click()
+  await expect(page.getByLabel('Setlist name')).toBeVisible()
+  await expect(page.getByLabel('Key for Amazing Grace')).toHaveValue('Ab')
+  await page.getByLabel('Setlist name').fill('Easter')
+  const songs = mobile(testInfo.project.name)
+    ? page.locator('.phone-tabs').getByRole('button', { name: 'Songs' })
+    : page.locator('.library').getByRole('button', { name: /First Light/ })
+  await songs.click()
+  if (mobile(testInfo.project.name)) await page.getByRole('button', { name: /First Light/ }).click()
+  await editorAction(page, 'Add to Setlist…')
+  await page.getByRole('menuitem', { name: /Easter/ }).click()
+  await expect(page.getByRole('status').first()).toContainText('Added to Easter')
 })

@@ -2,7 +2,7 @@ import { useEffect, useRef, useState, type ReactNode, type RefObject } from 'rea
 import { Guitar } from 'lucide-react'
 import { formatKey, parseKey } from '../domain/chord'
 import type { Setlist, SetlistEntry } from '../domain/library-types'
-import type { Song } from '../domain/song'
+import { findSongs, type Song } from '../domain/song'
 
 const KEYS = ['C', 'Db', 'D', 'Eb', 'E', 'F', 'F#', 'G', 'Ab', 'A', 'Bb', 'B']
 const NARROW_PANE = 640
@@ -15,6 +15,7 @@ export function SetlistScreen({
   onDelete,
   onExport,
   onStage,
+  onProject,
   onShare,
   onDownload,
   onImport,
@@ -34,6 +35,7 @@ export function SetlistScreen({
   onDelete: (id: string) => void
   onExport: (setlist: Setlist) => void
   onStage: (setlist: Setlist) => void
+  onProject: (setlist: Setlist) => void
 }) {
   const rootRef = useRef<HTMLDivElement>(null)
   const narrow = useNarrowPane(rootRef, NARROW_PANE)
@@ -114,6 +116,7 @@ export function SetlistScreen({
             onDelete={(id) => { setOpenedId(null); onDelete(id) }}
             onExport={onExport}
             onStage={onStage}
+            onProject={onProject}
             onShare={onShare}
             onDownload={onDownload}
             onExtra={setExtra}
@@ -134,6 +137,7 @@ function SetlistDetail({
   onDelete,
   onExport,
   onStage,
+  onProject,
   onShare,
   onDownload,
   onExtra,
@@ -149,6 +153,7 @@ function SetlistDetail({
   onDelete: (id: string) => void
   onExport: (setlist: Setlist) => void
   onStage: (setlist: Setlist) => void
+  onProject: (setlist: Setlist) => void
   onExtra: (extra: { index: number; field: 'capo' | 'notes' } | null) => void
 }) {
   return (
@@ -163,6 +168,7 @@ function SetlistDetail({
           </button>
           <button className="primary" type="button" onClick={() => onExport(setlist)}>Export PDF</button>
           <Menu label="Setlist actions">
+            <button type="button" role="menuitem" disabled={setlist.entries.length === 0} onClick={() => onProject(setlist)}>Projector view</button>
             <button type="button" role="menuitem" disabled={setlist.entries.length === 0} onClick={() => onShare(setlist)}>Copy share link</button>
             <button type="button" role="menuitem" disabled={setlist.entries.length === 0} onClick={() => onDownload(setlist)}>Download file</button>
             <button
@@ -229,15 +235,7 @@ function SetlistDetail({
         )
       })}
       <div className="setlist-add-row">
-      <select
-        className="select setlist-add"
-        aria-label="Add a song"
-        value=""
-        onChange={(event) => { if (event.target.value) onChange({ ...setlist, entries: [...setlist.entries, { songId: event.target.value }] }) }}
-      >
-        <option value="">Add song…</option>
-        {songs.map((song) => <option key={song.id} value={song.id}>{song.title}</option>)}
-      </select>
+        <AddSongBox songs={songs} onAdd={(song) => onChange({ ...setlist, entries: [...setlist.entries, { songId: song.id }] })} />
       </div>
       </div>
     </article>
@@ -317,4 +315,68 @@ function moveEntry(setlist: Setlist, index: number, direction: -1 | 1): Setlist 
   const [entry] = entries.splice(index, 1)
   entries.splice(target, 0, entry)
   return { ...setlist, entries }
+}
+
+const ADD_SONG_LIMIT = 50
+
+/** A search box that finds songs by title, artist or lyrics, so a big library is never one long dropdown. */
+function AddSongBox({ songs, onAdd }: { songs: Song[]; onAdd: (song: Song) => void }) {
+  const [query, setQuery] = useState('')
+  const [open, setOpen] = useState(false)
+  const [active, setActive] = useState(0)
+  const input = useRef<HTMLInputElement>(null)
+  const matches = open ? findSongs(songs, query).slice(0, ADD_SONG_LIMIT) : []
+  const highlighted = Math.min(active, matches.length - 1)
+
+  function add(song: Song) {
+    onAdd(song)
+    setQuery('')
+    setActive(0)
+    input.current?.focus()
+  }
+
+  return (
+    <div className="add-song" onBlur={(event) => { if (!event.currentTarget.contains(event.relatedTarget)) setOpen(false) }}>
+      <input
+        ref={input}
+        className="field setlist-add"
+        role="combobox"
+        aria-label="Add a song"
+        aria-expanded={matches.length > 0}
+        aria-controls="add-song-options"
+        aria-autocomplete="list"
+        aria-activedescendant={matches[highlighted] ? `add-song-${matches[highlighted].id}` : undefined}
+        placeholder="Add song…"
+        autoComplete="off"
+        value={query}
+        onFocus={() => setOpen(true)}
+        onChange={(event) => { setQuery(event.target.value); setActive(0); setOpen(true) }}
+        onKeyDown={(event) => {
+          if (event.key === 'ArrowDown') { event.preventDefault(); setOpen(true); setActive(Math.min(matches.length - 1, highlighted + 1)) }
+          else if (event.key === 'ArrowUp') { event.preventDefault(); setActive(Math.max(0, highlighted - 1)) }
+          else if (event.key === 'Enter' && matches[highlighted]) { event.preventDefault(); add(matches[highlighted]) }
+          else if (event.key === 'Escape') { setOpen(false); setQuery('') }
+        }}
+      />
+      {matches.length > 0 && (
+        <ul className="add-song-options" id="add-song-options" role="listbox" aria-label="Songs">
+          {matches.map((song, index) => (
+            <li
+              key={song.id}
+              id={`add-song-${song.id}`}
+              role="option"
+              aria-selected={index === highlighted}
+              className={index === highlighted ? 'add-song-option active' : 'add-song-option'}
+              onPointerDown={(event) => event.preventDefault()}
+              onPointerEnter={() => setActive(index)}
+              onClick={() => add(song)}
+            >
+              <strong>{song.title}</strong>
+              <span className="meta">{[song.artist, formatKey(song.originalKey)].filter(Boolean).join(' · ')}</span>
+            </li>
+          ))}
+        </ul>
+      )}
+    </div>
+  )
 }

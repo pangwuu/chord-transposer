@@ -157,7 +157,8 @@ button { cursor: pointer; }
 .menu { position: absolute; z-index: 6; left: 0; top: 36px; background: var(--bg-raised); box-shadow: var(--shadow-md); border-radius: 8px; padding: 6px; display: flex; flex-direction: column; min-width: 160px; }
 .menu button { text-align: left; border: 0; background: transparent; padding: 6px 8px; border-radius: 6px; }
 .editor-bar-phone { position: relative; display: flex; gap: 8px; align-items: center; }
-.editor-menu { right: 0; left: auto; top: 36px; }
+.editor-menu { right: 0; left: auto; top: 36px; max-height: min(70vh, 28rem); overflow-y: auto; }
+.editor-menu .meta { margin-left: auto; font-size: 12px; }
 .section-actions { display: inline-flex; }
 .editor-body { position: relative; display: grid; grid-template-columns: minmax(0, 1fr); min-height: 0; flex: 1; }
 .editor-body:has(.inspector) { grid-template-columns: minmax(0, 1fr) var(--inspector-w, 280px); }
@@ -399,6 +400,13 @@ button { cursor: pointer; }
 .setlist-song-extra { width: 100%; max-width: 100%; min-width: 0; }
 .setlist-add-row { padding: 8px 12px; }
 .setlist-add { width: auto; min-width: min(14rem, 100%); max-width: min(16rem, 100%); }
+.add-song { position: relative; width: min(16rem, 100%); }
+.add-song .setlist-add { width: 100%; max-width: 100%; min-height: 40px; }
+.add-song-options { position: absolute; z-index: 6; left: 0; right: 0; top: calc(100% + 4px); margin: 0; padding: 6px; list-style: none; max-height: min(20rem, 50vh); overflow-y: auto; background: var(--bg-raised); box-shadow: var(--shadow-md); border-radius: 8px; }
+.add-song-option { display: flex; flex-direction: column; gap: 2px; padding: 8px 10px; border-radius: 6px; cursor: pointer; min-height: 40px; justify-content: center; }
+.add-song-option strong { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-weight: 500; }
+.add-song-option .meta { font-size: 12.5px; }
+.add-song-option.active { background: var(--bg-active); }
 .setlist-song-extra { grid-column: 1 / -1; }
 .setlist-song .menu-anchor { display: inline-flex; align-items: center; }
 .setlist-song .icon-button { display: inline-grid; place-items: center; width: 36px; height: 36px; padding: 0; }

@@ -309,7 +309,7 @@ describe('playing the arrangement', () => {
   })
 
   it('gives every played section a projector slide', () => {
-    render(<ProjectorView song={repeatedSong()} onExit={() => {}} />)
+    render(<ProjectorView songs={[repeatedSong()]} onExit={() => {}} />)
     expect(screen.getByText(/1\/4/)).toBeTruthy()
   })
 })
@@ -349,5 +349,64 @@ describe('StageView remembers text size', () => {
     expect((document.querySelector('.stage-body') as HTMLElement).style.fontSize).toBe('32px')
     fireEvent.click(screen.getByRole('button', { name: 'Smaller text' }))
     expect(localStorage.getItem('csm-stage-size')).toBe('28')
+  })
+})
+
+describe('StageView page-turner pedal', () => {
+  const currentSection = () => (document.querySelector('.stage-section.is-current') as HTMLElement | null)?.dataset.stageSection
+  const press = (key: string) => fireEvent.keyDown(window, { key })
+
+  it('turns to the next and previous section with Page Down and Page Up', () => {
+    renderStage()
+    press('PageDown')
+    press('PageDown')
+    expect(currentSection()).toBe('Verse 3')
+    press('PageUp')
+    expect(currentSection()).toBe('Verse 2')
+  })
+
+  it('turns sections with the up and down arrows too', () => {
+    renderStage()
+    press('ArrowDown')
+    expect(currentSection()).toBe('Verse 2')
+    press('ArrowUp')
+    expect(currentSection()).toBe('Verse 1')
+  })
+
+  it('goes on to the next song after the last section, so one pedal steps through the set', () => {
+    renderSetlistStage()
+    press('PageDown')
+    press('PageDown')
+    expect(stageTitle()).toBe('Keep Smiling')
+    press('PageDown')
+    expect(stageTitle()).toBe('Second Song')
+    expect(currentSection()).toBe('Verse 1')
+  })
+
+  it('changes song with the left and right arrows', () => {
+    renderSetlistStage()
+    press('ArrowRight')
+    expect(stageTitle()).toBe('Second Song')
+    press('ArrowLeft')
+    expect(stageTitle()).toBe('Keep Smiling')
+  })
+
+  it('leaves the arrows to the key picker while it has focus', () => {
+    renderSetlistStage()
+    fireEvent.keyDown(screen.getByLabelText('Key'), { key: 'ArrowRight' })
+    expect(stageTitle()).toBe('Keep Smiling')
+  })
+})
+
+describe('ProjectorView for a setlist', () => {
+  it('runs every song in order, one slide per section, and names the song on screen', () => {
+    const first = songWithChords()
+    const second = { ...songWithChords(), id: 'second', title: 'Second Song' }
+    render(<ProjectorView songs={[first, second]} onExit={() => {}} />)
+    expect(screen.getByText('Keep Smiling · Verse 1 · 1/6')).toBeTruthy()
+    for (let i = 0; i < 3; i += 1) fireEvent.keyDown(window, { key: 'ArrowRight' })
+    expect(screen.getByText('Second Song · Verse 1 · 4/6')).toBeTruthy()
+    fireEvent.keyDown(window, { key: 'ArrowLeft' })
+    expect(screen.getByText('Keep Smiling · Verse 3 · 3/6')).toBeTruthy()
   })
 })

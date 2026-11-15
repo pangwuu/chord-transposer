@@ -36,6 +36,16 @@ function nudgeSpeed(value: number, delta: number) {
   return Math.min(MAX_SPEED, Math.max(MIN_SPEED, Math.round((value + delta) * 10) / 10))
 }
 
+const PEDAL_KEYS: Record<string, 'play' | 'next-section' | 'previous-section' | 'next-song' | 'previous-song'> = {
+  ' ': 'play',
+  PageDown: 'next-section',
+  ArrowDown: 'next-section',
+  PageUp: 'previous-section',
+  ArrowUp: 'previous-section',
+  ArrowRight: 'next-song',
+  ArrowLeft: 'previous-song',
+}
+
 export type StageEntry = {
   song: Song
   concert: Key
@@ -122,17 +132,12 @@ export function StageView({
     }
   }, [])
 
+  const onKey = useRef<(event: KeyboardEvent) => void>(() => {})
   useEffect(() => {
-    const onKey = (event: KeyboardEvent) => {
-      if (event.key === 'Escape') onExit()
-      if (event.key === ' ') {
-        event.preventDefault()
-        setPlaying((value) => !value)
-      }
-    }
-    window.addEventListener('keydown', onKey)
-    return () => window.removeEventListener('keydown', onKey)
-  }, [onExit])
+    const listener = (event: KeyboardEvent) => onKey.current(event)
+    window.addEventListener('keydown', listener)
+    return () => window.removeEventListener('keydown', listener)
+  }, [])
 
   if (!entry) return null
 
@@ -157,12 +162,33 @@ export function StageView({
   }
 
   const goSection = (direction: 1 | -1) => {
-    const next = Math.min(played.length - 1, Math.max(0, (sectionInView() ?? section) + direction))
+    const from = sectionInView() ?? section
+    const pastEnd = direction === 1 ? from >= played.length - 1 && songIndex < entries.length - 1 : from <= 0 && songIndex > 0
+    if (pastEnd) {
+      goSong(direction)
+      return
+    }
+    const next = Math.min(played.length - 1, Math.max(0, from + direction))
     const target = body.current?.querySelector(`[data-stage-section-index="${next}"]`)
     if (target && typeof target.scrollIntoView === 'function') {
       target.scrollIntoView({ behavior: 'smooth', block: 'start' })
     }
     setSection(next)
+  }
+
+  /** Bluetooth page-turner pedals type Page Down/Up or arrow keys, so these keys drive the stage hands-free. */
+  onKey.current = (event: KeyboardEvent) => {
+    if (event.key === 'Escape') onExit()
+    const target = event.target as HTMLElement | null
+    if (target?.closest?.('input, select, textarea, [contenteditable="true"]')) return
+    const action = PEDAL_KEYS[event.key]
+    if (!action) return
+    event.preventDefault()
+    if (action === 'play') setPlaying((value) => !value)
+    else if (action === 'next-section') goSection(1)
+    else if (action === 'previous-section') goSection(-1)
+    else if (action === 'next-song') goSong(1)
+    else goSong(-1)
   }
 
   /** The section at the top of the reading area, or null when there is no layout to measure. */
@@ -358,15 +384,20 @@ export function StageView({
   )
 }
 
-export function ProjectorView({ song, onExit }: { song: Song; onExit: () => void }) {
-  const slides = playedSections(song).map((played) => played.section).filter((section) => section.lines.some((line) => line.type === 'lyric' && line.text.trim()))
+export function ProjectorView({ songs, onExit }: { songs: Song[]; onExit: () => void }) {
+  const slides = songs.flatMap((song) =>
+    playedSections(song)
+      .map((played) => played.section)
+      .filter((section) => section.lines.some((line) => line.type === 'lyric' && line.text.trim()))
+      .map((section) => ({ song, section })),
+  )
   const [index, setIndex] = useState(0)
   const slide = slides[Math.min(index, Math.max(0, slides.length - 1))]
   useEffect(() => {
     const onKey = (event: KeyboardEvent) => {
       if (event.key === 'Escape') onExit()
-      if (event.key === 'ArrowRight' || event.key === ' ' || event.key === 'PageDown') setIndex((value) => Math.min(slides.length - 1, value + 1))
-      if (event.key === 'ArrowLeft' || event.key === 'PageUp') setIndex((value) => Math.max(0, value - 1))
+      if (event.key === 'ArrowRight' || event.key === 'ArrowDown' || event.key === ' ' || event.key === 'PageDown') setIndex((value) => Math.min(slides.length - 1, value + 1))
+      if (event.key === 'ArrowLeft' || event.key === 'ArrowUp' || event.key === 'PageUp') setIndex((value) => Math.max(0, value - 1))
     }
     window.addEventListener('keydown', onKey)
     return () => window.removeEventListener('keydown', onKey)
@@ -374,8 +405,8 @@ export function ProjectorView({ song, onExit }: { song: Song; onExit: () => void
   return (
     <div className="projector" onClick={() => setIndex((value) => Math.min(slides.length - 1, value + 1))}>
       <button className="text-button" type="button" style={{ position: 'absolute', top: 12, left: 12 }} onClick={(event) => { event.stopPropagation(); onExit() }}>Exit</button>
-      {slide?.lines.filter((line) => line.type === 'lyric').map((line) => line.type === 'lyric' ? <p key={line.id}>{line.text}</p> : null)}
-      <p className="meta" style={{ position: 'absolute', bottom: 16 }}>{song.title} · {slide?.label} · {Math.min(index + 1, slides.length)}/{slides.length}</p>
+      {slide?.section.lines.filter((line) => line.type === 'lyric').map((line) => line.type === 'lyric' ? <p key={line.id}>{line.text}</p> : null)}
+      <p className="meta" style={{ position: 'absolute', bottom: 16 }}>{slide?.song.title} · {slide?.section.label} · {Math.min(index + 1, slides.length)}/{slides.length}</p>
     </div>
   )
 }

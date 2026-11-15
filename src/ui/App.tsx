@@ -43,7 +43,7 @@ import { settingsFrom, type SettingsStore } from '../domain/settings-store'
 import { layoutPdf, layoutSetlist } from '../domain/pdf-layout'
 import { formatRoute, parseRoute, type Route } from '../domain/route'
 import { bundleSetlist, encodeBundle, encodeShare, mergeBundle, readShare, type ShareBundle } from '../domain/share'
-import { findPlacement, issuesIn, mapSymbols, type Song } from '../domain/song'
+import { findPlacement, findSongs, issuesIn, mapSymbols, type Song } from '../domain/song'
 import { amazingGrace, firstLight } from '../fixtures/charts'
 import { emptySong } from '../domain/song'
 import { Chart, type NudgeHow } from './chart'
@@ -55,6 +55,7 @@ import { PreviewPane } from './preview-pane'
 import { fitPanes, previewVisible } from './layout-rules'
 import { PaneDivider } from './pane-divider'
 import { ProjectorView, StageView, type StageEntry } from './performance'
+import { addSongToSetlist, setlistsNewestFirst } from '../domain/setlist'
 import { SetlistScreen, setlistName } from './setlist-screen'
 import { SettingsScreen } from './settings-screen'
 import type { BandControls } from './band-gate'
@@ -84,6 +85,7 @@ export function App({ library, settingsStore, band }: { library: LibraryReposito
   const [place, setPlace] = useState<Place>(() => (sharedPaste ? 'import' : phone ? 'songs' : 'editor'))
   const [mode, setMode] = useState<'visual' | 'chordpro'>('visual')
   const [menuOpen, setMenuOpen] = useState(false)
+  const [pickingSetlist, setPickingSetlist] = useState(false)
   const [performance, setPerformance] = useState<
     | { mode: 'stage'; entries: StageEntry[]; nashville: boolean }
     | { mode: 'projector'; songs: Song[] }
@@ -550,8 +552,25 @@ export function App({ library, settingsStore, band }: { library: LibraryReposito
       document.removeEventListener('keydown', onEscape)
     }
   }, [menuOpen])
+  useEffect(() => {
+    if (!menuOpen) setPickingSetlist(false)
+  }, [menuOpen])
 
-  const visible = songs.filter((song) => song.title.toLowerCase().includes(query.trim().toLowerCase()))
+  function addOpenSongTo(setlist: Setlist | null) {
+    if (!editor) return
+    const target = setlist ?? { id: crypto.randomUUID(), name: '', date: '', entries: [] }
+    const next = addSongToSetlist(target, editor.song, { concert: editor.concert, capo: editor.capo })
+    setSetlists((current) => (setlist ? current.map((item) => (item.id === next.id ? next : item)) : [...current, next]))
+    void library.saveSetlist(next)
+    setMenuOpen(false)
+    if (setlist) announce(`Added to ${setlistName(setlist)}`)
+    else {
+      setOpenSetlistId(next.id)
+      setPlace('sets')
+    }
+  }
+
+  const visible = findSongs(songs, query)
   const issues = view ? issuesIn(view) : []
   const transposed = editor ? formatKey(editor.concert) !== formatKey(editor.song.originalKey) : false
   const viewDirty = editor ? transposed || editor.capo > 0 : false
@@ -627,13 +646,28 @@ export function App({ library, settingsStore, band }: { library: LibraryReposito
                 <button className="text-button" type="button" aria-label="More actions" aria-expanded={menuOpen} aria-haspopup="menu" onClick={() => setMenuOpen((open) => !open)}>Menu</button>
                 {menuOpen && (
                   <div className="menu editor-menu" role="menu">
+                    {pickingSetlist ? (
+                      <>
+                        <button type="button" role="menuitem" onClick={() => setPickingSetlist(false)}>‹ Back</button>
+                        {setlistsNewestFirst(setlists).map((setlist) => (
+                          <button key={setlist.id} type="button" role="menuitem" onClick={() => addOpenSongTo(setlist)}>
+                            {setlistName(setlist)}{setlist.date && <span className="meta">{setlist.date}</span>}
+                          </button>
+                        ))}
+                        <button type="button" role="menuitem" onClick={() => addOpenSongTo(null)}>+ New setlist</button>
+                      </>
+                    ) : (
+                    <>
                     <button type="button" role="menuitem" onClick={() => { setEditor(undo(editor)); announce('Undid'); setMenuOpen(false) }}>Undo</button>
                     <button type="button" role="menuitem" onClick={() => { setEditor(redo(editor)); announce('Redid'); setMenuOpen(false) }}>Redo</button>
                     <button type="button" role="menuitem" onClick={() => { setMode((value) => value === 'visual' ? 'chordpro' : 'visual'); setMenuOpen(false) }}>{mode === 'visual' ? 'Use ChordPro Editor' : 'Use Visual Editor'}</button>
                     <button type="button" role="menuitem" onClick={() => { downloadCho(editor.song); setMenuOpen(false) }}>Download as ChordPro</button>
                     <button type="button" role="menuitem" onClick={() => { copyShare(editor.song, announce); setMenuOpen(false) }}>Copy Share Link</button>
                     <button type="button" role="menuitem" onClick={() => { if (view) setPerformance({ mode: 'projector', songs: [view] }); setMenuOpen(false) }}>Projector View</button>
+                    <button type="button" role="menuitem" onClick={() => setPickingSetlist(true)}>Add to Setlist…</button>
                     <button type="button" role="menuitem" onClick={() => { void deleteCurrentSong() }}>Delete song</button>
+                    </>
+                    )}
                   </div>
                 )}
               </div>
@@ -817,14 +851,14 @@ export function App({ library, settingsStore, band }: { library: LibraryReposito
         </main>
       )}
       {place === 'import' && <main className="editor"><ImportScreen phone={phone} shared={sharedPaste} onCancel={() => { setSharedPaste(null); setPlace(phone ? 'songs' : 'editor') }} onSave={(song) => { setSharedPaste(null); void library.saveSong(song); setSongs((current) => [song, ...current.filter((item) => item.id !== song.id)]); const opened = openEditor(song); setEditor({ ...opened, prefs: settings.prefs }); setPlace('editor') }} /></main>}
-      {place === 'sets' && <main className="editor"><SetlistScreen songs={songs} setlists={setlists} openedId={openSetlistId} onOpen={setOpenSetlistId} onShare={(setlist) => copySetlistShare(setlist, songs, announce)} onDownload={(setlist) => downloadSetlistFile(setlist, songs)} onImport={(file) => void importShared(file)} onCreate={() => { const setlist: Setlist = { id: crypto.randomUUID(), name: '', date: '', entries: [] }; setSetlists((current) => [...current, setlist]); void library.saveSetlist(setlist) }} onChange={(setlist) => { setSetlists((current) => current.map((item) => item.id === setlist.id ? setlist : item)); void library.saveSetlist(setlist) }} onDelete={(id) => { setSetlists((current) => current.filter((item) => item.id !== id)); void library.deleteSetlist(id) }} onExport={(setlist) => { setSetlistPrefs(settings.prefs); setSetlistExport(setlist) }} onStage={(setlist) => { const ordered = setlist.entries.flatMap((entry) => { const song = songs.find((item) => item.id === entry.songId); return song ? [{ song, concert: entry.key ?? song.originalKey, capo: entry.capo ?? 0 }] : [] }); if (ordered.length > 0) setPerformance({ mode: 'stage', entries: ordered, nashville: false }) }} /></main>}
+      {place === 'sets' && <main className="editor"><SetlistScreen songs={songs} setlists={setlists} openedId={openSetlistId} onOpen={setOpenSetlistId} onShare={(setlist) => copySetlistShare(setlist, songs, announce)} onDownload={(setlist) => downloadSetlistFile(setlist, songs)} onImport={(file) => void importShared(file)} onCreate={() => { const setlist: Setlist = { id: crypto.randomUUID(), name: '', date: '', entries: [] }; setSetlists((current) => [...current, setlist]); void library.saveSetlist(setlist) }} onChange={(setlist) => { setSetlists((current) => current.map((item) => item.id === setlist.id ? setlist : item)); void library.saveSetlist(setlist) }} onDelete={(id) => { setSetlists((current) => current.filter((item) => item.id !== id)); void library.deleteSetlist(id) }} onExport={(setlist) => { setSetlistPrefs(settings.prefs); setSetlistExport(setlist) }} onStage={(setlist) => { const ordered = setlist.entries.flatMap((entry) => { const song = songs.find((item) => item.id === entry.songId); return song ? [{ song, concert: entry.key ?? song.originalKey, capo: entry.capo ?? 0 }] : [] }); if (ordered.length > 0) setPerformance({ mode: 'stage', entries: ordered, nashville: false }) }} onProject={(setlist) => { const played = setlist.entries.flatMap((entry) => songs.filter((item) => item.id === entry.songId)); if (played.length > 0) setPerformance({ mode: 'projector', songs: played }) }} /></main>}
       {place === 'settings' && <main className="editor"><SettingsScreen settings={settings} onChange={changeSettings} onBackup={downloadBackup} onRestore={(file) => void restoreBackup(file)} band={band && <BandSettings info={band.info} onRename={band.rename} onLeave={() => setLeaving(true)} />} /></main>}
       {leaving && band?.info && <LeaveBandDialog info={band.info} songCount={songs.length} setlistCount={setlists.length} onBackup={downloadBackup} onCancel={() => setLeaving(false)} onLeave={() => void band.leave().finally(() => setLeaving(false))} />}
       {place === 'editor' && layout && previewVisible({ phone, inspectorOpen, peek: previewPeek }) && <PreviewPane layout={layout} divider={!phone && <PaneDivider label="Resize PDF preview" edge="left" onResize={(width) => resizePane('preview', width)} onReset={() => resizePane('preview', null)} />} />}
       {exportOpen && layout && <ExportDialog layout={layout} choices={pdfChoices} accidentals={accidentalBias(editor?.prefs ?? settings.prefs)} issueCount={issues.length} onChange={setPdfChoices} onAccidentals={(bias) => applyPrefs(prefsForBias(bias))} onClose={() => setExportOpen(false)} onDownload={() => void exportPdf()} />}
       {setlistExport && setlistLayout && <SetlistExportDialog fileName={setlistFileName(setlistExport)} layout={setlistLayout} choices={pdfChoices} accidentals={accidentalBias(setlistPrefs)} onChange={setPdfChoices} onAccidentals={(bias) => setSetlistPrefs(prefsForBias(bias))} onClose={() => setSetlistExport(null)} onDownload={() => void exportSetlist()} />}
       {performance?.mode === 'stage' && <StageView entries={performance.entries} nashville={performance.nashville} prefs={settings.prefs} onExit={() => setPerformance(null)} />}
-      {performance?.mode === 'projector' && performance.songs[0] && <ProjectorView song={performance.songs[0]} onExit={() => setPerformance(null)} />}
+      {performance?.mode === 'projector' && performance.songs.length > 0 && <ProjectorView songs={performance.songs} onExit={() => setPerformance(null)} />}
       <div className="phone-tabs">
         <button type="button" aria-pressed={songsTabActive} onClick={() => setPlace('songs')}>Songs</button>
         <button type="button" aria-pressed={place === 'sets'} onClick={() => setPlace('sets')}>Setlists</button>
