@@ -340,22 +340,24 @@ test('switches theme and finds a song from the library', async ({ page }, testIn
   await expect(page.getByLabel('Title')).toHaveValue('Untitled song')
 })
 
-test('deletes the open song from the menu after confirmation', async ({ page }, testInfo) => {
+test('deletes the open song from the menu straight away, with no confirmation box', async ({ page }, testInfo) => {
   await page.goto('/')
   await songs(page, testInfo.project.name)
   await page.getByRole('button', { name: '+ New song' }).click()
   await expect(page.getByLabel('Title')).toHaveValue('Untitled song')
-  page.once('dialog', (dialog) => {
-    expect(dialog.message()).toMatch(/Delete song “Untitled song”/)
-    void dialog.accept()
+  let asked = false
+  page.on('dialog', (dialog) => {
+    asked = true
+    void dialog.dismiss()
   })
   await editorAction(page, 'Delete song')
+  await expect(page.getByRole('status')).toContainText('Deleted ‘Untitled song’')
   await songs(page, testInfo.project.name)
   await expect(page.getByRole('button', { name: /Untitled song/ })).toHaveCount(0)
-  await expect(page.getByLabel('Title')).not.toHaveValue('Untitled song')
+  expect(asked).toBe(false)
 })
 
-test('keeps the setlist when delete confirmation is cancelled', async ({ page }, testInfo) => {
+test('deletes a setlist straight away and brings it back with Undo', async ({ page }, testInfo) => {
   await page.goto('/')
   const setlists =
     testInfo.project.name === 'mobile'
@@ -364,13 +366,14 @@ test('keeps the setlist when delete confirmation is cancelled', async ({ page },
   await setlists.click()
   await page.getByRole('button', { name: '+ New setlist' }).click()
   await page.getByLabel('Setlist name').fill('Sunday')
-  page.once('dialog', (dialog) => {
-    expect(dialog.message()).toMatch(/Delete setlist “Sunday”/)
-    void dialog.dismiss()
-  })
+  await addToSetlist(page, 'Amazing Grace')
   await page.getByRole('button', { name: 'Setlist actions' }).click()
   await page.getByRole('menuitem', { name: 'Delete' }).click()
+  await expect(page.getByLabel('Setlist name')).toHaveCount(0)
+  await expect(page.getByRole('status')).toContainText('Deleted ‘Sunday’')
+  await page.getByRole('status').getByRole('button', { name: 'Undo' }).click()
   await expect(page.getByLabel('Setlist name')).toHaveValue('Sunday')
+  await expect(page.locator('.setlist-song-title')).toContainText('Amazing Grace')
 })
 
 test('copies a share link and downloads a ChordPro file', async ({ page }) => {

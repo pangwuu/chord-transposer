@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { formatKey, parseKey, shiftKey } from '../domain/chord'
 import { importChartPaste, type ChartPasteResult } from '../domain/chart-paste'
 import {
@@ -20,7 +20,7 @@ import {
   type EditorState,
 } from '../domain/editor'
 import { chordTextFromPdfItems, countChords } from '../domain/import-text'
-import { issuesIn, placementLabel, type Song } from '../domain/song'
+import { findDuplicate, issuesIn, placementLabel, unusualChords, type Song } from '../domain/song'
 import { Chart } from './chart'
 
 const SOURCE_LABEL = {
@@ -52,13 +52,23 @@ function reviewState(result: ChartPasteResult): EditorState {
 export function ImportScreen({
   phone,
   shared,
+  songs = [],
+  autoPaste = false,
+  flagUnusual = false,
   onCancel,
   onSave,
 }: {
   phone: boolean
   shared: SharedPaste | null
+  /** The library, to warn when the imported title is already in it. */
+  songs?: Song[]
+  /** Start by reading the clipboard, where the browser allows it. */
+  autoPaste?: boolean
+  /** Point out chords that are unusual for the key: a misread often is. */
+  flagUnusual?: boolean
   onCancel: () => void
-  onSave: (song: Song) => void
+  /** `replaces` is the song already in the library that this import takes the place of. */
+  onSave: (song: Song, replaces?: Song) => void
 }) {
   const [source, setSource] = useState(shared?.text ?? '')
   const [notice, setNotice] = useState(shared?.notice ?? '')
@@ -89,17 +99,25 @@ export function ImportScreen({
     if (!keepsFixes()) read(text, text.length - source.length > PASTE_SIZE)
   }
 
-  const pasteFromClipboard = async () => {
+  const pasteFromClipboard = async (quiet = false) => {
     try {
       const text = await navigator.clipboard.readText()
       if (text.trim()) {
         if (!keepsFixes()) read(text, true)
       }
-      else setNotice('Nothing to paste yet. Copy the chart first.')
+      else if (!quiet) setNotice('Nothing to paste yet. Copy the chart first.')
     } catch {
-      setNotice('Could not read the clipboard. Press and hold in the box, then choose Paste.')
+      if (!quiet) setNotice('Could not read the clipboard. Press and hold in the box, then choose Paste.')
     }
   }
+
+  const pastedOnOpen = useRef(false)
+  useEffect(() => {
+    if (!autoPaste || pastedOnOpen.current || shared?.text || !navigator.clipboard?.readText) return
+    pastedOnOpen.current = true
+    // Nobody pressed Paste, so a refusal is not worth a message: the Paste button is still there.
+    void pasteFromClipboard(true)
+  }, [])
 
   const reviewVisible = Boolean(result && editor) && (!phone || reviewing)
   const sourceVisible = !phone || !reviewing || showSource
@@ -108,6 +126,21 @@ export function ImportScreen({
   const chordCount = editor ? countChords(editor.song) : 0
   const view = editor ? viewSong(editor) : null
   const shapeKey = editor ? shiftKey(editor.concert, -editor.capo, editor.prefs) : null
+  const duplicate = editor ? findDuplicate(editor.song.title, songs) : null
+  const unusual = editor && flagUnusual ? unusualChords(editor.song) : []
+
+  const jumpToUnusual = () => {
+    if (!editor || !unusual[0]) return
+    setEditor(selectChord(editor, unusual[0].id))
+    setEditingId(null)
+    requestAnimationFrame(() => document.querySelector('.import-screen .chord.selected')?.scrollIntoView({ block: 'center' }))
+  }
+
+  const replaceDuplicate = () => {
+    if (!editor || !duplicate) return
+    if (!window.confirm(`Replace “${duplicate.title}” with this import? The version you have now, and any edits made to it, will be lost. Setlists that use it will show the new one.`)) return
+    onSave({ ...editor.song, id: duplicate.id }, duplicate)
+  }
 
   const jumpToIssue = () => {
     if (!editor || !issues[0]) return
@@ -147,6 +180,7 @@ export function ImportScreen({
           <div className="chips">
             <span className="chip ok">{chordCount} chords</span>
             {issues.length > 0 ? <button className="chip warn" type="button" onClick={jumpToIssue}>{issues.length} to check</button> : <span className="chip ok">All chords read</span>}
+            {unusual.length > 0 && <button className="chip soft" type="button" title={`Not an error: ${unusual.map((chord) => chord.label).join(', ')}`} onClick={jumpToUnusual}>{unusual.length} unusual for {formatKey(editor.song.originalKey)}</button>}
             <span className="chip">{editor.song.sections.length} sections</span>
             {result.source && <span className="chip ok">{SOURCE_LABEL[result.source]}</span>}
           </div>
@@ -169,6 +203,15 @@ export function ImportScreen({
                   <input key={formatKey(editor.song.originalKey)} className="field" aria-label="Imported key" defaultValue={formatKey(editor.song.originalKey)} onBlur={(event) => commitKey(event.target.value)} />
                 </label>
               </div>
+              {duplicate && (
+                <div className="duplicate-note" role="status">
+                  <p>You already have <strong>{duplicate.title}</strong> ({[formatKey(duplicate.originalKey), editedOn(duplicate)].filter(Boolean).join(', ')}).</p>
+                  <div className="duplicate-actions">
+                    <button className="outline" type="button" onClick={replaceDuplicate}>Replace it</button>
+                    <button className="outline" type="button" onClick={() => onSave(editor.song)}>Keep both</button>
+                  </div>
+                </div>
+              )}
               <div className="chips" aria-label="Song order">
                 {performanceOrder(editor.song).map((label, index) => <span className="chip" key={`${label}-${index}`}>{label}</span>)}
               </div>
@@ -223,6 +266,14 @@ export function ImportScreen({
       </div>
     </div>
   )
+}
+
+/** `edited 3 Mar`, with the year when it was not this year. Empty for a song that was never edited. */
+function editedOn(song: Song): string {
+  const edited = new Date(song.updatedAt)
+  if (Number.isNaN(edited.getTime()) || edited.getTime() === 0) return ''
+  const thisYear = edited.getFullYear() === new Date().getFullYear()
+  return `edited ${new Intl.DateTimeFormat(undefined, { day: 'numeric', month: 'short', ...(thisYear ? {} : { year: 'numeric' }) }).format(edited)}`
 }
 
 function performanceOrder(song: Song): string[] {

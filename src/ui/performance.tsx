@@ -3,6 +3,7 @@ import { ChevronsDown, Eye, EyeOff, RotateCcw, SkipBack, SkipForward, X } from '
 import {
   accidentalBias,
   chooseAccidentalBias,
+  easyChord,
   formatKey,
   keyFromPitch,
   notePitch,
@@ -11,7 +12,9 @@ import {
   type Key,
   type SpellingPrefs,
 } from '../domain/chord'
-import { displayedSong, performance as playedSections, type Song } from '../domain/song'
+import { chordSummary, displayedSong, mapSymbols, performance as playedSections, type Song } from '../domain/song'
+import { symbolLabel } from './chart'
+import { shortcutFor } from './shortcuts'
 import { StageBarLine, StageLyricLine } from './stage-lines'
 
 const DEFAULT_SPEED = 0.8
@@ -36,20 +39,47 @@ function nudgeSpeed(value: number, delta: number) {
   return Math.min(MAX_SPEED, Math.max(MIN_SPEED, Math.round((value + delta) * 10) / 10))
 }
 
-const PEDAL_KEYS: Record<string, 'play' | 'next-section' | 'previous-section' | 'next-song' | 'previous-song'> = {
-  ' ': 'play',
-  PageDown: 'next-section',
-  ArrowDown: 'next-section',
-  PageUp: 'previous-section',
-  ArrowUp: 'previous-section',
-  ArrowRight: 'next-song',
-  ArrowLeft: 'previous-song',
-}
-
 export type StageEntry = {
   song: Song
   concert: Key
   capo: number
+  /** The setlist entry's notes for this service. */
+  notes?: string
+}
+
+/** What stage view was opened on, so reopening the same thing can pick up where it left off. */
+export type StageSource = { kind: 'setlist' | 'song'; id: string }
+
+const STAGE_POSITION_KEY = 'csm-stage-position'
+const RESUME_WINDOW = 3 * 60 * 60 * 1000
+const RESUME_NOTICE_TIME = 8000
+/** Longest a scroll to a section is given to arrive. */
+const JUMP_TIME = 1200
+
+type StagePosition = { source: string; songId: string; songIndex: number; section: number; key: string; capo: number; at: number }
+
+const sourceName = (source: StageSource) => `${source.kind}:${source.id}`
+
+/** Where this device left the same setlist or song within the last few hours, or null to start from the top. */
+function resumePosition(source: StageSource | undefined, entries: StageEntry[]): { songIndex: number; section: number; concert: Key; capo: number } | null {
+  if (!source) return null
+  try {
+    const held = JSON.parse(localStorage.getItem(STAGE_POSITION_KEY) ?? 'null') as StagePosition | null
+    if (!held || held.source !== sourceName(source) || Date.now() - held.at > RESUME_WINDOW) return null
+    // The setlist may have been reordered since: the song is what was being played, not its number.
+    const songIndex = entries[held.songIndex]?.song.id === held.songId ? held.songIndex : entries.findIndex((entry) => entry.song.id === held.songId)
+    if (songIndex < 0) return null
+    const sections = playedSections(entries[songIndex].song).length
+    return {
+      songIndex,
+      section: Math.max(0, Math.min(sections - 1, Math.round(held.section) || 0)),
+      concert: parseKey(held.key),
+      capo: Math.max(0, Math.min(11, Math.round(held.capo) || 0)),
+    }
+  } catch {
+    // Storage is blocked or holds something else: open as usual.
+    return null
+  }
 }
 
 const STAGE_SIZES = [18, 20, 22, 24, 28, 32, 36, 40]
@@ -69,18 +99,34 @@ export function StageView({
   entries,
   nashville: initialNashville,
   prefs: initialPrefs,
+  easy: initialEasy = false,
+  source,
   onExit,
 }: {
   entries: StageEntry[]
   nashville: boolean
   prefs: SpellingPrefs
+  easy?: boolean
+  /** With a source, the position is remembered on this device and picked up on reopening. */
+  source?: StageSource
   onExit: () => void
 }) {
-  const [songIndex, setSongIndex] = useState(0)
-  const [section, setSection] = useState(0)
-  const [concert, setConcert] = useState(() => entries[0]?.concert ?? parseKey('C'))
-  const [capo, setCapo] = useState(() => entries[0]?.capo ?? 0)
+  const [resumed] = useState(() => resumePosition(source, entries))
+  const [songIndex, setSongIndex] = useState(resumed?.songIndex ?? 0)
+  const [section, setSection] = useState(resumed?.section ?? 0)
+  const [concert, setConcert] = useState(() => resumed?.concert ?? entries[0]?.concert ?? parseKey('C'))
+  const [capo, setCapo] = useState(() => resumed?.capo ?? entries[0]?.capo ?? 0)
+  /** The section picked up at, named once: the section on screen moves on as the player scrolls. */
+  const [backAt, setBackAt] = useState<string | null>(() => {
+    if (!resumed || (resumed.songIndex === 0 && resumed.section === 0)) return null
+    const song = entries[resumed.songIndex].song
+    const label = playedSections(song)[resumed.section]?.section.label ?? ''
+    return resumed.songIndex > 0 ? `${label} of ${song.title}` : label
+  })
+  /** A section being scrolled to. Until it arrives, sections passed on the way are not the current one. */
+  const jump = useRef<{ target: number; until: number } | null>(null)
   const [nashville, setNashville] = useState(initialNashville)
+  const [easy, setEasy] = useState(initialEasy)
   const [prefs, setPrefs] = useState(initialPrefs)
   const [headerOpen, setHeaderOpen] = useState(true)
   const [sizeIndex, setSizeIndex] = useState(initialStageSize)
@@ -93,12 +139,38 @@ export function StageView({
   const touchStart = useRef<{ x: number; y: number } | null>(null)
   const entry = entries[Math.min(songIndex, Math.max(0, entries.length - 1))]
 
+  // The song the key, capo and section on screen belong to. It starts as the one opened, or picked up at.
+  const shownEntry = useRef(entry)
   useEffect(() => {
-    if (!entry) return
+    if (!entry || shownEntry.current === entry) return
+    shownEntry.current = entry
     setConcert(entry.concert)
     setCapo(entry.capo)
     setSection(0)
   }, [entry])
+
+  useEffect(() => {
+    if (!resumed || resumed.section === 0) return
+    const target = body.current?.querySelector(`[data-stage-section-index="${resumed.section}"]`)
+    if (!target || typeof target.scrollIntoView !== 'function') return
+    jump.current = { target: resumed.section, until: Date.now() + JUMP_TIME }
+    target.scrollIntoView({ behavior: 'instant', block: 'start' })
+  }, [resumed])
+
+  useEffect(() => {
+    if (!backAt) return
+    const timer = window.setTimeout(() => setBackAt(null), RESUME_NOTICE_TIME)
+    return () => window.clearTimeout(timer)
+  }, [backAt])
+
+  const sourceKey = source ? sourceName(source) : null
+  const songId = entry?.song.id
+  const keyName = formatKey(concert)
+  useEffect(() => {
+    if (!sourceKey || !songId) return
+    const position: StagePosition = { source: sourceKey, songId, songIndex, section, key: keyName, capo, at: Date.now() }
+    try { localStorage.setItem(STAGE_POSITION_KEY, JSON.stringify(position)) } catch { /* storage can be blocked */ }
+  }, [sourceKey, songId, songIndex, section, keyName, capo])
 
   useEffect(() => {
     const node = body.current
@@ -141,9 +213,13 @@ export function StageView({
 
   if (!entry) return null
 
-  const song = displayedSong(entry.song, concert, capo, prefs)
+  const transposed = displayedSong(entry.song, concert, capo, prefs)
+  const song = easy ? mapSymbols(transposed, easyChord) : transposed
   const played = playedSections(song)
   const shapeKey = shiftKey(concert, -capo, prefs)
+  const chords = chordSummary(song, (symbol) => symbolLabel(symbol, nashville, shapeKey))
+  const entryNotes = entry.notes?.trim()
+  const songNotes = entry.song.notes?.trim()
   const viewDirty = formatKey(concert) !== formatKey(entry.song.originalKey) || capo > 0
   const bias = accidentalBias(prefs)
   const order = song.arrangement
@@ -171,23 +247,32 @@ export function StageView({
     const next = Math.min(played.length - 1, Math.max(0, from + direction))
     const target = body.current?.querySelector(`[data-stage-section-index="${next}"]`)
     if (target && typeof target.scrollIntoView === 'function') {
+      jump.current = { target: next, until: Date.now() + JUMP_TIME }
       target.scrollIntoView({ behavior: 'smooth', block: 'start' })
     }
     setSection(next)
   }
 
+  const startFromTop = () => {
+    setBackAt(null)
+    jump.current = null
+    setSongIndex(0)
+    setSection(0)
+    body.current?.scrollTo?.({ top: 0 })
+  }
+
   /** Bluetooth page-turner pedals type Page Down/Up or arrow keys, so these keys drive the stage hands-free. */
   onKey.current = (event: KeyboardEvent) => {
-    if (event.key === 'Escape') onExit()
+    const action = shortcutFor(event, ['Stage'])
+    if (action === 'stage-exit') return onExit()
     const target = event.target as HTMLElement | null
     if (target?.closest?.('input, select, textarea, [contenteditable="true"]')) return
-    const action = PEDAL_KEYS[event.key]
     if (!action) return
     event.preventDefault()
-    if (action === 'play') setPlaying((value) => !value)
-    else if (action === 'next-section') goSection(1)
-    else if (action === 'previous-section') goSection(-1)
-    else if (action === 'next-song') goSong(1)
+    if (action === 'stage-play') setPlaying((value) => !value)
+    else if (action === 'stage-next-section') goSection(1)
+    else if (action === 'stage-previous-section') goSection(-1)
+    else if (action === 'stage-next-song') goSong(1)
     else goSong(-1)
   }
 
@@ -290,6 +375,17 @@ export function StageView({
                         1-4-5
                       </button>
                     </div>
+                    <div className="pill" role="group" aria-label="Easy chords">
+                      <button
+                        className="pill-btn"
+                        type="button"
+                        aria-pressed={easy}
+                        title="Show plain major and minor chords. The song itself is not changed."
+                        onClick={() => setEasy((value) => !value)}
+                      >
+                        Easy
+                      </button>
+                    </div>
                   </div>
                 </div>
               </div>
@@ -332,13 +428,23 @@ export function StageView({
           </button>
         </div>
       </div>
+      {backAt && (
+        <p className="stage-resume" role="status">
+          Back at {backAt} ·{' '}
+          <button className="text-button" type="button" onClick={startFromTop}>Start from the top</button>
+        </p>
+      )}
       <div
         className="stage-body"
         ref={body}
         style={{ fontSize: `${STAGE_SIZES[sizeIndex]}px` }}
         onScroll={() => {
           const inView = sectionInView()
-          if (inView !== null) setSection(inView)
+          if (inView === null) return
+          const pending = jump.current
+          if (pending && Date.now() < pending.until && inView !== pending.target) return
+          jump.current = null
+          setSection(inView)
         }}
         onTouchStart={(event) => {
           const touch = event.touches[0]
@@ -359,6 +465,13 @@ export function StageView({
           <strong className="stage-title">{song.title}</strong>
           {song.artist && <p className="stage-artist">{song.artist}</p>}
           {order && <p className="stage-order">Order: {order}</p>}
+          {chords.length > 0 && (
+            <p className="stage-chords" aria-label="Chords used">
+              {chords.map((chord) => <span key={chord.label} className={chord.invalid ? 'invalid' : undefined}>{chord.label}</span>)}
+            </p>
+          )}
+          {entryNotes && <p className="stage-notes" data-notes="setlist">{entryNotes}</p>}
+          {songNotes && <p className="stage-notes" data-notes="song">{songNotes}</p>}
         </header>
         {played.map(({ section: item }, index) => (
           <section
@@ -395,9 +508,10 @@ export function ProjectorView({ songs, onExit }: { songs: Song[]; onExit: () => 
   const slide = slides[Math.min(index, Math.max(0, slides.length - 1))]
   useEffect(() => {
     const onKey = (event: KeyboardEvent) => {
-      if (event.key === 'Escape') onExit()
-      if (event.key === 'ArrowRight' || event.key === 'ArrowDown' || event.key === ' ' || event.key === 'PageDown') setIndex((value) => Math.min(slides.length - 1, value + 1))
-      if (event.key === 'ArrowLeft' || event.key === 'ArrowUp' || event.key === 'PageUp') setIndex((value) => Math.max(0, value - 1))
+      const action = shortcutFor(event, ['Projector'])
+      if (action === 'projector-exit') onExit()
+      if (action === 'projector-next') setIndex((value) => Math.min(slides.length - 1, value + 1))
+      if (action === 'projector-previous') setIndex((value) => Math.max(0, value - 1))
     }
     window.addEventListener('keydown', onKey)
     return () => window.removeEventListener('keydown', onKey)

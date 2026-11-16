@@ -11,4 +11,7 @@ export async function openFirstSong(page: Page) {
 export async function addToSetlist(page: Page, title: string) {
   await page.getByRole('combobox', { name: 'Add a song' }).fill(title)
   await page.getByRole('option', { name: new RegExp(title) }).click()
+  // On a phone the songs open as a sheet that stays up for the next song: close it to see the setlist.
+  const done = page.locator('.add-song.is-sheet').getByRole('button', { name: 'Done' })
+  if (await done.isVisible()) await done.click()
 }

@@ -9,8 +9,11 @@ export function SettingsScreen({
   onChange,
   onBackup,
   onRestore,
+  onShortcuts,
   band,
 }: {
+  /** Opens the list of keyboard shortcuts. */
+  onShortcuts?: () => void
   settings: Settings
   onChange: (settings: Settings) => void
   onBackup: () => void
@@ -69,7 +72,18 @@ export function SettingsScreen({
             <label><input type="radio" name="enharmonic-bias" checked={bias === 'sharps'} onChange={() => setBias('sharps')} /> Prefer sharps</label>
           </div>
         </SettingsRow>
+        <SettingsRow label="Unusual chords" description="Point out chords that are unusual for the song's key. It is a hint for spotting a misread import, never an error.">
+          <label className="switch-row"><input type="checkbox" aria-label="Flag chords unusual for the key" checked={settings.flagUnusual ?? true} onChange={(event) => onChange({ ...settings, flagUnusual: event.target.checked })} /> Flag</label>
+        </SettingsRow>
       </SettingsGroup>
+
+      {onShortcuts && (
+        <SettingsGroup title="Keyboard">
+          <SettingsRow label="Keyboard shortcuts" description="Every shortcut in the editor, stage view and projector view. Press ? anywhere to see them.">
+            <button className="outline" type="button" onClick={onShortcuts}>Show shortcuts</button>
+          </SettingsRow>
+        </SettingsGroup>
+      )}
 
       <SettingsGroup title="PDF defaults">
         <SettingsRow label="Paper" description="Used for new exports.">

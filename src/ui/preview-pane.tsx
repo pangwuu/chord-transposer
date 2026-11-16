@@ -1,10 +1,14 @@
 import { useEffect, useRef, useState, type ReactNode, type RefObject } from 'react'
 import {
   blockHeight,
+  CHORD_STRIP_LINE,
+  CHORD_STRIP_SIZE,
   HEADING_SIZE,
   layoutStatus,
   lineGapBelow,
   SECTION_LEAD_IN,
+  type CoverColumn,
+  type CoverPage,
   type PdfBlock,
   type PdfDocument,
   type PdfMeasure,
@@ -109,6 +113,13 @@ export function PaperPage({
                 </p>
               )}
               {page.order && <p className="paper-order">{page.order}</p>}
+              {page.chordsUsed?.map((line, lineIndex) => (
+                <p key={lineIndex} className="paper-chords" style={{ height: CHORD_STRIP_LINE, lineHeight: `${CHORD_STRIP_LINE}px`, fontSize: CHORD_STRIP_SIZE }}>
+                  {line.map((chord) => (
+                    <span key={chord.label} className={chord.invalid ? 'invalid' : undefined} style={{ left: `${chord.index}ch` }}>{chord.label}</span>
+                  ))}
+                </p>
+              ))}
             </>
           )}
           <div className="rule" />
@@ -130,6 +141,56 @@ export function PaperPage({
             <p>
               <strong>{page.pageLabel}</strong>
             </p>
+          </div>
+        </div>
+      </article>
+    </div>
+  )
+}
+
+/** A page of a setlist's running order, drawn as the PDF draws it. */
+export function CoverPaper({ page, scale, label }: { page: CoverPage; scale: number; label: string }) {
+  const { columns, fontSize, lineHeight } = page
+  const cell = (column: CoverColumn | null, lines: string[], className?: string) =>
+    column && (
+      <div className={className} style={{ position: 'absolute', left: column.x - 42, width: column.width, top: 0 }}>
+        {lines.map((line, index) => <div key={index} style={{ height: lineHeight, lineHeight: `${lineHeight}px` }}>{line}</div>)}
+      </div>
+    )
+  const head = (column: CoverColumn | null, text: string) => column && <span style={{ position: 'absolute', left: column.x - 42 }}>{text}</span>
+  return (
+    <div>
+      <p className="meta" style={{ textAlign: 'center' }}>{label}</p>
+      <article className="paper" style={{ width: page.width * scale, height: page.height * scale }}>
+        <div className="paper-inner paper-cover" style={{ width: page.width, height: page.height, zoom: scale }}>
+          {page.first ? (
+            <>
+              <h2>{page.heading}</h2>
+              <p className="cover-date">{page.date ? `Running order · ${page.date}` : 'Running order'}</p>
+            </>
+          ) : (
+            <p className="run"><strong>{page.heading}</strong></p>
+          )}
+          <div className="rule" />
+          <div className="cover-head">
+            {head(columns.number, '#')}
+            {head(columns.title, 'SONG')}
+            {head(columns.key, 'KEY')}
+            {head(columns.meter, 'TIME')}
+            {head(columns.notes, 'NOTES')}
+            {head(columns.order, 'ORDER')}
+          </div>
+          <div className="cover-rows" style={{ fontSize }}>
+            {page.rows.map((row) => (
+              <div key={row.number} className="cover-row" style={{ top: row.top, height: row.height }}>
+                {cell(columns.number, [row.number], 'cover-soft')}
+                {cell(columns.title, row.title, 'cover-strong')}
+                {cell(columns.key, row.key, 'cover-key')}
+                {cell(columns.meter, [row.meter])}
+                {cell(columns.notes, row.notes)}
+                {cell(columns.order, [row.order], 'cover-soft')}
+              </div>
+            ))}
           </div>
         </div>
       </article>

@@ -2,8 +2,11 @@ import fontkit from '@pdf-lib/fontkit'
 import { PDFDocument, rgb, type PDFFont, type PDFPage } from 'pdf-lib'
 import {
   blockHeight,
+  CHORD_STRIP_LINE,
+  CHORD_STRIP_SIZE,
   columnBounds,
   lineGapBelow,
+  type CoverPage,
   type PdfBlock,
   type PdfDocument,
   type PdfPage,
@@ -50,6 +53,63 @@ export async function renderPdf(
         monoBold,
       },
     )
+  }
+  return document.save()
+}
+
+/** The running-order pages that open a setlist PDF. */
+export async function renderCover(
+  pages: CoverPage[],
+  fonts: PdfFonts,
+): Promise<Uint8Array> {
+  const document = await PDFDocument.create()
+  document.registerFontkit(fontkit)
+  const sans = await document.embedFont(fonts.sans)
+  const sansBold = await document.embedFont(fonts.sansBold)
+  const ink = rgb(0, 0, 0)
+  const secondary = rgb(0.2, 0.2, 0.2)
+  const hair = rgb(0.6, 0.6, 0.6)
+  for (const cover of pages) {
+    const page = document.addPage([cover.width, cover.height])
+    const left = 42
+    const right = cover.width - 42
+    let y = cover.height - 42
+    if (cover.first) {
+      page.drawText(cover.heading, { x: left, y: y - 18, size: 21, font: sansBold, color: ink })
+      y -= 24
+      page.drawText(cover.date ? `Running order · ${cover.date}` : 'Running order', { x: left, y: y - 12, size: 10.5, font: sans, color: secondary })
+      y -= 24
+    } else {
+      page.drawText(cover.heading, { x: left, y: y - 10, size: 9.5, font: sansBold, color: ink })
+      y -= 16
+    }
+    page.drawLine({ start: { x: left, y }, end: { x: right, y }, thickness: cover.first ? 1 : 0.75, color: ink })
+    y -= 16
+    const { columns, fontSize, lineHeight } = cover
+    const head = (text: string, column: { x: number } | null) => {
+      if (column) page.drawText(text, { x: column.x, y: y - 8, size: 8, font: sansBold, color: secondary })
+    }
+    head('#', columns.number)
+    head('SONG', columns.title)
+    head('KEY', columns.key)
+    head('TIME', columns.meter)
+    head('NOTES', columns.notes)
+    head('ORDER', columns.order)
+    y -= 20
+    for (const row of cover.rows) {
+      const top = y - row.top
+      const line = (text: string, column: { x: number } | null, index: number, font = sans, color = ink) => {
+        if (column && text) page.drawText(text, { x: column.x, y: top - fontSize - index * lineHeight, size: fontSize, font, color })
+      }
+      line(row.number, columns.number, 0, sans, secondary)
+      row.title.forEach((text, index) => line(text, columns.title, index, sansBold))
+      row.key.forEach((text, index) => line(text, columns.key, index, index === 0 ? sansBold : sans, index === 0 ? ink : secondary))
+      line(row.meter, columns.meter, 0)
+      row.notes.forEach((text, index) => line(text, columns.notes, index))
+      line(row.order, columns.order, 0, sans, secondary)
+      const rule = top - row.height + 2
+      page.drawLine({ start: { x: left, y: rule }, end: { x: right, y: rule }, thickness: 0.5, color: hair })
+    }
   }
   return document.save()
 }
@@ -156,6 +216,17 @@ function drawPage(
         color: secondary,
       })
       y -= 14
+    }
+    for (const line of layout.chordsUsed ?? []) {
+      for (const chord of line)
+        page.drawText(chord.label, {
+          x: left + chord.index * CHORD_STRIP_SIZE * 0.6,
+          y: y - 9,
+          size: CHORD_STRIP_SIZE,
+          font: fonts.monoBold,
+          color: ink,
+        })
+      y -= CHORD_STRIP_LINE
     }
   } else {
     page.drawText(layout.runningHeader, {

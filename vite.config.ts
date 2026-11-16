@@ -6,8 +6,9 @@ export default defineConfig({
   plugins: [
     react(),
     VitePWA({
-      registerType: 'autoUpdate',
-      includeAssets: ['favicon.svg', 'fonts/*'],
+      // A new version waits until `src/main.tsx` says it is safe to reload: see `applyUpdateWhenSafe`.
+      registerType: 'prompt',
+      includeAssets: ['favicon.svg', 'apple-touch-icon.png', 'fonts/*'],
       manifest: {
         name: 'Chord Sheet Maker',
         short_name: 'Charts',
@@ -16,10 +17,15 @@ export default defineConfig({
         share_target: { action: '/', method: 'GET', params: { title: 'title', text: 'text', url: 'url' } },
         background_color: '#ffffff',
         theme_color: '#7540E6',
-        icons: [{ src: 'favicon.svg', sizes: 'any', type: 'image/svg+xml', purpose: 'any' }],
+        icons: [
+          { src: 'icon-192.png', sizes: '192x192', type: 'image/png', purpose: 'any' },
+          { src: 'icon-512.png', sizes: '512x512', type: 'image/png', purpose: 'any' },
+          { src: 'icon-512.png', sizes: '512x512', type: 'image/png', purpose: 'maskable' },
+          { src: 'favicon.svg', sizes: 'any', type: 'image/svg+xml', purpose: 'any' },
+        ],
       },
       workbox: {
-        globPatterns: ['**/*.{js,css,html,svg,ttf,woff2}'],
+        globPatterns: ['**/*.{js,css,html,svg,png,ttf,woff2}'],
         maximumFileSizeToCacheInBytes: 5 * 1024 * 1024,
       },
     }),

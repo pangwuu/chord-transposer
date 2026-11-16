@@ -12,6 +12,14 @@ _Avoid_: Chart file, track
 A named, dated, ordered list of songs, each with its own key, capo and notes for that service.
 _Avoid_: Playlist, set
 
+**Running order**:
+A setlist written out for people: each song in order with its key, capo and notes. Copied as text for the band chat, or printed as the cover page of a setlist PDF.
+_Avoid_: Set order, agenda
+
+**Easy chords**:
+A way of showing a chart with every chord as its plain major or minor chord, for beginners. The song itself keeps the chords as written.
+_Avoid_: Simplified song, beginner version
+
 **Library**:
 One complete collection of songs and setlists, belonging to one band. Everything the song list and the Setlists screen show is the open library's contents.
 _Avoid_: Database, workspace, account

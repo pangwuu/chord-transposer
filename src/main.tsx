@@ -2,6 +2,8 @@ import { StrictMode } from 'react'
 import { createRoot } from 'react-dom/client'
 import type { BandSession } from './domain/band'
 import { localSettings, type SettingsStore } from './domain/settings-store'
+import { registerSW } from 'virtual:pwa-register'
+import { applyUpdateWhenSafe } from './ui/app-update'
 import { BandGate, takeLaunchInvite } from './ui/band-gate'
 import './styles.css'
 
@@ -13,6 +15,15 @@ async function services(): Promise<{ session: BandSession; settingsStore: Settin
 }
 
 const launchInvite = takeLaunchInvite()
+
+// The offline worker. A new deploy is downloaded in the background, then takes over with a reload
+// at the first moment that loses nothing: no edit waiting to be saved, nobody typing in a field.
+const updateApp = registerSW({
+  immediate: true,
+  onNeedRefresh() {
+    applyUpdateWhenSafe(() => void updateApp(true))
+  },
+})
 
 void services().then(({ session, settingsStore, deviceStorage }) => {
   createRoot(document.getElementById('root')!).render(

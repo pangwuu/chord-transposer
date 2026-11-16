@@ -1,4 +1,4 @@
-import { useRef } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { TriangleAlert } from 'lucide-react'
 import type { AccidentalBias } from '../domain/chord'
 import {
@@ -9,10 +9,11 @@ import {
   type PdfContent,
   type PdfDocument,
   type PdfPage,
+  type CoverPage,
   type Paper,
   type SetlistLayout,
 } from '../domain/pdf-layout'
-import { BlankPaper, PaperPage, pageScale, usePaneWidth } from './preview-pane'
+import { BlankPaper, CoverPaper, PaperPage, pageScale, usePaneWidth } from './preview-pane'
 
 export type PdfChoices = {
   paper: Paper
@@ -29,6 +30,12 @@ export type PdfChoices = {
   showColumnDivider: boolean
   showSectionDivider: boolean
   headingSize: number
+  /** Print plain major and minor chords. The song itself is not changed. */
+  easyChords: boolean
+  /** List the song's distinct chords under the header of its first page. */
+  showChords: boolean
+  /** Setlists only: start with a page listing the running order. */
+  coverPage: boolean
 }
 
 export const defaultPdfChoices = (): PdfChoices => ({
@@ -46,7 +53,95 @@ export const defaultPdfChoices = (): PdfChoices => ({
   showColumnDivider: true,
   showSectionDivider: true,
   headingSize: HEADING_SIZE,
+  easyChords: false,
+  showChords: false,
+  coverPage: false,
 })
+
+/** Whether this device's share sheet takes files, so a PDF can go straight to a chat app. */
+export function sharesFiles(): boolean {
+  try {
+    if (typeof navigator === 'undefined' || typeof navigator.share !== 'function' || typeof navigator.canShare !== 'function') return false
+    return navigator.canShare({ files: [new File([''], 'chart.pdf', { type: 'application/pdf' })] })
+  } catch {
+    return false
+  }
+}
+
+/**
+ * Cancel, Download and, where the device can share files, Share.
+ * The PDF is drawn ahead of the tap: Safari only opens the share sheet straight from a tap,
+ * so there is no time to draw it in between.
+ */
+function ExportActions({
+  fileName,
+  title,
+  drawn,
+  renderFile,
+  disabled = false,
+  phone = false,
+  onClose,
+  onDownload,
+  onNotice,
+}: {
+  fileName: string
+  title: string
+  /** Changes whenever the PDF would come out differently. */
+  drawn: unknown
+  renderFile?: () => Promise<Uint8Array>
+  disabled?: boolean
+  phone?: boolean
+  onClose: () => void
+  onDownload: () => void
+  onNotice?: (text: string) => void
+}) {
+  const [canShare] = useState(() => Boolean(renderFile) && sharesFiles())
+  const [file, setFile] = useState<File | null>(null)
+  const render = useRef(renderFile)
+  render.current = renderFile
+  useEffect(() => {
+    setFile(null)
+    if (!canShare || disabled) return
+    let cancelled = false
+    const timer = window.setTimeout(() => {
+      render.current?.().then((bytes) => {
+        if (!cancelled) setFile(new File([new Uint8Array(bytes)], fileName, { type: 'application/pdf' }))
+      }).catch(() => {})
+    }, 250)
+    return () => {
+      cancelled = true
+      window.clearTimeout(timer)
+    }
+  }, [canShare, disabled, drawn, fileName])
+
+  function share() {
+    if (!file) return
+    navigator.share({ files: [file], title }).catch((error: unknown) => {
+      // Closing the share sheet is a choice, not a failure.
+      if (error instanceof Error && error.name === 'AbortError') return
+      onDownload()
+      onNotice?.("Sharing didn't work, so the PDF was downloaded instead.")
+    })
+  }
+
+  return (
+    <div className="row-meta">
+      <button className="text-button" type="button" onClick={onClose}>
+        Cancel
+      </button>
+      <span className="export-buttons">
+        <button className={canShare && phone ? 'outline' : 'primary'} type="button" onClick={onDownload} disabled={disabled}>
+          Download
+        </button>
+        {canShare && (
+          <button className={phone ? 'primary' : 'outline'} type="button" onClick={share} disabled={disabled || !file}>
+            Share
+          </button>
+        )}
+      </span>
+    </div>
+  )
+}
 
 export function ExportDialog({
   layout,
@@ -57,6 +152,9 @@ export function ExportDialog({
   onAccidentals,
   onClose,
   onDownload,
+  renderFile,
+  phone,
+  onNotice,
 }: {
   layout: PdfDocument
   choices: PdfChoices
@@ -66,6 +164,10 @@ export function ExportDialog({
   onAccidentals: (bias: AccidentalBias) => void
   onClose: () => void
   onDownload: () => void
+  /** Draws the PDF. With it, devices that can share files get a Share button. */
+  renderFile?: () => Promise<Uint8Array>
+  phone?: boolean
+  onNotice?: (text: string) => void
 }) {
   const scrollRef = useRef<HTMLDivElement>(null)
   const paneWidth = usePaneWidth(scrollRef)
@@ -106,14 +208,7 @@ export function ExportDialog({
         {layout.fitWarning && (
           <p className="fit-warning">{layout.fitWarning}</p>
         )}
-        <div className="row-meta">
-          <button className="text-button" type="button" onClick={onClose}>
-            Cancel
-          </button>
-          <button className="primary" type="button" onClick={onDownload}>
-            Download
-          </button>
-        </div>
+        <ExportActions fileName={layout.fileName} title={layout.pages[0]?.title ?? 'Chart'} drawn={layout} renderFile={renderFile} phone={phone} onClose={onClose} onDownload={onDownload} onNotice={onNotice} />
       </div>
     </div>
   )
@@ -128,6 +223,9 @@ export function SetlistExportDialog({
   onAccidentals,
   onClose,
   onDownload,
+  renderFile,
+  phone,
+  onNotice,
 }: {
   fileName: string
   layout: SetlistLayout
@@ -137,6 +235,9 @@ export function SetlistExportDialog({
   onAccidentals: (bias: AccidentalBias) => void
   onClose: () => void
   onDownload: () => void
+  renderFile?: () => Promise<Uint8Array>
+  phone?: boolean
+  onNotice?: (text: string) => void
 }) {
   const scrollRef = useRef<HTMLDivElement>(null)
   const paneWidth = usePaneWidth(scrollRef)
@@ -157,14 +258,16 @@ export function SetlistExportDialog({
         <h2 id="setlist-export-title">Export setlist PDF</h2>
         <div className="pdf-export-grid">
           <div>
-            <PdfChoiceFields choices={choices} accidentals={accidentals} onChange={onChange} onAccidentals={onAccidentals} />
+            <PdfChoiceFields choices={choices} accidentals={accidentals} onChange={onChange} onAccidentals={onAccidentals} setlist />
           </div>
           <div className="pdf-export-preview" ref={scrollRef}>
             {pages.length === 0 && (
               <p className="meta">Add a song before exporting.</p>
             )}
             {pages.map((item) =>
-              item.kind === 'blank' ? (
+              item.kind === 'cover' ? (
+                <CoverPaper key={item.key} page={item.page} scale={pageScale(paneWidth, item.page.width)} label={item.label} />
+              ) : item.kind === 'blank' ? (
                 <BlankPaper
                   key={item.key}
                   width={item.width}
@@ -192,19 +295,7 @@ export function SetlistExportDialog({
             {warning}
           </p>
         ))}
-        <div className="row-meta">
-          <button className="text-button" type="button" onClick={onClose}>
-            Cancel
-          </button>
-          <button
-            className="primary"
-            type="button"
-            onClick={onDownload}
-            disabled={layout.pageCount === 0}
-          >
-            Download
-          </button>
-        </div>
+        <ExportActions fileName={fileName} title={fileName.replace(/\.pdf$/, '')} drawn={layout} renderFile={renderFile} disabled={layout.pageCount === 0} phone={phone} onClose={onClose} onDownload={onDownload} onNotice={onNotice} />
       </div>
     </div>
   )
@@ -215,14 +306,28 @@ function PdfChoiceFields({
   accidentals,
   onChange,
   onAccidentals,
+  setlist = false,
 }: {
   choices: PdfChoices
   accidentals: AccidentalBias
   onChange: (choices: PdfChoices) => void
   onAccidentals: (bias: AccidentalBias) => void
+  setlist?: boolean
 }) {
   return (
     <div className="properties">
+      {setlist && (
+        <>
+          <span>Cover page</span>
+          <input
+            type="checkbox"
+            aria-label="Cover page"
+            title="Start with a page listing the running order"
+            checked={choices.coverPage}
+            onChange={(event) => onChange({ ...choices, coverPage: event.target.checked })}
+          />
+        </>
+      )}
       <span>Paper</span>
       <select
         className="select"
@@ -262,6 +367,24 @@ function PdfChoiceFields({
         <option value="flats">Flats (♭)</option>
         <option value="sharps">Sharps (♯)</option>
       </select>
+      <span>Easy chords</span>
+      <input
+        type="checkbox"
+        aria-label="Easy chords"
+        title="Print plain major and minor chords. The song itself is not changed."
+        checked={choices.easyChords}
+        disabled={choices.content === 'lyrics'}
+        onChange={(event) => onChange({ ...choices, easyChords: event.target.checked })}
+      />
+      <span>Chords used</span>
+      <input
+        type="checkbox"
+        aria-label="Show chords used"
+        title="List the song's chords under the header of its first page"
+        checked={choices.showChords}
+        disabled={choices.content === 'lyrics'}
+        onChange={(event) => onChange({ ...choices, showChords: event.target.checked })}
+      />
       <span>Columns</span>
       <select
         className="select"
@@ -427,11 +550,19 @@ type PreviewItem =
       layout: PdfDocument
     }
   | { kind: 'blank'; key: string; label: string; width: number; height: number }
+  | { kind: 'cover'; key: string; label: string; page: CoverPage }
 
 function previewPages(layout: SetlistLayout): PreviewItem[] {
   const items: PreviewItem[] = []
   let number = 0
   for (const [index, sheet] of layout.sheets.entries()) {
+    if (sheet.kind === 'cover') {
+      for (const page of sheet.pages) {
+        number += 1
+        items.push({ kind: 'cover', key: `cover-${number}`, label: `Running order · Page ${number}`, page })
+      }
+      continue
+    }
     if (sheet.kind === 'blank') {
       number += 1
       items.push({

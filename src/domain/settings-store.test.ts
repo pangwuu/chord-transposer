@@ -51,6 +51,21 @@ describe('settings on this device', () => {
     expect(localSettings(() => fakeStorage({ [SETTINGS_KEY]: stored })).read().panes).toEqual({ library: 240, inspector: 333, preview: null })
   })
 
+  it('remembers the song list order and closed hints, and falls back when they are not understood', () => {
+    const storage = fakeStorage()
+    localSettings(() => storage).write({ ...defaultSettings(), songSort: { by: 'key', reverse: true }, flagUnusual: false, dismissed: { firstSong: true, install: false } })
+    const read = localSettings(() => storage).read()
+    expect(read.songSort).toEqual({ by: 'key', reverse: true })
+    expect(read.flagUnusual).toBe(false)
+    expect(read.dismissed).toEqual({ firstSong: true, install: false })
+
+    const stored = JSON.stringify({ songSort: { by: 'loudness', reverse: 'yes' }, flagUnusual: 'no', dismissed: 'all' })
+    const fallback = localSettings(() => fakeStorage({ [SETTINGS_KEY]: stored })).read()
+    expect(fallback.songSort).toEqual({ by: 'title', reverse: false })
+    expect(fallback.flagUnusual).toBe(true)
+    expect(fallback.dismissed).toEqual({ firstSong: false, install: false })
+  })
+
   it('reads the defaults and drops writes when storage is blocked', () => {
     const blocked = localSettings(() => {
       throw new Error('SecurityError')

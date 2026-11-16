@@ -1,5 +1,5 @@
 import { cleanup, fireEvent, render, screen, within } from '@testing-library/react'
-import { afterEach, describe, expect, it } from 'vitest'
+import { afterEach, describe, expect, it, vi } from 'vitest'
 import { DEFAULT_PREFS, parseChord, parseKey } from '../domain/chord'
 import { emptySong, idSequence } from '../domain/song'
 import { ProjectorView, StageView } from './performance'
@@ -408,5 +408,193 @@ describe('ProjectorView for a setlist', () => {
     expect(screen.getByText('Second Song · Verse 1 · 4/6')).toBeTruthy()
     fireEvent.keyDown(window, { key: 'ArrowLeft' })
     expect(screen.getByText('Keep Smiling · Verse 3 · 3/6')).toBeTruthy()
+  })
+})
+
+describe('StageView notes', () => {
+  function renderNotes(songNotes: string | undefined, entryNotes: string | undefined) {
+    const song = { ...songWithChords(), notes: songNotes }
+    return render(<StageView entries={[{ song, concert: song.originalKey, capo: 0, notes: entryNotes }]} nashville={false} prefs={DEFAULT_PREFS} onExit={() => {}} />)
+  }
+  const notes = () => [...document.querySelectorAll('.stage-notes')].map((node) => node.textContent)
+
+  it('shows the song notes under the title', () => {
+    renderNotes('Start soft, build on chorus 2', undefined)
+    expect(notes()).toEqual(['Start soft, build on chorus 2'])
+    expect(document.querySelector('.stage-head')?.contains(document.querySelector('.stage-notes'))).toBe(true)
+  })
+
+  it('shows the setlist entry notes', () => {
+    renderNotes(undefined, 'Capo 4 for acoustic')
+    expect(notes()).toEqual(['Capo 4 for acoustic'])
+  })
+
+  it('shows the setlist entry notes first when there are both', () => {
+    renderNotes('Start soft', 'Capo 4 for acoustic')
+    expect(notes()).toEqual(['Capo 4 for acoustic', 'Start soft'])
+  })
+
+  it('adds nothing when there are no notes', () => {
+    renderNotes(undefined, undefined)
+    expect(document.querySelector('.stage-notes')).toBeNull()
+    cleanup()
+    renderNotes('   ', '')
+    expect(document.querySelector('.stage-notes')).toBeNull()
+  })
+
+  it('keeps the lines of notes written on several lines', () => {
+    renderNotes('Start soft\nBuild on chorus 2', undefined)
+    expect(document.querySelector('.stage-notes')?.textContent).toBe('Start soft\nBuild on chorus 2')
+  })
+
+  it('keeps the notes when the header controls are hidden', () => {
+    renderNotes('Start soft', undefined)
+    fireEvent.click(screen.getByRole('button', { name: 'Hide header' }))
+    expect(notes()).toEqual(['Start soft'])
+  })
+
+  it('shows the next song\'s notes after moving on', () => {
+    const first = { ...songWithChords(), notes: 'First notes' }
+    const second = { ...songWithChords(), id: 'second', title: 'Second Song', notes: undefined }
+    render(<StageView entries={[{ song: first, concert: first.originalKey, capo: 0 }, { song: second, concert: second.originalKey, capo: 0, notes: 'Second entry notes' }]} nashville={false} prefs={DEFAULT_PREFS} onExit={() => {}} />)
+    expect(notes()).toEqual(['First notes'])
+    fireEvent.click(screen.getByRole('button', { name: 'Next song' }))
+    expect(notes()).toEqual(['Second entry notes'])
+  })
+})
+
+describe('StageView chords used and easy chords', () => {
+  const strip = () => [...(screen.getByLabelText('Chords used').children)].map((node) => node.textContent)
+
+  it('lists the song\'s chords once each under the title', () => {
+    renderStage()
+    expect(strip()).toEqual(['D', 'G', 'A'])
+    expect(document.querySelector('.stage-head')?.contains(screen.getByLabelText('Chords used'))).toBe(true)
+  })
+
+  it('follows the key, the capo and Nashville numbers', () => {
+    renderStage({ nashville: true })
+    expect(strip()).toEqual(['1', '4', '5'])
+    fireEvent.click(screen.getByRole('button', { name: '1-4-5' }))
+    fireEvent.click(screen.getByRole('button', { name: 'Key up a semitone' }))
+    expect(strip()).toEqual(['Eb', 'Ab', 'Bb'])
+  })
+
+  it('shows plain chords when Easy is on, and the written ones again when off', () => {
+    const song = songWithChords()
+    const line = song.sections[0].lines[0]
+    if (line.type === 'lyric') line.chords[0].symbol = parseChord('Dmaj7/F#')
+    const before = structuredClone(song)
+    render(<StageView entries={[{ song, concert: song.originalKey, capo: 0 }]} nashville={false} prefs={DEFAULT_PREFS} onExit={() => {}} />)
+    expect(strip()).toEqual(['Dmaj7/F#', 'G', 'A'])
+    const easy = screen.getByRole('button', { name: 'Easy' })
+    expect(easy.getAttribute('aria-pressed')).toBe('false')
+    fireEvent.click(easy)
+    expect(easy.getAttribute('aria-pressed')).toBe('true')
+    expect(strip()).toEqual(['D', 'G', 'A'])
+    expect(document.querySelector('.stage-chord')?.textContent).toBe('D')
+    fireEvent.click(easy)
+    expect(document.querySelector('.stage-chord')?.textContent).toBe('Dmaj7/F#')
+    expect(song).toEqual(before)
+  })
+})
+
+describe('StageView picks up where it left off', () => {
+  const KEY = 'csm-stage-position'
+  afterEach(() => localStorage.clear())
+
+  function setlistEntries() {
+    const first = songWithChords()
+    const second = { ...songWithChords(), id: 'second', title: 'Second Song' }
+    return [{ song: first, concert: first.originalKey, capo: 0 }, { song: second, concert: second.originalKey, capo: 0 }]
+  }
+  const open = (id = 'sunday', entries = setlistEntries()) =>
+    render(<StageView entries={entries} source={{ kind: 'setlist', id }} nashville={false} prefs={DEFAULT_PREFS} onExit={() => {}} />)
+  const current = () => (document.querySelector('.stage-section.is-current') as HTMLElement | null)?.dataset.stageSection
+  const keyShown = () => (screen.getByLabelText('Key') as HTMLSelectElement).value
+  const capoShown = () => (screen.getByLabelText('Capo') as HTMLSelectElement).value
+
+  function playToSecondSongVerseTwo() {
+    open()
+    fireEvent.click(screen.getByRole('button', { name: 'Next song' }))
+    fireEvent.click(screen.getByRole('button', { name: 'Key up a semitone' }))
+    fireEvent.change(screen.getByLabelText('Capo'), { target: { value: '2' } })
+    fireEvent.click(screen.getByRole('button', { name: 'Next section' }))
+    expect(current()).toBe('Verse 2')
+    cleanup()
+  }
+
+  it('reopens the same setlist at the same song and section, in the same key and capo', () => {
+    playToSecondSongVerseTwo()
+    open()
+    expect(stageTitle()).toBe('Second Song')
+    expect(current()).toBe('Verse 2')
+    expect(keyShown()).toBe('Eb')
+    expect(capoShown()).toBe('2')
+    expect(screen.getByRole('status').textContent).toContain('Back at Verse 2')
+    expect(screen.getByRole('button', { name: 'Autoscroll' })).toBeTruthy()
+  })
+
+  it('goes to song 1, section 1 on Start from the top', () => {
+    playToSecondSongVerseTwo()
+    open()
+    fireEvent.click(screen.getByRole('button', { name: 'Start from the top' }))
+    expect(stageTitle()).toBe('Keep Smiling')
+    expect(current()).toBe('Verse 1')
+    expect(screen.queryByRole('status')).toBeNull()
+  })
+
+  it('starts a different setlist from the top, with no notice', () => {
+    playToSecondSongVerseTwo()
+    open('easter')
+    expect(stageTitle()).toBe('Keep Smiling')
+    expect(current()).toBe('Verse 1')
+    expect(keyShown()).toBe('D')
+    expect(screen.queryByRole('status')).toBeNull()
+  })
+
+  it('starts from the top once the position is more than three hours old', () => {
+    playToSecondSongVerseTwo()
+    const held = JSON.parse(localStorage.getItem(KEY) ?? '{}')
+    localStorage.setItem(KEY, JSON.stringify({ ...held, at: Date.now() - 3 * 60 * 60 * 1000 - 1000 }))
+    open()
+    expect(stageTitle()).toBe('Keep Smiling')
+    expect(current()).toBe('Verse 1')
+  })
+
+  it('finds the song by itself when the setlist was reordered, and starts from the top when it was removed', () => {
+    playToSecondSongVerseTwo()
+    const [first, second] = setlistEntries()
+    const extra = { ...first, song: { ...first.song, id: 'third', title: 'Third Song' } }
+    open('sunday', [extra, first, second])
+    expect(stageTitle()).toBe('Second Song')
+    expect(current()).toBe('Verse 2')
+    cleanup()
+    localStorage.clear()
+    playToSecondSongVerseTwo()
+    open('sunday', [first, extra])
+    expect(stageTitle()).toBe('Keep Smiling')
+    expect(current()).toBe('Verse 1')
+  })
+
+  it('opens normally when storage is blocked or holds something else', () => {
+    localStorage.setItem(KEY, '{not json')
+    open()
+    expect(stageTitle()).toBe('Keep Smiling')
+    cleanup()
+    const blocked = vi.spyOn(Storage.prototype, 'getItem').mockImplementation(() => { throw new Error('SecurityError') })
+    const full = vi.spyOn(Storage.prototype, 'setItem').mockImplementation(() => { throw new Error('QuotaExceededError') })
+    open()
+    expect(stageTitle()).toBe('Keep Smiling')
+    fireEvent.click(screen.getByRole('button', { name: 'Next song' }))
+    expect(stageTitle()).toBe('Second Song')
+    blocked.mockRestore()
+    full.mockRestore()
+  })
+
+  it('remembers nothing when it was not told what was opened', () => {
+    renderSetlistStage()
+    fireEvent.click(screen.getByRole('button', { name: 'Next song' }))
+    expect(localStorage.getItem(KEY)).toBeNull()
   })
 })

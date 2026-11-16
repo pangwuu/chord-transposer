@@ -32,6 +32,7 @@ export function Chart({
   selectedIds,
   readOnly,
   compact = false,
+  unusualIds,
   onSelect,
   onAdd,
   onCheck,
@@ -57,6 +58,8 @@ export function Chart({
   readOnly: boolean
   /** Only the section actions that fix an import: rename and delete. */
   compact?: boolean
+  /** Chords to mark with a dot as unusual for the key. Not an error. */
+  unusualIds?: string[]
   onSelect: (id: string | null, shift?: boolean) => void
   onAdd: (lineId: string, index: number) => void
   onCheck: (lineId: string) => void
@@ -167,7 +170,7 @@ export function Chart({
                 <p className="bars" key={line.id}>
                   {line.items.map((item) =>
                     item.kind === 'bar' ? <span key={item.id}> | </span> : item.kind === 'rest' ? <span key={item.id}> {item.mark} </span> : (
-                      <button key={item.id} type="button" className={chordClass(item.symbol, selectedIds.includes(item.id))} onClick={(event) => { event.stopPropagation(); onSelect(item.id, event.shiftKey) }} onDoubleClick={(event) => { event.stopPropagation(); onEdit(item.id) }}>
+                      <button key={item.id} type="button" className={chordClass(item.symbol, selectedIds.includes(item.id), unusualIds?.includes(item.id))} onClick={(event) => { event.stopPropagation(); onSelect(item.id, event.shiftKey) }} onDoubleClick={(event) => { event.stopPropagation(); onEdit(item.id) }}>
                         {symbolLabel(item.symbol, numbers, shapeKey)}
                       </button>
                     ),
@@ -206,7 +209,7 @@ export function Chart({
                             <button
                               key={chord.id}
                               type="button"
-                              className={chordClass(chord.symbol, selectedIds.includes(chord.id))}
+                              className={chordClass(chord.symbol, selectedIds.includes(chord.id), unusualIds?.includes(chord.id))}
                               style={{ left: `${placed.index}ch` }}
                               aria-label={`Chord ${symbolLabel(chord.symbol, false, shapeKey)} over "${wordAt(line.text, chord.index)}", ${section.label} line ${lineNumber + 1}`}
                               onClick={(event) => { event.stopPropagation(); onSelect(chord.id, event.shiftKey) }}
@@ -424,8 +427,8 @@ function visualColumn(origins: number[], index: number): number {
   return at >= 0 ? at : origins.length
 }
 
-function chordClass(symbol: ChordSymbol, selected: boolean): string {
-  return ['chord', selected ? 'selected' : '', symbol.kind === 'invalid' ? 'invalid' : ''].filter(Boolean).join(' ')
+function chordClass(symbol: ChordSymbol, selected: boolean, unusual = false): string {
+  return ['chord', selected ? 'selected' : '', symbol.kind === 'invalid' ? 'invalid' : '', unusual ? 'unusual' : ''].filter(Boolean).join(' ')
 }
 
 function wordAt(text: string, index: number): string {
