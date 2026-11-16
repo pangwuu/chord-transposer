@@ -1,5 +1,5 @@
 import { expect, test } from '@playwright/test'
-import { openFirstSong } from './helpers'
+import { openFirstSong, addToSetlist } from './helpers'
 
 test('nudges, adds, edits, deletes, and replaces chords', async ({ page }, testInfo) => {
   const phone = testInfo.project.name === 'mobile'
@@ -50,8 +50,8 @@ test('walks a setlist on stage', async ({ page }, testInfo) => {
   const setlists = testInfo.project.name === 'mobile' ? page.locator('.phone-tabs').getByRole('button', { name: 'Setlists' }) : page.locator('.side-nav').getByRole('button', { name: 'Setlists' })
   await setlists.click()
   await page.getByRole('button', { name: '+ New setlist' }).click()
-  await page.getByLabel('Add a song').selectOption({ label: 'Amazing Grace' })
-  await page.getByLabel('Add a song').selectOption({ label: 'First Light' })
+  await addToSetlist(page, 'Amazing Grace')
+  await addToSetlist(page, 'First Light')
   await page.getByRole('button', { name: 'Perform' }).click()
   await page.getByRole('button', { name: 'Next song' }).click()
   await expect(page.locator('.stage strong')).toHaveText('First Light')

@@ -1,9 +1,8 @@
 import type { Key } from './chord'
-import type { Song } from './song'
+import type { Song, SongSort } from './song'
 
 export type SetlistEntry = {
   songId: string
-  viewId?: string
   key?: Key
   capo?: number
   notes?: string
@@ -30,6 +29,12 @@ export type Settings = {
   lyricSize: number
   allowTwoColumns: boolean
   panes: PaneWidths
+  /** The order of the song list, and of the setlist "Add song" box. */
+  songSort: SongSort
+  /** Point out chords that are unusual for the song's key. */
+  flagUnusual: boolean
+  /** One-time hints this device has closed, or no longer needs. */
+  dismissed: { firstSong: boolean; install: boolean }
 }
 
 /** Desktop pane widths in px, as the user dragged them. A `null` preview shares the space evenly with the editor. */
@@ -52,6 +57,9 @@ export const defaultSettings = (): Settings => ({
   lyricSize: 12,
   allowTwoColumns: true,
   panes: { library: 240, inspector: 280, preview: null },
+  songSort: { by: 'title', reverse: false },
+  flagUnusual: true,
+  dismissed: { firstSong: false, install: false },
 })
 
 export type LibraryRepository = {

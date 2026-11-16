@@ -64,8 +64,9 @@ export function takeBandmateCopy(state: EditorState, song: Song): EditorState {
   return { ...state, song, past: [], future: [], selectedIds: [] }
 }
 
+/** Every edit is a new version of the song, dated now, so "date edited" and "newer copy" mean what they say. */
 function commit(state: EditorState, song: Song): EditorState {
-  return { ...state, song, past: [...state.past, state.song].slice(-LIMIT), future: [] }
+  return { ...state, song: { ...song, updatedAt: new Date().toISOString() }, past: [...state.past, state.song].slice(-LIMIT), future: [] }
 }
 
 export function viewSong(state: EditorState): Song {
@@ -245,7 +246,6 @@ export function applyChordProOf(state: EditorState, text: string): EditorState {
     const song: Song = {
       ...parsed,
       id: state.song.id,
-      views: state.song.views,
       notes: state.song.notes,
       updatedAt: new Date().toISOString(),
     }

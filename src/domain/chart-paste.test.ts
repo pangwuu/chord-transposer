@@ -41,9 +41,7 @@ describe('importChartPaste', () => {
     expect(result.song.title).toBe('Morning Kitchen')
     expect(result.song.artist).toBe('First Light Band')
     expect(formatKey(result.song.originalKey)).toBe('A')
-    expect(result.song.views).toEqual([
-      expect.objectContaining({ name: 'Capo 2', capo: 2 }),
-    ])
+    expect(result.capo).toBe(2)
     expect(result.song.sections.map((section) => section.label)).toEqual(['Verse 1', 'Chorus'])
     expect(result.chordCount).toBe(8)
     const verse = result.song.sections[0].lines[0]
@@ -80,7 +78,7 @@ describe('importChartPaste', () => {
     const result = importChartPaste(raw, idSequence('ugapp'))
     expect(result.source).toBe('ultimate-guitar')
     expect(result.song.title).toBe('Untitled song')
-    expect(result.song.views).toEqual([expect.objectContaining({ name: 'Capo 3', capo: 3 })])
+    expect(result.capo).toBe(3)
     expect(result.song.sections[0].label).toBe('Verse 1')
     expect(result.chordCount).toBe(4)
   })
@@ -108,7 +106,7 @@ describe('importChartPaste', () => {
     expect(result.song.title).toBe('Morning Kitchen')
     expect(result.song.artist).toBe('First Light Band')
     expect(formatKey(result.song.originalKey)).toBe('Ab')
-    expect(result.song.views).toEqual([expect.objectContaining({ name: 'Capo 1', capo: 1 })])
+    expect(result.capo).toBe(1)
     expect(result.song.sections.map((section) => section.label)).toEqual(['Verse 1', 'Chorus'])
     expect(result.chordCount).toBe(8)
     const verse = result.song.sections[0].lines[0]

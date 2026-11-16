@@ -12,6 +12,8 @@ import { createId, symbolsIn, transposeSong, type IdGen, type Song } from './son
 export type ChartPasteResult = ImportResult & {
   notices?: string[]
   source?: ChartPasteSource
+  /** The capo the chart was written for. The song holds the sounding key; review opens at this capo to show the pasted shapes. */
+  capo?: number
 }
 
 const cleaners: SiteCleaner[] = [ultimateGuitarCleaner, chordieCleaner, eChordsCleaner]
@@ -23,7 +25,7 @@ export function importChartPaste(raw: string, ids: IdGen = createId): ChartPaste
 
   const cleaned = cleaner ? cleaner.clean(text) : cleanPage(text)
   const result = importText(cleaned.body, ids)
-  const applied = applyMeta(result.song, cleaned.meta, ids)
+  const applied = applyMeta(result.song, cleaned.meta)
   return {
     ...result,
     song: applied.song,
@@ -31,6 +33,7 @@ export function importChartPaste(raw: string, ids: IdGen = createId): ChartPaste
     keyGuessed: result.keyGuessed && !cleaned.meta.key,
     notices: [...cleaned.notices, ...applied.notices],
     source: cleaner?.id,
+    ...(applied.capo ? { capo: applied.capo } : {}),
   }
 }
 
@@ -41,8 +44,8 @@ function soundingKey(shapes: Key, stated: Key | undefined, capo: number): Key {
   return statesTheSound ? stated : shiftKey(stated, capo)
 }
 
-function applyMeta(song: Song, meta: ChartPasteMeta, ids: IdGen): { song: Song; notices: string[] } {
-  let next: Song = { ...song, views: [...song.views] }
+function applyMeta(song: Song, meta: ChartPasteMeta): { song: Song; notices: string[]; capo?: number } {
+  let next: Song = song
   const notices: string[] = []
   if (meta.title?.trim() && (!next.title || next.title === 'Untitled song')) next = { ...next, title: meta.title.trim() }
   if (meta.artist?.trim() && !next.artist) next = { ...next, artist: meta.artist.trim() }
@@ -54,12 +57,9 @@ function applyMeta(song: Song, meta: ChartPasteMeta, ids: IdGen): { song: Song; 
   if (meta.capo && meta.capo > 0) {
     const shapes = inferKey(symbolsIn(next)) ?? meta.key ?? next.originalKey
     const concert = soundingKey(shapes, meta.key, meta.capo)
-    next = {
-      ...transposeSong(next, meta.capo, concert),
-      originalKey: concert,
-      views: [...next.views, { id: ids(), name: `Capo ${meta.capo}`, key: concert, capo: meta.capo, nashville: false }],
-    }
+    next = { ...transposeSong(next, meta.capo, concert), originalKey: concert }
     notices.push(`Capo ${meta.capo}: sounds in ${formatKey(concert)}, shown as ${formatKey(shapes)} shapes`)
+    return { song: next, notices, capo: meta.capo }
   }
   return { song: next, notices }
 }

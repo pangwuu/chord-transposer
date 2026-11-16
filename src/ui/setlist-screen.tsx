@@ -2,7 +2,8 @@ import { useEffect, useRef, useState, type ReactNode, type RefObject } from 'rea
 import { Guitar } from 'lucide-react'
 import { formatKey, parseKey } from '../domain/chord'
 import type { Setlist, SetlistEntry } from '../domain/library-types'
-import type { Song } from '../domain/song'
+import { lastPlayed, lastPlayedLabel, todayDate } from '../domain/setlist'
+import { DEFAULT_SONG_SORT, findSongs, type Song, type SongSort } from '../domain/song'
 
 const KEYS = ['C', 'Db', 'D', 'Eb', 'E', 'F', 'F#', 'G', 'Ab', 'A', 'Bb', 'B']
 const NARROW_PANE = 640
@@ -15,14 +16,26 @@ export function SetlistScreen({
   onDelete,
   onExport,
   onStage,
+  onProject,
   onShare,
   onDownload,
   onImport,
+  onCopyOrder,
+  onShareOrder,
+  sort = DEFAULT_SONG_SORT,
+  today = todayDate(),
   openedId: givenId,
   onOpen,
 }: {
   songs: Song[]
   setlists: Setlist[]
+  /** The order chosen for the song list; the "Add song" box lists songs the same way. */
+  sort?: SongSort
+  /** Today as `YYYY-MM-DD`, for the "last played" hints. */
+  today?: string
+  onCopyOrder?: (setlist: Setlist) => void
+  /** Only given where the device has a share sheet. */
+  onShareOrder?: (setlist: Setlist) => void
   onShare: (setlist: Setlist) => void
   onDownload: (setlist: Setlist) => void
   onImport: (file: File) => void
@@ -34,6 +47,7 @@ export function SetlistScreen({
   onDelete: (id: string) => void
   onExport: (setlist: Setlist) => void
   onStage: (setlist: Setlist) => void
+  onProject: (setlist: Setlist) => void
 }) {
   const rootRef = useRef<HTMLDivElement>(null)
   const narrow = useNarrowPane(rootRef, NARROW_PANE)
@@ -107,6 +121,11 @@ export function SetlistScreen({
           <SetlistDetail
             setlist={shown}
             songs={songs}
+            setlists={setlists}
+            sort={sort}
+            today={today}
+            onCopyOrder={onCopyOrder}
+            onShareOrder={onShareOrder}
             narrow={narrow}
             extra={extra}
             onBack={() => { setExtra(null); setOpenedId(null) }}
@@ -114,6 +133,7 @@ export function SetlistScreen({
             onDelete={(id) => { setOpenedId(null); onDelete(id) }}
             onExport={onExport}
             onStage={onStage}
+            onProject={onProject}
             onShare={onShare}
             onDownload={onDownload}
             onExtra={setExtra}
@@ -134,10 +154,21 @@ function SetlistDetail({
   onDelete,
   onExport,
   onStage,
+  onProject,
   onShare,
   onDownload,
   onExtra,
+  setlists,
+  sort,
+  today,
+  onCopyOrder,
+  onShareOrder,
 }: {
+  setlists: Setlist[]
+  sort: SongSort
+  today: string
+  onCopyOrder?: (setlist: Setlist) => void
+  onShareOrder?: (setlist: Setlist) => void
   onShare: (setlist: Setlist) => void
   onDownload: (setlist: Setlist) => void
   setlist: Setlist
@@ -149,6 +180,7 @@ function SetlistDetail({
   onDelete: (id: string) => void
   onExport: (setlist: Setlist) => void
   onStage: (setlist: Setlist) => void
+  onProject: (setlist: Setlist) => void
   onExtra: (extra: { index: number; field: 'capo' | 'notes' } | null) => void
 }) {
   return (
@@ -163,18 +195,12 @@ function SetlistDetail({
           </button>
           <button className="primary" type="button" onClick={() => onExport(setlist)}>Export PDF</button>
           <Menu label="Setlist actions">
+            <button type="button" role="menuitem" disabled={setlist.entries.length === 0} onClick={() => onProject(setlist)}>Projector view</button>
             <button type="button" role="menuitem" disabled={setlist.entries.length === 0} onClick={() => onShare(setlist)}>Copy share link</button>
             <button type="button" role="menuitem" disabled={setlist.entries.length === 0} onClick={() => onDownload(setlist)}>Download file</button>
-            <button
-              type="button"
-              role="menuitem"
-              onClick={() => {
-                if (!window.confirm(`Delete setlist “${setlistName(setlist)}”? This cannot be undone.`)) return
-                onDelete(setlist.id)
-              }}
-            >
-              Delete
-            </button>
+            {onCopyOrder && <button type="button" role="menuitem" disabled={setlist.entries.length === 0} onClick={() => onCopyOrder(setlist)}>Copy running order</button>}
+            {onShareOrder && <button type="button" role="menuitem" disabled={setlist.entries.length === 0} onClick={() => onShareOrder(setlist)}>Share running order</button>}
+            <button type="button" role="menuitem" onClick={() => onDelete(setlist.id)}>Delete</button>
           </Menu>
         </div>
       </div>
@@ -229,15 +255,14 @@ function SetlistDetail({
         )
       })}
       <div className="setlist-add-row">
-      <select
-        className="select setlist-add"
-        aria-label="Add a song"
-        value=""
-        onChange={(event) => { if (event.target.value) onChange({ ...setlist, entries: [...setlist.entries, { songId: event.target.value }] }) }}
-      >
-        <option value="">Add song…</option>
-        {songs.map((song) => <option key={song.id} value={song.id}>{song.title}</option>)}
-      </select>
+        <AddSongBox
+          songs={songs}
+          sort={sort}
+          sheet={narrow}
+          inSet={new Set(setlist.entries.map((entry) => entry.songId))}
+          hint={(song) => lastPlayedLabel(lastPlayed(song, setlists, today), today)}
+          onAdd={(song) => onChange({ ...setlist, entries: [...setlist.entries, { songId: song.id }] })}
+        />
       </div>
       </div>
     </article>
@@ -317,4 +342,124 @@ function moveEntry(setlist: Setlist, index: number, direction: -1 | 1): Setlist 
   const [entry] = entries.splice(index, 1)
   entries.splice(target, 0, entry)
   return { ...setlist, entries }
+}
+
+const ADD_SONG_LIMIT = 300
+
+/**
+ * A search box that finds songs by title, artist or lyrics, so a big library is never one long dropdown.
+ * Focused with nothing typed, it lists the whole library in the song list's order. On a narrow screen the
+ * list opens as a sheet from the top of the screen, sized to what the on-screen keyboard leaves visible.
+ */
+function AddSongBox({
+  songs,
+  sort,
+  sheet,
+  inSet,
+  hint,
+  onAdd,
+}: {
+  songs: Song[]
+  sort: SongSort
+  sheet: boolean
+  inSet: Set<string>
+  hint: (song: Song) => string
+  onAdd: (song: Song) => void
+}) {
+  const [query, setQuery] = useState('')
+  const [open, setOpen] = useState(false)
+  const [active, setActive] = useState(0)
+  const input = useRef<HTMLInputElement>(null)
+  const box = useRef<HTMLDivElement>(null)
+  const matches = open ? findSongs(songs, query, sort).slice(0, ADD_SONG_LIMIT) : []
+  const highlighted = Math.min(active, matches.length - 1)
+  const asSheet = sheet && open
+
+  useEffect(() => {
+    const node = box.current
+    const viewport = window.visualViewport
+    if (!asSheet || !node || !viewport) return
+    const fit = () => { node.style.height = `${viewport.height}px`; node.style.top = `${viewport.offsetTop}px` }
+    fit()
+    viewport.addEventListener('resize', fit)
+    viewport.addEventListener('scroll', fit)
+    return () => {
+      viewport.removeEventListener('resize', fit)
+      viewport.removeEventListener('scroll', fit)
+      node.style.height = ''
+      node.style.top = ''
+    }
+  }, [asSheet])
+
+  useEffect(() => {
+    if (!open) return
+    document.getElementById(`add-song-${matches[highlighted]?.id}`)?.scrollIntoView?.({ block: 'nearest' })
+  }, [highlighted, open])
+
+  function add(song: Song) {
+    onAdd(song)
+    setQuery('')
+    setActive(0)
+    input.current?.focus()
+  }
+
+  function close() {
+    setOpen(false)
+    setQuery('')
+    setActive(0)
+  }
+
+  return (
+    <div ref={box} className={asSheet ? 'add-song is-sheet' : 'add-song'} onBlur={(event) => { if (!event.currentTarget.contains(event.relatedTarget)) setOpen(false) }}>
+      <div className="add-song-bar">
+        <input
+          ref={input}
+          className="field setlist-add"
+          role="combobox"
+          aria-label="Add a song"
+          aria-expanded={matches.length > 0}
+          aria-controls="add-song-options"
+          aria-autocomplete="list"
+          aria-activedescendant={matches[highlighted] ? `add-song-${matches[highlighted].id}` : undefined}
+          placeholder="Add song…"
+          autoComplete="off"
+          value={query}
+          onFocus={() => setOpen(true)}
+          onClick={() => setOpen(true)}
+          onChange={(event) => { setQuery(event.target.value); setActive(0); setOpen(true) }}
+          onKeyDown={(event) => {
+            if (event.key === 'ArrowDown') { event.preventDefault(); setOpen(true); setActive(Math.min(matches.length - 1, highlighted + 1)) }
+            else if (event.key === 'ArrowUp') { event.preventDefault(); setActive(Math.max(0, highlighted - 1)) }
+            else if (event.key === 'Enter' && matches[highlighted]) { event.preventDefault(); add(matches[highlighted]) }
+            else if (event.key === 'Escape') { event.stopPropagation(); close() }
+          }}
+        />
+        {asSheet && <button className="text-button" type="button" onClick={() => { close(); input.current?.blur() }}>Done</button>}
+      </div>
+      {matches.length > 0 && (
+        <ul className="add-song-options" id="add-song-options" role="listbox" aria-label="Songs">
+          {matches.map((song, index) => (
+            <li
+              key={song.id}
+              id={`add-song-${song.id}`}
+              role="option"
+              aria-selected={index === highlighted}
+              className={index === highlighted ? 'add-song-option active' : 'add-song-option'}
+              onPointerDown={(event) => event.preventDefault()}
+              onPointerEnter={() => setActive(index)}
+              onClick={() => add(song)}
+            >
+              <span className="add-song-title">
+                <strong>{song.title}</strong>
+                {inSet.has(song.id) && <span className="in-set">In set</span>}
+              </span>
+              <span className="meta">{[song.artist, formatKey(song.originalKey)].filter(Boolean).join(' · ')}</span>
+              <span className="meta last-played">{hint(song)}</span>
+            </li>
+          ))}
+        </ul>
+      )}
+      {open && matches.length === 0 && query.trim() !== '' && <p className="add-song-none" role="status">No songs match.</p>}
+    </div>
+  )
 }

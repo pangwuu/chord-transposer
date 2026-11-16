@@ -7,10 +7,12 @@ import {
   parseChord,
   parseKey,
   sameChord,
+  notePitch,
   shiftKey,
   signedInterval,
   suggestionsFor,
   transposeSymbol,
+  unusualInKey,
 } from './chord'
 
 export type SectionKind =
@@ -70,14 +72,6 @@ export type ArrangementItem = {
   repeat?: number
 }
 
-export type NamedView = {
-  id: string
-  name: string
-  key: Key
-  capo: number
-  nashville: boolean
-}
-
 export type Song = {
   id: string
   title: string
@@ -90,8 +84,9 @@ export type Song = {
   notes?: string
   sections: Section[]
   arrangement: ArrangementItem[]
-  views: NamedView[]
   updatedAt: string
+  /** When the song was created or imported. Songs from before this was kept have none. */
+  createdAt?: string
 }
 
 export type IdGen = () => string
@@ -140,9 +135,9 @@ export function emptySong(partial: Partial<Song> & { title?: string } = {}, ids:
       },
     ],
     arrangement: partial.arrangement ?? [],
-    views: partial.views ?? [],
     updatedAt: partial.updatedAt ?? new Date(0).toISOString(),
   }
+  if (partial.createdAt) song.createdAt = partial.createdAt
   if (song.arrangement.length === 0) song.arrangement = song.sections.map((section) => ({ sectionId: section.id }))
   return song
 }
@@ -570,4 +565,126 @@ export function searchText(song: Song): string {
     .map((line) => (line.type === 'comment' ? line.text : line.type === 'lyric' ? line.text : ''))
     .join('\n')
   return `${song.title}\n${song.artist ?? ''}\n${lyrics}`.toLowerCase()
+}
+
+const byTitle = new Intl.Collator(undefined, { sensitivity: 'base', numeric: true })
+
+export type SongSort = { by: 'title' | 'added' | 'edited' | 'key'; reverse: boolean }
+
+export const DEFAULT_SONG_SORT: SongSort = { by: 'title', reverse: false }
+
+/** Newest first. A song with no date goes after every dated one, whichever way the sort runs. */
+function byDate<T extends Song>(songs: T[], dateOf: (song: T) => string | undefined, reverse: boolean): T[] {
+  const time = (song: T) => Date.parse(dateOf(song) ?? '')
+  const dated = songs.filter((song) => !Number.isNaN(time(song))).sort((a, b) => time(b) - time(a))
+  return [...(reverse ? dated.reverse() : dated), ...songs.filter((song) => Number.isNaN(time(song)))]
+}
+
+/**
+ * The library in a chosen order. Title runs A to Z; date added and date edited run newest first;
+ * key runs from C up to B with major before minor. Ties, and songs with no date, fall back to the title.
+ */
+export function sortSongs<T extends Song>(songs: T[], sort: SongSort = DEFAULT_SONG_SORT): T[] {
+  const titled = [...songs].sort((a, b) => byTitle.compare(a.title, b.title))
+  if (sort.by === 'added') return byDate(titled, (song) => song.createdAt, sort.reverse)
+  if (sort.by === 'edited') return byDate(titled, (song) => song.updatedAt, sort.reverse)
+  if (sort.by === 'key') {
+    const rank = (song: T) => notePitch(song.originalKey.tonic) * 2 + (song.originalKey.mode === 'minor' ? 1 : 0)
+    titled.sort((a, b) => rank(a) - rank(b))
+  }
+  return sort.reverse ? titled.reverse() : titled
+}
+
+/**
+ * Songs whose title, artist or lyrics hold every word of the query, in the chosen order.
+ * While searching, title matches come ahead of artist and lyric matches.
+ */
+export function findSongs<T extends Song>(songs: T[], query: string, sort: SongSort = DEFAULT_SONG_SORT): T[] {
+  const words = query.toLowerCase().split(/\s+/).filter(Boolean)
+  const sorted = sortSongs(songs, sort)
+  if (words.length === 0) return sorted
+  const matches = sorted.filter((song) => {
+    const haystack = searchText(song)
+    return words.every((word) => haystack.includes(word))
+  })
+  const inTitle = (song: Song) => words.every((word) => song.title.toLowerCase().includes(word))
+  return [...matches.filter(inTitle), ...matches.filter((song) => !inTitle(song))]
+}
+
+/**
+ * The distinct chords of a song in the order a player first meets them, following the arrangement.
+ * `labelOf` is how the chart shows a chord, so two chords shown alike count once. `N.C.` is left out.
+ */
+export function chordSummary(song: Song, labelOf: (symbol: ChordSymbol) => string = formatSymbol): { label: string; invalid: boolean }[] {
+  const seen = new Set<string>()
+  const summary: { label: string; invalid: boolean }[] = []
+  const visit = (symbol: ChordSymbol) => {
+    if (symbol.kind === 'nc') return
+    const label = labelOf(symbol)
+    if (seen.has(label)) return
+    seen.add(label)
+    summary.push({ label, invalid: symbol.kind === 'invalid' })
+  }
+  for (const { section } of performance(song)) {
+    for (const line of section.lines) {
+      if (line.type === 'lyric') line.chords.forEach((chord) => visit(chord.symbol))
+      else if (line.type === 'bars') line.items.forEach((item) => item.kind === 'chord' && visit(item.symbol))
+    }
+  }
+  return summary
+}
+
+/** Chords a player would not expect in the key: a cheap clue to a misread import. Never an error. */
+export function unusualChords(song: Song, key: Key = song.originalKey): { id: string; label: string }[] {
+  const found: { id: string; label: string }[] = []
+  const visit = (id: string, symbol: ChordSymbol) => {
+    if (unusualInKey(symbol, key)) found.push({ id, label: formatSymbol(symbol) })
+  }
+  for (const section of song.sections) {
+    for (const line of section.lines) {
+      if (line.type === 'lyric') line.chords.forEach((chord) => visit(chord.id, chord.symbol))
+      else if (line.type === 'bars') line.items.forEach((item) => item.kind === 'chord' && visit(item.id, item.symbol))
+    }
+  }
+  return found
+}
+
+function comparableTitle(title: string): string {
+  return title
+    .normalize('NFKD')
+    .toLowerCase()
+    .replace(/[^\p{L}\p{N}\s]/gu, '')
+    .replace(/\s+/g, ' ')
+    .trim()
+    .replace(/^the /, '')
+}
+
+/** A song already in the library with the same title, ignoring case, punctuation, extra spaces and a leading "The". */
+export function findDuplicate<T extends Song>(title: string, songs: T[]): T | null {
+  const wanted = comparableTitle(title)
+  if (!wanted) return null
+  return songs.find((song) => comparableTitle(song.title) === wanted) ?? null
+}
+
+const SHORT_KIND: Partial<Record<SectionKind, string>> = {
+  intro: 'I', verse: 'V', prechorus: 'PC', chorus: 'C', bridge: 'B', tag: 'T', instrumental: 'Inst', interlude: 'Int', outro: 'O',
+}
+
+/** The arrangement in a few letters, such as `V1 C V2 C B C`, for a running order. */
+export function compactOrder(song: Song): string {
+  return song.arrangement
+    .flatMap((item) => {
+      const section = song.sections.find((candidate) => candidate.id === item.sectionId)
+      if (!section) return []
+      const number = section.label.match(/\d+/)?.[0] ?? ''
+      const short = SHORT_KIND[section.kind]
+      const name = short ? `${short}${number}` : section.label.split(/\s+/).map((word) => word[0]?.toUpperCase() ?? '').join('')
+      return [item.repeat && item.repeat > 1 ? `${name}×${item.repeat}` : name]
+    })
+    .join(' ')
+}
+
+/** True while the library holds nothing but the songs a new band is seeded with, or nothing at all. */
+export function onlySeededSongs(songs: Song[], seededIds: string[]): boolean {
+  return songs.every((song) => seededIds.includes(song.id))
 }

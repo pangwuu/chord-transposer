@@ -80,7 +80,8 @@ const OPEN_SPELLING: Note[] = [
   { letter: 'B', accidental: '' },
 ]
 
-const QUALITIES = new Set([
+/** Every chord quality the parser accepts. A new one needs an easy form in `EASY_FORM` too. */
+export const QUALITIES = new Set([
   '',
   'm',
   'min',
@@ -463,4 +464,56 @@ export function sameChord(a: ChordSymbol, b: ChordSymbol): boolean {
     a.chord.quality === b.chord.quality &&
     (a.chord.bass ? notePitch(a.chord.bass) : null) === (b.chord.bass ? notePitch(b.chord.bass) : null)
   )
+}
+
+export type EasyQuality = '' | 'm' | 'dim' | 'aug'
+
+/** The plain chord a beginner plays instead of each quality. */
+const EASY_FORM: Record<string, EasyQuality> = {
+  '': '', M: '', maj: '', maj7: '', M7: '', 'Δ': '', 'Δ7': '', '7': '', '9': '', '11': '', '13': '', maj9: '', maj13: '', 'maj7#11': '',
+  '6': '', add9: '', add2: '', add4: '', add11: '', '2': '', '4': '', '5': '',
+  sus: '', sus2: '', sus4: '', '7sus': '', '7sus2': '', '7sus4': '', '9sus4': '', '7b5': '', '7b9': '', '7#9': '',
+  m: 'm', min: 'm', m7: 'm', min7: 'm', m6: 'm', m9: 'm', m11: 'm', m13: 'm', madd9: 'm', madd11: 'm', mM7: 'm', mmaj7: 'm',
+  dim: 'dim', '°': 'dim', dim7: 'dim', '°7': 'dim', m7b5: 'dim', 'ø': 'dim', 'ø7': 'dim',
+  aug: 'aug', '+': 'aug', aug7: 'aug', '+7': 'aug', 'm7#5': 'aug', '7#5': 'aug',
+}
+
+function easyQuality(quality: string): EasyQuality {
+  const known = EASY_FORM[quality]
+  if (known !== undefined) return known
+  // An altered form such as `m7b9` plays as the chord it alters.
+  return EASY_FORM[quality.replace(/(#|b)\d+$/, '')] ?? ''
+}
+
+/**
+ * The plain major, minor, dim or aug chord on the same root, with no bass note.
+ * For display only: `N.C.` and unrecognised chords come back exactly as written.
+ */
+export function easyChord(symbol: ChordSymbol): ChordSymbol {
+  if (symbol.kind !== 'chord') return symbol
+  const chord: Chord = { root: symbol.chord.root, quality: easyQuality(symbol.chord.quality), raw: '' }
+  chord.raw = formatChord(chord)
+  return { kind: 'chord', chord }
+}
+
+/** Semitones above the tonic, and the chord families expected there beyond the key's own chords. */
+const EXPECTED_BEYOND_KEY: Record<KeyMode, Record<number, ChordFamily[]>> = {
+  // II and III as secondary dominants; bIII, bVI, bVII and iv borrowed from the minor.
+  major: { 2: ['major'], 4: ['major'], 3: ['major'], 8: ['major'], 10: ['major'], 5: ['minor'] },
+  // The major V, and II as the dominant of V.
+  minor: { 7: ['major'], 2: ['major'] },
+}
+
+/**
+ * Whether a chord would surprise a player in this key: outside the key's own chords, the common
+ * borrowed chords and the common secondary dominants. A slash chord is judged by its chord, not its bass.
+ * `N.C.` and unrecognised chords are never unusual; unrecognised ones have their own warning.
+ */
+export function unusualInKey(symbol: ChordSymbol, key: Key): boolean {
+  if (symbol.kind !== 'chord') return false
+  const tonic = notePitch(key.tonic)
+  if (fits(symbol.chord, key, tonic) === 1) return false
+  const family = chordFamily(symbol.chord.quality)
+  const allowed = EXPECTED_BEYOND_KEY[key.mode][(notePitch(symbol.chord.root) - tonic + 12) % 12] ?? []
+  return !(family === 'any' ? allowed.length > 0 : allowed.includes(family))
 }

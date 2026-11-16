@@ -102,7 +102,6 @@ function checkSong(value: unknown): Song {
     }
   }
   for (const item of list(song.arrangement, 'arrangement')) text(record(item, 'arrangement item').sectionId, 'arrangement section')
-  list(song.views, 'views')
   return value as Song
 }
 

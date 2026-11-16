@@ -157,7 +157,8 @@ button { cursor: pointer; }
 .menu { position: absolute; z-index: 6; left: 0; top: 36px; background: var(--bg-raised); box-shadow: var(--shadow-md); border-radius: 8px; padding: 6px; display: flex; flex-direction: column; min-width: 160px; }
 .menu button { text-align: left; border: 0; background: transparent; padding: 6px 8px; border-radius: 6px; }
 .editor-bar-phone { position: relative; display: flex; gap: 8px; align-items: center; }
-.editor-menu { right: 0; left: auto; top: 36px; }
+.editor-menu { right: 0; left: auto; top: 36px; max-height: min(70vh, 28rem); overflow-y: auto; }
+.editor-menu .meta { margin-left: auto; font-size: 12px; }
 .section-actions { display: inline-flex; }
 .editor-body { position: relative; display: grid; grid-template-columns: minmax(0, 1fr); min-height: 0; flex: 1; }
 .editor-body:has(.inspector) { grid-template-columns: minmax(0, 1fr) var(--inspector-w, 280px); }
@@ -399,6 +400,23 @@ button { cursor: pointer; }
 .setlist-song-extra { width: 100%; max-width: 100%; min-width: 0; }
 .setlist-add-row { padding: 8px 12px; }
 .setlist-add { width: auto; min-width: min(14rem, 100%); max-width: min(16rem, 100%); }
+.add-song { position: relative; width: min(16rem, 100%); }
+.add-song .setlist-add { width: 100%; max-width: 100%; min-height: 40px; }
+.add-song-options { position: absolute; z-index: 6; left: 0; right: 0; top: calc(100% + 4px); margin: 0; padding: 6px; list-style: none; max-height: min(20rem, 50vh); overflow-y: auto; background: var(--bg-raised); box-shadow: var(--shadow-md); border-radius: 8px; }
+.add-song-option { display: flex; flex-direction: column; gap: 2px; padding: 8px 10px; border-radius: 6px; cursor: pointer; min-height: 40px; justify-content: center; }
+.add-song-option strong { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-weight: 500; }
+.add-song-title { display: flex; align-items: baseline; gap: 8px; min-width: 0; }
+.add-song-title strong { flex: 0 1 auto; min-width: 0; }
+.in-set { flex: none; font-size: 11px; font-weight: 600; padding: 1px 6px; border-radius: 999px; background: var(--bg-subtle); color: var(--text-muted); }
+.add-song-option .last-played { font-size: 12px; color: var(--text-faint); }
+.add-song-none { position: absolute; z-index: 6; left: 0; right: 0; top: calc(100% + 4px); margin: 0; padding: 10px 12px; background: var(--bg-raised); box-shadow: var(--shadow-md); border-radius: 8px; color: var(--text-muted); }
+.add-song-bar { display: flex; align-items: center; gap: 8px; }
+.add-song-bar .setlist-add { flex: 1; min-width: 0; }
+/* On a phone the options open as a sheet from the top, as tall as the keyboard leaves visible. */
+.add-song.is-sheet { position: fixed; z-index: 30; left: 0; right: 0; top: 0; width: auto; height: 100dvh; box-sizing: border-box; padding: 12px; display: flex; flex-direction: column; gap: 8px; background: var(--bg); }
+.add-song.is-sheet .add-song-options, .add-song.is-sheet .add-song-none { position: static; flex: 1; min-height: 0; max-height: none; box-shadow: none; padding: 0; background: transparent; }
+.add-song-option .meta { font-size: 12.5px; }
+.add-song-option.active { background: var(--bg-active); }
 .setlist-song-extra { grid-column: 1 / -1; }
 .setlist-song .menu-anchor { display: inline-flex; align-items: center; }
 .setlist-song .icon-button { display: inline-grid; place-items: center; width: 36px; height: 36px; padding: 0; }
@@ -511,3 +529,69 @@ button { cursor: pointer; }
 .band-confirm { display: grid; gap: 6px; }
 .primary.danger { background: var(--danger); }
 .primary:disabled { opacity: .5; cursor: not-allowed; }
+
+/* Stage: chords used, notes, and the notice after picking up where it left off. */
+.stage-chords { display: flex; flex-wrap: wrap; gap: 4px 14px; margin: 12px 0 0; font-family: var(--mono); font-size: max(14px, .7em); font-weight: 800; color: var(--stage-chord); }
+.stage-chords .invalid { text-decoration: underline wavy; }
+.stage-notes { margin: 12px 0 0; font-family: var(--sans); font-size: max(13px, .68em); line-height: 1.4; color: var(--stage-muted); white-space: pre-wrap; overflow-wrap: anywhere; }
+.stage-resume { margin: 0; padding: 8px 16px; font-family: var(--sans); font-size: 14px; color: var(--stage-text); background: var(--stage-chrome); border-bottom: 1px solid var(--stage-line); }
+.stage-resume .text-button { color: var(--stage-strong); text-decoration: underline; padding: 0; min-height: 0; }
+
+/* PDF preview: chords-used strip and the setlist cover page. */
+.paper .paper-chords { position: relative; font-family: var(--mono); font-weight: 800; overflow: hidden; }
+.paper .paper-chords span { position: absolute; top: 0; white-space: pre; }
+.paper-cover { font-family: Inter, sans-serif; color: #000; }
+.paper .cover-date { font-size: 10.5px; line-height: 24px; height: 24px; color: #333; }
+.cover-head { position: relative; height: 20px; font-size: 8px; font-weight: 700; color: #333; letter-spacing: .02em; }
+.cover-rows { position: relative; }
+.cover-row { position: absolute; left: 0; right: 0; box-sizing: border-box; border-bottom: .5px solid #999; white-space: nowrap; }
+.cover-row .cover-strong, .cover-row .cover-key > div:first-child { font-weight: 700; }
+.cover-row .cover-soft, .cover-row .cover-key > div + div { color: #333; }
+.export-buttons { display: inline-flex; gap: 8px; }
+
+/* Import review: a title already in the library, and chords unusual for the key. */
+.duplicate-note { margin: 8px 0; padding: 10px 12px; border: 1px solid var(--border-strong); border-radius: 8px; background: var(--bg-subtle); }
+.duplicate-note p { margin: 0 0 8px; }
+.duplicate-actions { display: flex; flex-wrap: wrap; gap: 8px; }
+.duplicate-actions .outline { min-height: 40px; }
+.chip.soft { border: 1px dashed var(--border-strong); background: transparent; color: var(--text-muted); cursor: pointer; }
+
+/* Keyboard shortcuts sheet. */
+.shortcuts { width: min(760px, calc(100% - 24px)); }
+.shortcuts-head { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-bottom: 8px; }
+.shortcuts-head h2 { margin: 0; }
+.shortcut-groups { columns: 2 280px; column-gap: 28px; }
+.shortcut-groups section { break-inside: avoid; margin-bottom: 14px; }
+.shortcut-groups h3 { margin: 0 0 4px; font-size: 12px; font-weight: 600; text-transform: uppercase; letter-spacing: .05em; color: var(--text-muted); }
+.shortcut-groups dl { margin: 0; }
+.shortcut-row { display: flex; justify-content: space-between; align-items: baseline; gap: 12px; padding: 4px 0; border-bottom: 1px solid var(--border); }
+.shortcut-row dt { min-width: 0; }
+.shortcut-row dd { margin: 0; display: flex; flex-wrap: wrap; justify-content: flex-end; gap: 4px 6px; white-space: nowrap; }
+.shortcut-combo { display: inline-flex; align-items: center; gap: 3px; }
+.shortcut-or { color: var(--text-faint); font-size: 12px; margin-right: 3px; }
+.shortcuts kbd { display: inline-block; min-width: 1.4em; padding: 1px 5px; border: 1px solid var(--border-strong); border-bottom-width: 2px; border-radius: 5px; background: var(--bg-subtle); font-family: var(--sans); font-size: 12px; text-align: center; }
+
+/* Song list: sort control and one-time hints. */
+.library-sort { display: flex; align-items: center; gap: 4px; margin: 0 12px 8px; }
+.library-sort .select { flex: 1; min-width: 0; padding: 5px 8px; font-size: 12.5px; color: var(--text-muted); }
+.library-sort .icon-button { flex: none; width: 30px; height: 30px; display: inline-flex; align-items: center; justify-content: center; color: var(--text-muted); }
+.library-sort .icon-button[aria-pressed='true'] { background: var(--bg-active); color: var(--accent); }
+.rail .library-sort { display: none; }
+.hint-card { position: relative; margin: 4px 8px 10px; padding: 10px 34px 10px 12px; border: 1px solid var(--border-strong); border-radius: 10px; background: var(--bg); font-size: 13px; line-height: 1.4; }
+.hint-card p { margin: 0; color: var(--text-muted); }
+.hint-card p strong { color: var(--text); }
+.hint-card .icon-button { position: absolute; top: 4px; right: 4px; width: 28px; height: 28px; display: inline-flex; align-items: center; justify-content: center; color: var(--text-muted); }
+.hint-card .primary { margin-top: 8px; min-height: 36px; padding: 6px 12px; }
+.menu-note { margin: 0; padding: 4px 8px 6px; font-size: 12px; color: var(--text-muted); white-space: nowrap; }
+/* Chords unusual for the key: a soft pointer, never an error. */
+.check-mark.soft { color: var(--text-muted); font-weight: 500; padding: 0 8px; border: 1px dashed var(--border-strong); cursor: pointer; }
+.check-mark.soft[aria-pressed='true'] { background: var(--bg-active); color: var(--text); }
+.unusual-list { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; margin-top: 8px; font-size: 12.5px; }
+.chord.unusual::after { content: ''; position: absolute; top: -1px; right: -3px; width: 5px; height: 5px; border-radius: 50%; background: var(--text-muted); }
+.bars .chord.unusual { text-decoration: underline dotted; }
+@media (max-width: 767px) {
+  .library-sort .select { min-height: 40px; font-size: 14px; }
+  .library-sort .icon-button { width: 40px; height: 40px; }
+  .hint-card .icon-button { width: 40px; height: 40px; }
+  .hint-card { padding-right: 44px; }
+}

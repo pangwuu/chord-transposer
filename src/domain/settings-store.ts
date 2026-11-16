@@ -20,6 +20,9 @@ export function settingsFrom(value: unknown): Settings {
   const panes = (typeof raw.panes === 'object' && raw.panes !== null ? raw.panes : {}) as Record<string, unknown>
   const width = <T,>(candidate: unknown, fallback: T) => (typeof candidate === 'number' && Number.isFinite(candidate) ? candidate : fallback)
   const flag = (candidate: unknown, fallback: boolean) => (typeof candidate === 'boolean' ? candidate : fallback)
+  const part = (candidate: unknown) => (typeof candidate === 'object' && candidate !== null ? candidate : {}) as Record<string, unknown>
+  const sort = part(raw.songSort)
+  const dismissed = part(raw.dismissed)
   return {
     theme: oneOf(raw.theme, ['system', 'light', 'dark'], defaults.theme),
     accent: oneOf(raw.accent, ACCENTS, defaults.accent),
@@ -35,6 +38,9 @@ export function settingsFrom(value: unknown): Settings {
       inspector: width(panes.inspector, defaults.panes.inspector),
       preview: width(panes.preview, defaults.panes.preview),
     },
+    songSort: { by: oneOf(sort.by, ['title', 'added', 'edited', 'key'], defaults.songSort.by), reverse: flag(sort.reverse, defaults.songSort.reverse) },
+    flagUnusual: flag(raw.flagUnusual, defaults.flagUnusual),
+    dismissed: { firstSong: flag(dismissed.firstSong, false), install: flag(dismissed.install, false) },
   }
 }
 

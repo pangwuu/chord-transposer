@@ -1,5 +1,6 @@
 import {
   DEFAULT_PREFS,
+  easyChord,
   formatKey,
   formatSymbol,
   nashville,
@@ -9,7 +10,7 @@ import {
   type SpellingPrefs,
 } from './chord'
 import { padCollisions } from './line-layout'
-import { displayedSong, performance, type BarItem, type Song } from './song'
+import { chordSummary, compactOrder, displayedSong, mapSymbols, performance, type BarItem, type Song } from './song'
 
 export type PdfContent = 'full' | 'chords' | 'lyrics'
 export type Paper = 'a4' | 'letter'
@@ -35,6 +36,10 @@ export type PdfOptions = {
   showColumnDivider?: boolean
   showSectionDivider?: boolean
   headingSize?: number
+  /** Print the plain major, minor, dim or aug chord in place of each chord. */
+  easyChords?: boolean
+  /** List the song's distinct chords under the header of its first page. */
+  showChords?: boolean
 }
 
 export type PdfChord = { label: string; index: number; invalid: boolean }
@@ -61,6 +66,8 @@ export type PdfPage = {
   meta: string
   capoLabel: string | null
   order: string | null
+  /** The distinct chords of the song, already wrapped into lines. First page only. */
+  chordsUsed: { label: string; invalid: boolean; index: number }[][] | null
   footerTitle: string
   cue: string
   pageLabel: string
@@ -90,11 +97,42 @@ export type SetlistChart = {
   song: Song
   capo: number
   concert: Key
+  /** The setlist entry's notes for this service, shown on the cover page. */
+  notes?: string
+}
+
+export type CoverColumn = { x: number; width: number }
+
+export type CoverRow = {
+  number: string
+  title: string[]
+  key: string[]
+  meter: string
+  notes: string[]
+  order: string
+  /** Distance from the top of the table body to the top of this row. */
+  top: number
+  height: number
+}
+
+/** One page of a setlist's running order. Rows are never split across pages. */
+export type CoverPage = {
+  width: number
+  height: number
+  /** The setlist name, or its name with "(cont.)" on later pages. */
+  heading: string
+  date: string | null
+  first: boolean
+  fontSize: number
+  lineHeight: number
+  columns: { number: CoverColumn; title: CoverColumn; key: CoverColumn; meter: CoverColumn | null; notes: CoverColumn; order: CoverColumn | null }
+  rows: CoverRow[]
 }
 
 export type SetlistSheet =
   | { kind: 'song'; layout: PdfDocument }
   | { kind: 'blank'; width: number; height: number }
+  | { kind: 'cover'; pages: CoverPage[] }
 
 export type SetlistLayout = {
   sheets: SetlistSheet[]
@@ -226,14 +264,46 @@ function headerMeta(song: Song, options: PdfOptions): string {
     .join('    ')
 }
 
-function headerReserve(song: Song, options: PdfOptions, first: boolean): number {
-  // Must match drawPage() in pdf-render: title 24 + artist 16 + meta 18 + order 14 + rule gap 16.
+/** Type size and line height of the chords-used strip, set in the monospaced chord face. */
+export const CHORD_STRIP_SIZE = 9
+export const CHORD_STRIP_LINE = 13
+
+function shownSong(song: Song, options: PdfOptions): Song {
+  const prefs = options.prefs ?? DEFAULT_PREFS
+  const played = displayedSong(song, options.concert, options.capo, prefs)
+  return options.easyChords ? mapSymbols(played, easyChord) : played
+}
+
+/** The chords-used strip, wrapped to the page. Empty when the option is off or the page prints no chords. */
+function chordStrip(song: Song, options: PdfOptions, width: number): { label: string; invalid: boolean; index: number }[][] {
+  if (!options.showChords || options.content === 'lyrics') return []
+  const prefs = options.prefs ?? DEFAULT_PREFS
+  const shapeKey = shiftKey(options.concert, -options.capo, prefs)
+  const chords = chordSummary(shownSong(song, options), (symbol) => symbolLabel(symbol, options.numbers, shapeKey))
+  const capacity = Math.floor((width - MARGIN * 2) / (CHORD_STRIP_SIZE * MONO))
+  const lines: { label: string; invalid: boolean; index: number }[][] = []
+  let cursor = 0
+  for (const chord of chords) {
+    const current = lines[lines.length - 1]
+    if (!current || (cursor > 0 && cursor + chord.label.length > capacity)) {
+      lines.push([{ ...chord, index: 0 }])
+      cursor = chord.label.length + 2
+    } else {
+      current.push({ ...chord, index: cursor })
+      cursor += chord.label.length + 2
+    }
+  }
+  return lines
+}
+
+function headerReserve(song: Song, options: PdfOptions, first: boolean, width: number): number {
+  // Must match drawPage() in pdf-render: title 24 + artist 16 + meta 18 + order 14 + chords used 13 a line + rule gap 16.
   if (!first) return 32
   const display = readDisplay(options)
   let reserve = 88
   if (!display.showArtist || !song.artist) reserve -= 16
   if (!headerMeta(song, options) && options.capo <= 0) reserve -= 18
-  return reserve
+  return reserve + chordStrip(song, options, width).length * CHORD_STRIP_LINE
 }
 
 function tag(blocks: UntaggedBlock[], column: PdfColumn): PdfBlock[] {
@@ -265,7 +335,7 @@ type Piece = { blocks: UntaggedBlock[] }
 function piecesFor(song: Song, options: PdfOptions): Piece[] {
   const prefs = options.prefs ?? DEFAULT_PREFS
   const shapeKey = shiftKey(options.concert, -options.capo, prefs)
-  const played = displayedSong(song, options.concert, options.capo, prefs)
+  const played = shownSong(song, options)
   return performance(song, options.repeats).map(
     ({ section, copies, pointer }) => {
       const source =
@@ -399,8 +469,8 @@ function layoutOnce(
       sectionLeadIn: display.sectionLeadIn,
       headingSize: display.headingSize,
     })
-  const firstInner = innerHeight(size.height, headerReserve(song, options, true))
-  const nextInner = innerHeight(size.height, headerReserve(song, options, false))
+  const firstInner = innerHeight(size.height, headerReserve(song, options, true, size.width))
+  const nextInner = innerHeight(size.height, headerReserve(song, options, false, size.width))
   const maxInner = Math.max(firstInner, nextInner)
   const pages: { blocks: PdfBlock[]; columnCount: 1 | 2 }[] = [
     { blocks: [], columnCount: 1 },
@@ -648,6 +718,7 @@ function stamp(
     .join(' · ')
   const display = readDisplay(options)
   const meta = headerMeta(song, options)
+  const strip = chordStrip(song, options, size.width)
   return {
     fontSize,
     columns,
@@ -686,6 +757,7 @@ function stamp(
         meta,
         capoLabel,
         order: index === 0 ? `Order: ${order}` : null,
+        chordsUsed: index === 0 && strip.length > 0 ? strip : null,
         footerTitle: display.showKey ? `${song.title} · Key ${keyName}` : song.title,
         cue,
         pageLabel: `${position}Page ${index + 1} of ${total}`,
@@ -698,10 +770,125 @@ function titleCase(label: string): string {
   return label.toLowerCase().replace(/\b\w/g, (letter) => letter.toUpperCase())
 }
 
+/** How wide a character of the cover's sans type is taken to be, per point. Erring wide keeps text inside its column. */
+const COVER_CHAR = 0.56
+const COVER_HEADING = 64
+const COVER_TABLE_HEAD = 20
+const COVER_ROW_PAD = 6
+
+function wrapWords(text: string, capacity: number): string[] {
+  const lines: string[] = []
+  let line = ''
+  for (const word of text.split(/\s+/).filter(Boolean)) {
+    let rest = word
+    // A single word longer than the column is broken rather than left to run over.
+    while (rest.length > capacity) {
+      if (line) lines.push(line)
+      lines.push(rest.slice(0, capacity))
+      rest = rest.slice(capacity)
+      line = ''
+    }
+    if (!line) line = rest
+    else if (line.length + 1 + rest.length <= capacity) line = `${line} ${rest}`
+    else {
+      lines.push(line)
+      line = rest
+    }
+  }
+  if (line) lines.push(line)
+  return lines.length > 0 ? lines : ['']
+}
+
+/**
+ * The running order of a setlist as one or more pages: number, title, key and capo, tempo and time,
+ * notes, and the arrangement where it fits. The type shrinks to 10 pt before a second page is used.
+ */
+export function layoutCover(
+  cover: { name: string; date: string },
+  entries: SetlistChart[],
+  options: Pick<PdfOptions, 'paper' | 'prefs'>,
+): CoverPage[] {
+  const size = pageSize(options.paper)
+  const prefs = options.prefs ?? DEFAULT_PREFS
+  const inner = size.width - MARGIN * 2
+  const meterOf = (song: Song) => [song.timeSignature?.trim(), song.tempo ? `${song.tempo} bpm` : ''].filter(Boolean).join(' · ')
+  const hasMeter = entries.some((entry) => meterOf(entry.song))
+  const orders = entries.map((entry) => compactOrder(entry.song))
+
+  const attempt = (fontSize: number, withOrder: boolean) => {
+    const chars = (width: number) => Math.max(4, Math.floor((width - 8) / (fontSize * COVER_CHAR)))
+    const number = { x: MARGIN, width: 24 }
+    // The key alone needs little room; "Capo 2 · G shapes" under it needs more.
+    const key = { x: 0, width: entries.some((entry) => entry.capo > 0) ? 108 : 44 }
+    const meter = hasMeter ? { x: 0, width: 84 } : null
+    const orderWidth = withOrder ? Math.min(150, Math.max(...orders.map((text) => text.length), 5) * fontSize * COVER_CHAR + 8) : 0
+    const flexible = inner - number.width - key.width - (meter?.width ?? 0) - orderWidth
+    const title = { x: number.x + number.width, width: Math.round(flexible * 0.46) }
+    key.x = title.x + title.width
+    if (meter) meter.x = key.x + key.width
+    const notes = { x: (meter ?? key).x + (meter ?? key).width, width: flexible - title.width }
+    const order = withOrder ? { x: notes.x + notes.width, width: orderWidth } : null
+    const orderFits = !order || orders.every((text) => text.length <= chars(order.width))
+    const lineHeight = Math.round(fontSize * 1.35)
+    const rows = entries.map((entry, index) => {
+      const concert = entry.concert
+      const shape = formatKey(shiftKey(concert, -entry.capo, prefs)).replace(/m$/, '')
+      const row = {
+        number: String(index + 1),
+        title: wrapWords(entry.song.title, chars(title.width)),
+        key: entry.capo > 0 ? [formatKey(concert), `Capo ${entry.capo} · ${shape} shapes`] : [formatKey(concert)],
+        meter: meterOf(entry.song),
+        notes: entry.notes?.trim() ? wrapWords(entry.notes.trim(), chars(notes.width)) : [],
+        order: withOrder ? orders[index] : '',
+        top: 0,
+        height: 0,
+      }
+      row.height = Math.max(row.title.length, row.key.length, row.notes.length, 1) * lineHeight + COVER_ROW_PAD
+      return row
+    })
+    return { fontSize, lineHeight, columns: { number, title, key, meter, notes, order }, rows, orderFits }
+  }
+
+  const room = (first: boolean) => size.height - MARGIN - FOOTER - (first ? COVER_HEADING : 32) - COVER_TABLE_HEAD
+  const fitsOnePage = (laid: ReturnType<typeof attempt>) => laid.rows.reduce((sum, row) => sum + row.height, 0) <= room(true)
+  const tries = [attempt(12, true), attempt(12, false), attempt(11, false), attempt(10, false)]
+  const chosen = tries.find((laid) => laid.orderFits && fitsOnePage(laid)) ?? tries[tries.length - 1]
+
+  const pages: CoverPage[] = []
+  const name = cover.name.trim() || 'Untitled setlist'
+  const open = () => {
+    const first = pages.length === 0
+    pages.push({
+      width: size.width,
+      height: size.height,
+      heading: first ? name : `${name} (cont.)`,
+      date: first && cover.date ? cover.date : null,
+      first,
+      fontSize: chosen.fontSize,
+      lineHeight: chosen.lineHeight,
+      columns: chosen.columns,
+      rows: [],
+    })
+  }
+  open()
+  let used = 0
+  for (const row of chosen.rows) {
+    const page = pages[pages.length - 1]
+    if (page.rows.length > 0 && used + row.height > room(page.first)) {
+      open()
+      used = 0
+    }
+    pages[pages.length - 1].rows.push({ ...row, top: used })
+    used += row.height
+  }
+  return pages
+}
+
 export function layoutSetlist(
   entries: SetlistChart[],
   options: Omit<PdfOptions, 'capo' | 'concert' | 'songPosition'>,
   rightHand: boolean,
+  cover?: { name: string; date: string },
 ): SetlistLayout {
   const layouts = entries.map((entry, index) =>
     layoutPdf(entry.song, {
@@ -712,6 +899,7 @@ export function layoutSetlist(
     }),
   )
   const sheets: SetlistSheet[] = []
+  if (cover && entries.length > 0) sheets.push({ kind: 'cover', pages: layoutCover(cover, entries, options) })
   layouts.forEach((layout, index) => {
     sheets.push({ kind: 'song', layout })
     const last = index === layouts.length - 1
@@ -727,7 +915,7 @@ export function layoutSetlist(
   })
   const pageCount = sheets.reduce(
     (sum, sheet) =>
-      sum + (sheet.kind === 'blank' ? 1 : sheet.layout.pages.length),
+      sum + (sheet.kind === 'blank' ? 1 : sheet.kind === 'cover' ? sheet.pages.length : sheet.layout.pages.length),
     0,
   )
   return { sheets, pageCount }

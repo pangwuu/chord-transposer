@@ -2,7 +2,7 @@
 
 **Status:** proposed, not built. When accepted, it replaces the **Sharing** bullet in `SPEC.md` §7, the "No accounts or cloud sync in v1" line in the `SPEC.md` header, and the IndexedDB storage line in `SPEC.md` §1.
 
-**Phase B is superseded** by `docs/adr/0001-band-sync-on-firestore.md` and GitHub issue #43: the cloud library is a band, joined with an invite link, with anonymous sign-in and no IndexedDB migration. Where §4 and §8 differ from those, they are history. Phases A and C are still proposed.
+**Phase B is superseded** by `docs/adr/0001-band-sync-on-firestore.md` and GitHub issue #43: the cloud library is a band, joined with an invite link, with anonymous sign-in and no IndexedDB migration. Where §4 and §8 differ from those, they are history. Phase A is dropped (§3). Phase C is still proposed.
 
 Terms (library, share link, setlist file, backup) are defined in `GLOSSARY.md`. "Library link" below is the old name for the invite link.
 
@@ -30,32 +30,16 @@ Each phase ships on its own and is useful without the next.
 
 | Phase | What changes | Server | Size |
 | --- | --- | --- | --- |
-| A. Compact links | Share links drop inner ids | None | Small; hours |
 | B. Cloud library | Library lives in Firestore, opened by a secret link, syncs live, works offline | Firebase (existing project) | Large; days |
 | C. Short share links | A setlist link becomes `#/s/<id>`, any size | Firestore, same project | Small once B exists |
 
-Phase A comes first whatever is decided about B. If B is rejected, C can still be built on Vercel Blob instead (§5).
+If B is rejected, C can still be built on Vercel Blob instead (§5).
 
 ---
 
-## 3. Phase A — Compact share links
+## 3. Phase A — Compact share links (dropped)
 
-### Behaviour
-- A new link format `3.` encodes a bundle with song ids and setlist ids kept, and section, line and chord placement ids left out.
-- Arrangement items refer to sections by position in the compact form, since section ids are gone.
-- On import, the app gives every section, line and chord placement a fresh id, then maps arrangement positions back to the new section ids.
-- Song id is kept so that importing the same song again updates it instead of duplicating it (`mergeBundle` already relies on this).
-- Links in format `1.` and `2.` still open. New links are always `3.`.
-- Shared files and backups keep the full shape with all ids; only links are compacted.
-- The 12,000 character cap stays. The "too large" message and the Download file fallback stay for anything that still goes over.
-
-### Expected result
-Roughly 1–3k characters per typical song, so about 5–8 songs per setlist link. That is an estimate from two charts; measure a real 6-song set before relying on it.
-
-### Acceptance
-- Round trip: `readShare(encode(bundle))` gives songs whose chords, chord positions, lyrics, arrangement order and named views equal the originals, ignoring inner ids.
-- A `1.` and a `2.` link made by the current code still import.
-- A test asserts a 5-song setlist built from realistic charts fits under the cap.
+Not built. A band shares its whole library through the invite link, so a setlist travels to bandmates without a share link. Share links stay in their current `1.`/`2.` formats.
 
 ---
 
@@ -144,8 +128,8 @@ Fixes setlist links for good, at any size, without giving away the whole library
 - A share is frozen: editing the setlist later does not change it. Sharing again makes a new link.
 - Shares expire after 30 days (Firestore TTL policy on an `expiresAt` field; check TTL is available on the plan in use).
 - Rules: create and get allowed, list, update and delete denied. Size-capped.
-- Offline or upload failed → fall back to the compact link from Phase A, then to the file.
-- Song links stay inline (Phase A) since one song fits.
+- Offline or upload failed → fall back to the inline link, then to the file.
+- Song links stay inline since one song fits.
 
 If Phase B is not adopted, the same feature runs on a Vercel serverless function plus Vercel Blob, keyed by a random id. Same behaviour, different store.
 
@@ -155,7 +139,7 @@ If Phase B is not adopted, the same feature runs on a Vercel serverless function
 
 | Option | What it gives | Why not chosen (or not alone) |
 | --- | --- | --- |
-| **Raise the link cap** | Bigger links with no work | Long links get cut by chat apps; failures are silent and confusing. Phase A gets most of the gain safely. |
+| **Raise the link cap** | Bigger links with no work | Long links get cut by chat apps; failures are silent and confusing. |
 | **Files only** (what exists today) | No server, works for any size | Clumsy on phones; every update means re-sending. Kept as the fallback. |
 | **Short-link store only** (Phase C alone, Vercel Blob) | Short links of any size, no accounts, an afternoon of work | Still copies: a chord fix never reaches the band, and laptop and phone still drift. Good if live sync is not wanted. |
 | **Firestore library beside IndexedDB** (two back ends) | Local-only use stays fully offline and Firebase-free | Two code paths, a library switcher, copy-between-libraries UI. More to build and test than it protects against for this app's users. |

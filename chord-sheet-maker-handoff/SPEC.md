@@ -109,6 +109,14 @@ type Chord = {
 ### 3.3 Nashville numbers
 - Optional display mode: chords shown as numbers relative to the current key (`1`, `4/6`, `5sus`, `b7`, `2m`). Toggle per view and in PDF export.
 
+### 3.4 Easy chords
+- Optional display mode for beginners: every chord is shown as the plain major, minor, `dim` or `aug` chord on the same root, with no bass note (`Cmaj7` → `C`, `Dsus4` → `D`, `Em7` → `Em`, `G/B` → `G`). `N.C.` and unrecognised chords are shown as written. Toggle in the editor, in stage view, and as a PDF export option.
+- Display only, like numbers: the stored chord never changes. The chord editor always opens on the real chord. It combines with transposing, capo shapes, accidentals and numbers.
+
+### 3.5 Chords unusual for the key
+- A soft pointer for spotting a misread import, never an error: chords outside the key's own chords, the common borrowed chords (♭III, ♭VI, ♭VII and iv in major; V in minor) and the secondary dominants II and III. Slash chords are judged by their chord. Each section is judged against the song's key.
+- Shown as a count beside the chord check in the editor and on import review. Opening it lists the chords and dots them in the chart. It can be turned off per device in Settings.
+
 ---
 
 ## 4. Editing (priority 2)
@@ -151,9 +159,11 @@ Editing works with mouse, keyboard, and touch. Every action is undoable (undo/re
 3. **ChordPro files** (`.cho`, `.chordpro`, `.chopro`, `.crd`).
 4. **PDF upload** (best effort): extract text with positions (pdf.js), rebuild chords-over-lyrics lines from x/y coordinates, then run importer 2.
 
-**Key and repeats:** a stated key is used; otherwise the key is guessed from all the chords and marked as guessed. Written with a capo, chords are treated as shapes: the song stores the sounding key and keeps a capo view of the shapes. A section written out again, or named with nothing under it, becomes another entry in the arrangement.
+**Key and repeats:** a stated key is used; otherwise the key is guessed from all the chords and marked as guessed. Written with a capo, chords are treated as shapes: the song stores the sounding key, and review opens at that capo to show the shapes as pasted. A section written out again, or named with nothing under it, becomes another entry in the arrangement.
 
 **Every import goes through a review screen before saving**: the rendered result side by side with the source text (on a phone, the chart fills the screen and the source is one tap away), a count of chords found, and any unparseable tokens highlighted. Headings, chords, title, artist and key can be fixed in review. Nothing that looks like a chord is ever discarded without being shown to the user.
+
+**Duplicates:** when the reviewed title matches a song already in the library (ignoring case, punctuation, extra spaces and a leading "The"), review offers **Replace it** or **Keep both**. Replace saves the import under the existing song's id, after a confirmation, so setlists keep pointing at it. Shared links keep their own "newer copy" flow.
 
 ---
 
@@ -188,17 +198,26 @@ The PDF must be readable at a distance on a music stand, with pages laid side by
 - Single song or a whole setlist as one PDF. For a setlist, each song starts on a new page.
 - File name: `Song Title - Key.pdf` (with `- Capo 4` when relevant); setlist: `Setlist Name - Date.pdf`.
 - Export options include **Accidentals** (Follow the key, Flats, Sharps). For a song it is the same setting as the editor's ♭/♯ toggle; for a setlist it applies to that export only. The export dialog warns, under the options, when any chord isn't recognised.
+- **Easy chords** (see 3.4) and **Chords used**, both off by default. Chords used lists the song's distinct chords, as displayed and in order of first appearance, under the header of page 1. It takes space like any header line and moves no chord.
+- Setlists only: **Cover page**, off by default. The PDF then starts with the running order: number, title, key (with capo and shapes), time and tempo, the entry's notes, and the arrangement in short form where it fits. The type shrinks to 10 pt before a second cover page is used, and a row is never split. Cover pages are not counted in any song's `Page X of Y`.
+- Where the device can share files, the export dialog has **Share** beside Download, sending the PDF to the system share sheet under the same file name. Closing the sheet is silent; a failure downloads the file instead.
 - The PDF is generated identically on phone and laptop (same layout engine, same fonts).
 
 ---
 
 ## 7. Other views (secondary)
 
-- **Stage view:** Quiet Chart reading mode — large text, dark mode, solid header (Exit / key / Speed / Autoscroll / Next section / Previous song / Next song (swipe left or right on touch) + transpose/Capo/accidentals/Nashville) that stays open until the eye hides it. The eye stays on screen; a closed eye leaves only that icon. The header sits above the title. In-flow section headings, chords over lyrics with wrap, screen wake lock; autoscroll default 0.8 in 0.1 steps; session-local controls (no save-back); uses the setlist order.
-- **Projector view:** lyrics only, large, one section per screen, arrow keys to advance.
-- **Setlists:** name, date, ordered songs, key and capo per song, notes; export as one PDF; step through on stage.
+- **Stage view:** Quiet Chart reading mode — large text, dark mode, solid header (Exit / key / Speed / Autoscroll / Next section / Previous song / Next song (swipe left or right on touch) + transpose/Capo/accidentals/Nashville) that stays open until the eye hides it. The eye stays on screen; a closed eye leaves only that icon. The header sits above the title. In-flow section headings, chords over lyrics with wrap, screen wake lock; autoscroll default 0.8 in 0.1 steps; session-local controls (no save-back); uses the setlist order. Page-turner pedals and keyboards: Page Down/Up and ↓/↑ turn sections, running on into the next or previous song; ←/→ change song. Keys typed into the header's pickers stay with the picker. Under the title: the chords used, then the setlist entry's notes, then the song's notes; the eye never hides them. Reopening the same song or setlist within three hours returns to the same song, section, key and capo, with a "Start from the top" button.
+- **Projector view:** lyrics only, large, one section per screen, arrow and page keys to advance. Opens for one song, or for a whole setlist in order.
+- **Setlists:** name, date, ordered songs, key and capo per song, notes; export as one PDF; step through on stage. A song is added by searching for it (title, artist or lyrics), or from the song's menu with Add to Setlist…, which keeps the key and capo the song is shown in. The Add song box lists the library in the song list's order, marks songs already in the setlist, and says when and in which key each was last played (read from past setlists; nothing extra is stored). **Copy running order** copies the setlist as text for the band chat.
+- **Song search** matches title, artist and lyrics; every word must appear somewhere. Title matches come first.
+- **Song list order:** Title (A to Z), Date added, Date edited (both newest first) or Key (C up to B, major before minor), each reversible. The choice is kept per device.
+- **Deleting** a song or a setlist happens at once with no confirmation; the message offers Undo for about 8 seconds, which restores it with the same id, and puts a song back into every setlist entry it was taken from. A message only has an Undo button when Undo takes back exactly what it says.
+- **Keyboard shortcuts:** `?` lists them all, as do the song menu and Settings. The list and the key handlers read one table, `src/ui/shortcuts.ts`.
+- **First launch:** while the library holds only the seeded demo songs, the song list shows one dismissible card pointing at pasting a chart.
+- **Installed app:** on iPhone Safari, outside the installed app, a one-time hint suggests Add to Home Screen, which keeps the browser's storage (and so the band membership) from being cleared. A new deploy takes over with a reload only when no edit is waiting to be saved and nobody is typing.
 - **Phone start screen:** a phone opens on the all-songs list. A share link that adds a new song opens that song in the editor instead.
-- **Sharing:** export a song or setlist as a file, and a share link that encodes the song in the URL (compressed). Opening the link imports an editable copy into the recipient's band (no account); later edits on either side do not travel. For view-only handoff, export a PDF instead. Proposed compact and short links are in `SHARING.md`.
+- **Sharing:** export a song or setlist as a file, and a share link that encodes the song in the URL (compressed). Opening the link imports an editable copy into the recipient's band (no account); later edits on either side do not travel. For view-only handoff, export a PDF instead. A proposed short link for big setlists is in `SHARING.md`.
 
 ---
 
@@ -206,9 +225,9 @@ The PDF must be readable at a distance on a music stand, with pages laid side by
 
 Preload Johnny's six charts. The chord placements are in the reference script (`rebuild_lyrics.py`) and PDFs attached alongside this spec:
 - Yet Not I But Through Christ In Me — C
-- Jerusalem — B (and a Capo 4, G shapes version as a saved view)
+- Jerusalem — B
 - Amazing Grace (My Chains Are Gone) — D
-- This I Believe (The Creed) — F (and E as a saved view)
+- This I Believe (The Creed) — F
 
 These must be private to Johnny's browser (lyrics are copyrighted), so ship them as an importable file rather than in a public page.
 
