@@ -350,6 +350,7 @@ const ADD_SONG_LIMIT = 300
  * A search box that finds songs by title, artist or lyrics, so a big library is never one long dropdown.
  * Focused with nothing typed, it lists the whole library in the song list's order. On a narrow screen the
  * list opens as a sheet from the top of the screen, sized to what the on-screen keyboard leaves visible.
+ * The sheet closes only with Done: iOS Safari blurs the box when a row is tapped, before the row's click.
  */
 function AddSongBox({
   songs,
@@ -410,7 +411,7 @@ function AddSongBox({
   }
 
   return (
-    <div ref={box} className={asSheet ? 'add-song is-sheet' : 'add-song'} onBlur={(event) => { if (!event.currentTarget.contains(event.relatedTarget)) setOpen(false) }}>
+    <div ref={box} className={asSheet ? 'add-song is-sheet' : 'add-song'} onBlur={(event) => { if (!sheet && !event.currentTarget.contains(event.relatedTarget)) setOpen(false) }}>
       <div className="add-song-bar">
         <input
           ref={input}

@@ -1,4 +1,4 @@
-import { cleanup, render, screen } from '@testing-library/react'
+import { cleanup, fireEvent, render, screen } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { parseKey } from '../domain/chord'
@@ -11,11 +11,11 @@ afterEach(() => {
   vi.restoreAllMocks()
 })
 
-function stubLayoutApis() {
+function stubLayoutApis({ phone = false } = {}) {
   Object.defineProperty(window, 'matchMedia', {
     writable: true,
     value: vi.fn().mockImplementation((query: string) => ({
-      matches: false,
+      matches: phone,
       media: query,
       onchange: null,
       addListener: vi.fn(),
@@ -195,6 +195,31 @@ describe('SetlistScreen Add song box', () => {
     await user.keyboard('{Escape}')
     expect(screen.queryByRole('option')).toBeNull()
     expect(box.getAttribute('aria-expanded')).toBe('false')
+  })
+})
+
+describe('SetlistScreen Add song sheet on a phone', () => {
+  const grace = emptySong({ id: 'grace', title: 'Amazing Grace', originalKey: parseKey('G') })
+  const light = emptySong({ id: 'light', title: 'First Light', originalKey: parseKey('D') })
+
+  it('keeps the sheet up when a tap takes focus off the box, as iOS Safari does, so songs can be added one after another', async () => {
+    const user = userEvent.setup()
+    stubLayoutApis({ phone: true })
+    let setlist = sunday()
+    const onChange = vi.fn((next: Setlist) => { setlist = next; view.rerender(screenFor()) })
+    const screenFor = () => (
+      <SetlistScreen songs={[grace, light]} setlists={[setlist]} openedId="set-1" onOpen={() => {}} onCreate={() => {}} onChange={onChange} onDelete={() => {}} onExport={() => {}} onShare={() => {}} onDownload={() => {}} onImport={() => {}} onStage={() => {}} onProject={() => {}} />
+    )
+    const view = render(screenFor())
+    const box = screen.getByRole('combobox', { name: 'Add a song' })
+    await user.click(box)
+    for (const title of ['Amazing Grace', 'First Light']) {
+      fireEvent.blur(box)
+      await user.click(screen.getByRole('option', { name: new RegExp(title) }))
+    }
+    expect(setlist.entries).toEqual([{ songId: 'grace' }, { songId: 'light' }])
+    await user.click(screen.getByRole('button', { name: 'Done' }))
+    expect(screen.queryByRole('listbox', { name: 'Songs' })).toBeNull()
   })
 })
 
