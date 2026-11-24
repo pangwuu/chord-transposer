@@ -1,4 +1,4 @@
-import { cleanup, render, screen } from '@testing-library/react'
+import { act, cleanup, fireEvent, render, screen } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { parseKey } from '../domain/chord'
@@ -178,6 +178,20 @@ describe('SetlistScreen Add song box', () => {
     await user.click(screen.getByRole('combobox', { name: 'Add a song' }))
     expect(screen.getByRole('option', { name: /Amazing Grace/ }).textContent).toMatch(/Last played .*3.* · A · Capo 2/)
     expect(screen.getByRole('option', { name: /First Light/ }).textContent).toContain('Not played yet')
+  })
+
+  it('adds a tapped song when iOS still sends mousedown after a cancelled pointerdown', async () => {
+    const user = userEvent.setup()
+    const { onChange } = renderBox()
+    const box = screen.getByRole('combobox', { name: 'Add a song' })
+    await user.click(box)
+    const option = screen.getByRole('option', { name: /Amazing Grace/ })
+    fireEvent.pointerDown(option, { pointerType: 'touch' })
+    const focusMoves = fireEvent.mouseDown(option)
+    if (focusMoves) act(() => box.blur())
+    fireEvent.click(option)
+    expect(onChange).toHaveBeenCalledWith(expect.objectContaining({ entries: [{ songId: 'grace' }] }))
+    expect(document.activeElement).toBe(box)
   })
 
   it('works from the keyboard alone: Tab in, type, arrows, Enter, and Escape closes', async () => {
