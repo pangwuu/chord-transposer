@@ -595,3 +595,6 @@ button { cursor: pointer; }
   .hint-card .icon-button { width: 40px; height: 40px; }
   .hint-card { padding-right: 44px; }
 }
+@media (pointer: coarse) {
+  input, textarea, select, .artist-input, input.section-label, .library-sort .select { font-size: 16px; }
+}

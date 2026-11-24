@@ -302,3 +302,19 @@ test('adds a cover page with the running order to a setlist PDF', async ({ page 
   await dialog.getByRole('button', { name: 'Download' }).click()
   expect((await download).suggestedFilename()).toBe('Sunday.pdf')
 })
+
+test('types into fields at 16px or more on a phone, so iOS does not zoom in on focus', async ({ page }, testInfo) => {
+  test.skip(testInfo.project.name !== 'mobile', 'iOS zooms only on touch screens')
+  const smallFields = () => page.locator('input:visible, textarea:visible, select:visible').evaluateAll((fields) =>
+    fields
+      .filter((field) => parseFloat(getComputedStyle(field).fontSize) < 16)
+      .map((field) => `${field.getAttribute('aria-label') ?? field.className}: ${getComputedStyle(field).fontSize}`),
+  )
+  await openFirstSong(page)
+  await expect(page.getByLabel('Verse 1 name')).toBeVisible()
+  expect(await smallFields()).toEqual([])
+  await nav(page, 'Setlists')
+  await page.getByRole('button', { name: '+ New setlist' }).click()
+  await expect(page.getByRole('combobox', { name: 'Add a song' })).toBeVisible()
+  expect(await smallFields()).toEqual([])
+})
