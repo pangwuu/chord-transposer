@@ -446,6 +446,7 @@ function AddSongBox({
               aria-selected={index === highlighted}
               className={index === highlighted ? 'add-song-option active' : 'add-song-option'}
               onPointerDown={(event) => event.preventDefault()}
+              onMouseDown={(event) => event.preventDefault()}
               onPointerEnter={() => setActive(index)}
               onClick={() => add(song)}
             >
